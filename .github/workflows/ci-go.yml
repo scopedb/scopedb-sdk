@@ -50,8 +50,6 @@ jobs:
       - name: Run tests
         run: make test
         working-directory: go
-        env:
-          SCOPEDB_ENDPOINT: http://localhost:6543
 
   required:
     name: Required
