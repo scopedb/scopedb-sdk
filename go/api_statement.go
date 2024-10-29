@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// statementAPI defines interfaces under /v1/statements.
 type statementAPI interface {
 	// submitStatement submits a statement to the ScopeDB server and returns the statement ID.
 	submitStatement(ctx context.Context, req *StatementRequest) (*StatementResponse, error)

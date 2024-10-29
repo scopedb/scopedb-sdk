@@ -7,6 +7,7 @@ import (
 	"net/url"
 )
 
+// ingestAPI defines interfaces under /v1/ingest.
 type ingestAPI interface {
 	// createIngestChannel creates a new ingest channel and returns the channel ID.
 	createIngestChannel(ctx context.Context, req *CreateIngestChannelRequest) (string, error)
