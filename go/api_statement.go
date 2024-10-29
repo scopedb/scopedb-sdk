@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 ScopeDB, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package scopedb
 
 import (
@@ -5,12 +21,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/apache/arrow/go/v17/arrow"
 	"io"
 	"net/url"
 	"time"
+
+	"github.com/apache/arrow/go/v17/arrow"
 )
 
+// statementAPI defines interfaces under /v1/statements.
 type statementAPI interface {
 	// submitStatement submits a statement to the ScopeDB server and returns the statement ID.
 	submitStatement(ctx context.Context, req *StatementRequest) (*StatementResponse, error)
@@ -22,10 +40,10 @@ var _ statementAPI = (*Connection)(nil)
 
 type StatementRequest struct {
 	// Statement is the ScopeQL statement to execute.
-	Statement string `json:"statement"`
+	Statement string `json:"statement,omitempty"`
 	// WaitTimeout is the maximum time to wait for the statement to finish.
 	// Possible values like "60s".
-	WaitTimeout string `json:"wait_timeout"`
+	WaitTimeout string `json:"wait_timeout,omitempty"`
 	// Format is the format of the result set.
 	Format ResultFormat `json:"format"`
 }
@@ -106,8 +124,10 @@ func NewResultSetFetcher(conn *Connection, params *FetchStatementParams) *Result
 	}
 }
 
-const defaultFetchTimeout = 60 * time.Second
-const defaultFetchInterval = 1 * time.Second
+const (
+	defaultFetchTimeout  = 60 * time.Second
+	defaultFetchInterval = 1 * time.Second
+)
 
 func (f *ResultSetFetcher) FetchResultSet(ctx context.Context) (*StatementResponse, error) {
 	deadline, ok := ctx.Deadline()
@@ -124,34 +144,38 @@ func (f *ResultSetFetcher) FetchResultSet(ctx context.Context) (*StatementRespon
 			return nil, ctx.Err()
 		case <-ticker.C:
 			if time.Now().After(deadline) {
-				msg := fmt.Sprintf("fetch result set timeout after after %v: %s", time.Since(deadline), f.fetchParams.StatementId)
-				return nil, errors.New(msg)
+				return nil, fmt.Errorf("fetch result set timeout after after %v: %s", time.Since(deadline), f.fetchParams.StatementId)
 			}
 
 			resp, err := f.conn.fetchStatementResult(ctx, f.fetchParams)
 			if err != nil {
 				return nil, err
 			}
-			if resp.Status != QueryStatusFinished {
+			switch resp.Status {
+			case QueryStatusStarted:
 				continue
+			case QueryStatusRunning:
+				continue
+			case QueryStatusFinished:
+				return resp, nil
 			}
-			return resp, nil
 		}
 	}
 }
 
-func (conn *Connection) submitStatement(ctx context.Context, req *StatementRequest) (*StatementResponse, error) {
-	url, err := url.Parse(conn.config.Endpoint + "/v1/statements")
+func (conn *Connection) submitStatement(ctx context.Context, request *StatementRequest) (*StatementResponse, error) {
+	req, err := url.Parse(conn.config.Endpoint + "/v1/statements")
 	if err != nil {
 		return nil, err
 	}
 
-	body, err := json.Marshal(req)
+	body, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := conn.http.Post(ctx, url, body)
+	resp, err := conn.http.Post(ctx, req, body)
+	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -168,16 +192,17 @@ func (conn *Connection) submitStatement(ctx context.Context, req *StatementReque
 	return &respData, err
 }
 
-func (conn *Connection) fetchStatementResult(ctx context.Context, fetchParams *FetchStatementParams) (*StatementResponse, error) {
-	url, err := url.Parse(conn.config.Endpoint + "/v1/statements/" + fetchParams.StatementId)
+func (conn *Connection) fetchStatementResult(ctx context.Context, params *FetchStatementParams) (*StatementResponse, error) {
+	req, err := url.Parse(conn.config.Endpoint + "/v1/statements/" + params.StatementId)
 	if err != nil {
 		return nil, err
 	}
-	q := url.Query()
-	q.Add("format", string(fetchParams.Format))
-	url.RawQuery = q.Encode()
+	q := req.Query()
+	q.Add("format", string(params.Format))
+	req.RawQuery = q.Encode()
 
-	resp, err := conn.http.Get(ctx, url)
+	resp, err := conn.http.Get(ctx, req)
+	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return nil, err
 	}

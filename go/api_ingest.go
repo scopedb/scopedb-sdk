@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 ScopeDB, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package scopedb
 
 import (
@@ -7,6 +23,7 @@ import (
 	"net/url"
 )
 
+// ingestAPI defines interfaces under /v1/ingest.
 type ingestAPI interface {
 	// createIngestChannel creates a new ingest channel and returns the channel ID.
 	createIngestChannel(ctx context.Context, req *CreateIngestChannelRequest) (string, error)
@@ -51,18 +68,19 @@ type IngestData struct {
 	Rows string `json:"rows"`
 }
 
-func (conn *Connection) createIngestChannel(ctx context.Context, req *CreateIngestChannelRequest) (string, error) {
-	url, err := url.Parse(conn.config.Endpoint + "/v1/ingest")
+func (conn *Connection) createIngestChannel(ctx context.Context, request *CreateIngestChannelRequest) (string, error) {
+	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest")
 	if err != nil {
 		return "", err
 	}
 
-	body, err := json.Marshal(req)
+	body, err := json.Marshal(request)
 	if err != nil {
 		return "", err
 	}
 
-	resp, err := conn.http.Post(ctx, url, body)
+	resp, err := conn.http.Post(ctx, req, body)
+	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -79,18 +97,19 @@ func (conn *Connection) createIngestChannel(ctx context.Context, req *CreateInge
 	return respData.Id, err
 }
 
-func (conn *Connection) ingestData(ctx context.Context, channel string, req *IngestDataRequest) error {
-	url, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel)
+func (conn *Connection) ingestData(ctx context.Context, channel string, request *IngestDataRequest) error {
+	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel)
 	if err != nil {
 		return err
 	}
 
-	body, err := json.Marshal(req)
+	body, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
 
-	resp, err := conn.http.Post(ctx, url, body)
+	resp, err := conn.http.Post(ctx, req, body)
+	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -101,12 +120,13 @@ func (conn *Connection) ingestData(ctx context.Context, channel string, req *Ing
 }
 
 func (conn *Connection) commitIngestChannel(ctx context.Context, channel string) error {
-	url, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel + "/commit")
+	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel + "/commit")
 	if err != nil {
 		return err
 	}
 
-	resp, err := conn.http.Post(ctx, url, nil)
+	resp, err := conn.http.Post(ctx, req, nil)
+	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return err
 	}
