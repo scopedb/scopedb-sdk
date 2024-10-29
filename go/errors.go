@@ -1,8 +1,8 @@
 package scopedb
 
 import (
-	"errors"
 	"fmt"
+	"io"
 )
 
 func checkStatusCodeOK(actual int) error {
@@ -11,14 +11,22 @@ func checkStatusCodeOK(actual int) error {
 
 func checkStatusCode(actual int, expected int) error {
 	if actual != expected {
-		return errors.New(fmt.Sprintf("unexpected status code: %d", actual))
+		return fmt.Errorf("unexpected status code: %d", actual)
 	}
 	return nil
 }
 
 func checkResultFormat(actual ResultFormat, expected ResultFormat) error {
 	if actual != expected {
-		return errors.New(fmt.Sprintf("unexpected result format: %s", actual))
+		return fmt.Errorf("unexpected result format: %s", actual)
 	}
 	return nil
+}
+
+// sneakyBodyClose closes the body and ignores the error.
+// This is useful to close the HTTP response body when we don't care about the error.
+func sneakyBodyClose(body io.ReadCloser) {
+	if body != nil {
+		_ = body.Close()
+	}
 }

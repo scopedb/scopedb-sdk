@@ -52,18 +52,19 @@ type IngestData struct {
 	Rows string `json:"rows"`
 }
 
-func (conn *Connection) createIngestChannel(ctx context.Context, req *CreateIngestChannelRequest) (string, error) {
-	url, err := url.Parse(conn.config.Endpoint + "/v1/ingest")
+func (conn *Connection) createIngestChannel(ctx context.Context, request *CreateIngestChannelRequest) (string, error) {
+	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest")
 	if err != nil {
 		return "", err
 	}
 
-	body, err := json.Marshal(req)
+	body, err := json.Marshal(request)
 	if err != nil {
 		return "", err
 	}
 
-	resp, err := conn.http.Post(ctx, url, body)
+	resp, err := conn.http.Post(ctx, req, body)
+	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -80,18 +81,19 @@ func (conn *Connection) createIngestChannel(ctx context.Context, req *CreateInge
 	return respData.Id, err
 }
 
-func (conn *Connection) ingestData(ctx context.Context, channel string, req *IngestDataRequest) error {
-	url, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel)
+func (conn *Connection) ingestData(ctx context.Context, channel string, request *IngestDataRequest) error {
+	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel)
 	if err != nil {
 		return err
 	}
 
-	body, err := json.Marshal(req)
+	body, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
 
-	resp, err := conn.http.Post(ctx, url, body)
+	resp, err := conn.http.Post(ctx, req, body)
+	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -102,12 +104,13 @@ func (conn *Connection) ingestData(ctx context.Context, channel string, req *Ing
 }
 
 func (conn *Connection) commitIngestChannel(ctx context.Context, channel string) error {
-	url, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel + "/commit")
+	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel + "/commit")
 	if err != nil {
 		return err
 	}
 
-	resp, err := conn.http.Post(ctx, url, nil)
+	resp, err := conn.http.Post(ctx, req, nil)
+	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return err
 	}

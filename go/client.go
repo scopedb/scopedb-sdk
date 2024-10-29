@@ -9,7 +9,7 @@ import (
 
 // HTTPClient is the interface for HTTP client.
 type HTTPClient interface {
-	// Get sends a GET request to the ScoepDB server.
+	// Get sends a GET request to the ScopeDB server.
 	Get(context.Context, *url.URL) (*http.Response, error)
 	// Post sends a POST request to the ScopeDB server.
 	Post(context.Context, *url.URL, []byte) (*http.Response, error)
