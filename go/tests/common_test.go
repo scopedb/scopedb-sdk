@@ -3,13 +3,14 @@ package tests
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/apache/arrow/go/v17/arrow"
 	"github.com/apache/arrow/go/v17/arrow/array"
 	"github.com/apache/arrow/go/v17/arrow/memory"
 	"github.com/gkampitakis/go-snaps/snaps"
 	scopedb "github.com/scopedb/scopedb-sdk/go/v0"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestReadAfterWrite(t *testing.T) {

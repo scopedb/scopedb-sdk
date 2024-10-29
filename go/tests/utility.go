@@ -2,10 +2,11 @@ package tests
 
 import (
 	"context"
-	"github.com/lucasepe/codename"
-	scopedb "github.com/scopedb/scopedb-sdk/go/v0"
 	"os"
 	"strings"
+
+	"github.com/lucasepe/codename"
+	scopedb "github.com/scopedb/scopedb-sdk/go/v0"
 )
 
 // LoadConfig loads the configuration from environment variables.
