@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"github.com/lucasepe/codename"
 	scopedb "github.com/scopedb/scopedb-sdk/go/v0"
 	"os"
@@ -25,4 +26,11 @@ func GenerateTableName() (string, error) {
 	}
 	tableName := strings.ReplaceAll(codename.Generate(rng, 10), "-", "_")
 	return tableName, nil
+}
+
+func DropTable(ctx context.Context, conn *scopedb.Connection, tableName string) error {
+	return conn.Execute(ctx, &scopedb.StatementRequest{
+		Statement: "drop table " + tableName,
+		Format:    scopedb.ArrowJSONFormat,
+	})
 }

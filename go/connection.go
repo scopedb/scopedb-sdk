@@ -18,7 +18,6 @@ package scopedb
 
 import (
 	"context"
-
 	"github.com/apache/arrow/go/v17/arrow"
 )
 

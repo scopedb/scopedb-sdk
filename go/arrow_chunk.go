@@ -31,17 +31,11 @@ func encodeRecordBatches(batches []arrow.Record) (payload []byte, err error) {
 		return nil, errors.New("cannot ingest empty batches")
 	}
 
+	schema := batches[0].Schema()
+
 	var buf bytes.Buffer
 	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
-	defer func() {
-		err = errors.Join(err, encoder.Close())
-	}()
-
-	schema := batches[0].Schema()
 	writer := ipc.NewWriter(encoder, ipc.WithSchema(schema))
-	defer func() {
-		err = errors.Join(err, writer.Close())
-	}()
 
 	for _, batch := range batches {
 		if err := writer.Write(batch); err != nil {
@@ -49,6 +43,12 @@ func encodeRecordBatches(batches []arrow.Record) (payload []byte, err error) {
 		}
 	}
 
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+	if err := encoder.Close(); err != nil {
+		return nil, err
+	}
 	return buf.Bytes(), nil
 }
 
