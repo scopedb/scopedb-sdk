@@ -22,13 +22,13 @@ build:
 test:
 	$(GO) test -v ./...
 
-tools/bin/golangci-lint:
+dev/bin/golangci-lint:
 	# Build from source is not recommend. See https://golangci-lint.run/usage/install/
-	GOBIN=$(shell pwd)/tools/bin $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+	GOBIN=$(shell pwd)/dev/bin $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
 
 .PHONY: check-static
-check-static: tools/bin/golangci-lint
-	GO111MODULE=on CGO_ENABLED=0 tools/bin/golangci-lint run -v
+check-static: dev/bin/golangci-lint
+	GO111MODULE=on CGO_ENABLED=0 dev/bin/golangci-lint run -v
 
 .PHONY: check-mod-tidy
 check-mod-tidy:

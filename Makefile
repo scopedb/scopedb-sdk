@@ -15,10 +15,14 @@
 .PHONY: check
 check: check-license
 
+.PHONY: download-hawkeye
+download-hawkeye:
+	dev/download-hawkeye.sh
+
 .PHONY: check-license
-check-license:
-	cargo binstall hawkeye && hawkeye check
+check-license: download-hawkeye
+	hawkeye check
 
 .PHONY: fmt-license
-fmt-license:
-	cargo binstall hawkeye && hawkeye format
+fmt-license: download-hawkeye
+	hawkeye format
