@@ -12,31 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The pull request's title should be fulfilled the following pattern:
-#
-#     <type>[optional scope]: <description>
-#
-# ... where valid types and scopes can be found below; for example:
-#
-#     build(maven): One level down for native profile
-#
-# More about configurations on https://github.com/Ezard/semantic-prs#configuration
+GO := GO111MODULE=on go
 
-enabled: true
+.PHONY: build
+build:
+	$(GO) build ./...
 
-titleOnly: true
+.PHONY: test
+test:
+	$(GO) test -v ./...
 
-types:
-  - feat
-  - fix
-  - docs
-  - style
-  - refactor
-  - perf
-  - test
-  - build
-  - ci
-  - chore
-  - revert
+tools/bin/golangci-lint:
+	# Build from source is not recommend. See https://golangci-lint.run/usage/install/
+	GOBIN=$(shell pwd)/tools/bin $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
 
-targetUrl: https://github.com/scopedb/scopedb-sdk/blob/main/.github/semantic.yml
+.PHONY: check-static
+check-static: tools/bin/golangci-lint
+	GO111MODULE=on CGO_ENABLED=0 tools/bin/golangci-lint run -v
+
+.PHONY: check-mod-tidy
+check-mod-tidy:
+	$(GO) mod tidy
+	git diff --exit-code go.sum
+
+.PHONY: check
+check: check-mod-tidy check-static

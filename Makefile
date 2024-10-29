@@ -12,31 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The pull request's title should be fulfilled the following pattern:
-#
-#     <type>[optional scope]: <description>
-#
-# ... where valid types and scopes can be found below; for example:
-#
-#     build(maven): One level down for native profile
-#
-# More about configurations on https://github.com/Ezard/semantic-prs#configuration
+.PHONY: check
+check: check-license
 
-enabled: true
+.PHONY: check-license
+check-license:
+	cargo binstall hawkeye && hawkeye check
 
-titleOnly: true
-
-types:
-  - feat
-  - fix
-  - docs
-  - style
-  - refactor
-  - perf
-  - test
-  - build
-  - ci
-  - chore
-  - revert
-
-targetUrl: https://github.com/scopedb/scopedb-sdk/blob/main/.github/semantic.yml
+.PHONY: fmt-license
+fmt-license:
+	cargo binstall hawkeye && hawkeye format

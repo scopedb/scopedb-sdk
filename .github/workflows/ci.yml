@@ -12,31 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The pull request's title should be fulfilled the following pattern:
-#
-#     <type>[optional scope]: <description>
-#
-# ... where valid types and scopes can be found below; for example:
-#
-#     build(maven): One level down for native profile
-#
-# More about configurations on https://github.com/Ezard/semantic-prs#configuration
+name: CI
+on:
+  pull_request:
+    branches: [ main ]
 
-enabled: true
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.number || github.run_id }}
+  cancel-in-progress: true
 
-titleOnly: true
-
-types:
-  - feat
-  - fix
-  - docs
-  - style
-  - refactor
-  - perf
-  - test
-  - build
-  - ci
-  - chore
-  - revert
-
-targetUrl: https://github.com/scopedb/scopedb-sdk/blob/main/.github/semantic.yml
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: make check
