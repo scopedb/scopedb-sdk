@@ -29,8 +29,10 @@ type ingestAPI interface {
 	createIngestChannel(ctx context.Context, req *CreateIngestChannelRequest) (string, error)
 	// ingestData ingests data into the specified channel.
 	ingestData(ctx context.Context, channel string, req *IngestDataRequest) error
-	// commitIngestChannel commits the specified ingest channel.
-	commitIngestChannel(ctx context.Context, channel string) error
+	// commitIngest commits the specified ingest channel.
+	commitIngest(ctx context.Context, channel string) error
+	// abortIngest aborts the specified ingest channel.
+	abortIngest(ctx context.Context, channel string) error
 }
 
 var _ ingestAPI = (*Connection)(nil)
@@ -119,8 +121,22 @@ func (conn *Connection) ingestData(ctx context.Context, channel string, request 
 	return nil
 }
 
-func (conn *Connection) commitIngestChannel(ctx context.Context, channel string) error {
+func (conn *Connection) commitIngest(ctx context.Context, channel string) error {
 	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel + "/commit")
+	if err != nil {
+		return err
+	}
+
+	resp, err := conn.http.Post(ctx, req, nil)
+	defer sneakyBodyClose(resp.Body)
+	if err != nil {
+		return err
+	}
+	return checkStatusCodeOK(resp.StatusCode)
+}
+
+func (conn *Connection) abortIngest(ctx context.Context, channel string) error {
+	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel + "/abort")
 	if err != nil {
 		return err
 	}

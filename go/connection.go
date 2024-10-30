@@ -66,9 +66,14 @@ func (conn *Connection) IngestData(ctx context.Context, channel string, batches 
 	return conn.ingestData(ctx, channel, req)
 }
 
-// CommitIngestChannel commits the specified ingest channel.
-func (conn *Connection) CommitIngestChannel(ctx context.Context, channel string) error {
-	return conn.commitIngestChannel(ctx, channel)
+// CommitIngest commits the specified ingest channel.
+func (conn *Connection) CommitIngest(ctx context.Context, channel string) error {
+	return conn.commitIngest(ctx, channel)
+}
+
+// AbortIngest aborts the specified ingest channel.
+func (conn *Connection) AbortIngest(ctx context.Context, channel string) error {
+	return conn.abortIngest(ctx, channel)
 }
 
 // Execute submits a statement to the server, waits for it to finish, and ignores the result.

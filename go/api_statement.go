@@ -40,7 +40,7 @@ var _ statementAPI = (*Connection)(nil)
 
 type StatementRequest struct {
 	// Statement is the ScopeQL statement to execute.
-	Statement string `json:"statement,omitempty"`
+	Statement string `json:"statement"`
 	// WaitTimeout is the maximum time to wait for the statement to finish.
 	// Possible values like "60s".
 	WaitTimeout string `json:"wait_timeout,omitempty"`

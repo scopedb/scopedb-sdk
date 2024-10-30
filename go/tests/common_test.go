@@ -70,7 +70,7 @@ with (
 	ingestId, err := conn.CreateIngestChannel(ctx, "scopedb", "public", tableName, nil)
 	require.NoError(t, err)
 	require.NoError(t, conn.IngestData(ctx, ingestId, records))
-	require.NoError(t, conn.CommitIngestChannel(ctx, ingestId))
+	require.NoError(t, conn.CommitIngest(ctx, ingestId))
 
 	statement = fmt.Sprintf("from %s", tableName)
 	rs, err := conn.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
@@ -100,7 +100,7 @@ with (
 	ingestId, err = conn.CreateIngestChannel(ctx, "scopedb", "public", tableName, mergeOptions)
 	require.NoError(t, err)
 	require.NoError(t, conn.IngestData(ctx, ingestId, mergeRecords))
-	require.NoError(t, conn.CommitIngestChannel(ctx, ingestId))
+	require.NoError(t, conn.CommitIngest(ctx, ingestId))
 
 	rs, err = conn.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
 		Statement: statement,
