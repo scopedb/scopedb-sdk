@@ -34,22 +34,28 @@ func encodeRecordBatches(batches []arrow.Record) (payload []byte, err error) {
 	schema := batches[0].Schema()
 
 	var buf bytes.Buffer
+	defer func() {
+		if err == nil {
+			payload = buf.Bytes()
+		}
+	}()
+
 	encoder := base64.NewEncoder(base64.StdEncoding, &buf)
+	defer func() {
+		err = errors.Join(err, encoder.Close())
+	}()
+
 	writer := ipc.NewWriter(encoder, ipc.WithSchema(schema))
+	defer func() {
+		err = errors.Join(err, writer.Close())
+	}()
 
 	for _, batch := range batches {
 		if err := writer.Write(batch); err != nil {
 			return nil, err
 		}
 	}
-
-	if err := writer.Close(); err != nil {
-		return nil, err
-	}
-	if err := encoder.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return
 }
 
 // decodeRecordBatches decodes the given base64 encoded byte slice into record batches.

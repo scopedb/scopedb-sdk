@@ -13,7 +13,7 @@
 # limitations under the License.
 
 [server.meta]
-service_url = "postgres://scopedb:my_secret_password@localhost:5432/scopedb_meta"
+service_url = "postgres://scopedb:my_secret_password@postgres:5432/scopedb_meta"
 
 [server.http]
 listen_addr = "0.0.0.0:6543"

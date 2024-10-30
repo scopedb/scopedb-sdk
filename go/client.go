@@ -35,15 +35,14 @@ type httpClient struct {
 	client *http.Client
 }
 
+var _ HTTPClient = (*httpClient)(nil)
+
 // NewHTTPClient creates a new internal HTTP client.
 func NewHTTPClient() HTTPClient {
 	return &httpClient{
 		client: http.DefaultClient,
 	}
 }
-
-// Ensure httpClient implements HTTPClient.
-var _ HTTPClient = (*httpClient)(nil)
 
 func (c *httpClient) Get(ctx context.Context, u *url.URL) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)

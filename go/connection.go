@@ -93,6 +93,17 @@ func (conn *Connection) Execute(ctx context.Context, req *StatementRequest) erro
 	return err
 }
 
+// SubmitQuery submits a query to the server and returns immediately.
+// The Status of the returned StatementResponse may be QueryStatusFinished if the query is finished immediately.
+// If so, the result set is in ArrowJSONFormat. Otherwise, you can fetch the result set by NewResultSetFetcher
+// and calling 'FetchResultSet'.
+func (conn *Connection) SubmitQuery(ctx context.Context, statement string) (*StatementResponse, error) {
+	return conn.submitStatement(ctx, &StatementRequest{
+		Statement: statement,
+		Format:    ArrowJSONFormat,
+	})
+}
+
 // QueryAsArrowBatch submits a query to the server and returns the result set as Arrow's record batches.
 func (conn *Connection) QueryAsArrowBatch(ctx context.Context, req *StatementRequest) (*ArrowResultSet, error) {
 	if err := checkResultFormat(req.Format, ArrowJSONFormat); err != nil {
