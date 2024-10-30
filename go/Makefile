@@ -22,6 +22,10 @@ build:
 test:
 	$(GO) test -v ./...
 
+.PHONY: ci-test
+ci-test:
+	SCOPEDB_ENDPOINT=http://localhost:6543 $(GO) test -v ./...
+
 dev/bin/golangci-lint:
 	# Build from source is not recommend. See https://golangci-lint.run/usage/install/
 	GOBIN=$(shell pwd)/dev/bin $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0

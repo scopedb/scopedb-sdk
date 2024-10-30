@@ -47,7 +47,22 @@ jobs:
           go-version: stable
       - run: make build
         working-directory: go
+      - name: Login to GitHub Container Registry
+        if: ${{ github.repository == 'scopedb/scopedb-sdk' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.CI_GITHUB_ACTOR }}
+          password: ${{ secrets.CI_GITHUB_TOKEN }}
+      - name: Prepare Composed Environment
+        if: ${{ github.repository == 'scopedb/scopedb-sdk' }}
+        run: docker compose -f ./dev/docker-compose.yml up -d
+      - name: Run full tests
+        if: ${{ github.repository == 'scopedb/scopedb-sdk' }}
+        run: make ci-test
+        working-directory: go
       - name: Run tests
+        if: ${{ github.repository != 'scopedb/scopedb-sdk' }}
         run: make test
         working-directory: go
 
