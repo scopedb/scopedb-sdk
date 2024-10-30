@@ -175,10 +175,10 @@ func (conn *Connection) submitStatement(ctx context.Context, request *StatementR
 	}
 
 	resp, err := conn.http.Post(ctx, req, body)
-	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return nil, err
 	}
+	defer sneakyBodyClose(resp.Body)
 	if err := checkStatusCodeOK(resp); err != nil {
 		return nil, err
 	}
@@ -202,10 +202,10 @@ func (conn *Connection) fetchStatementResult(ctx context.Context, params *FetchS
 	req.RawQuery = q.Encode()
 
 	resp, err := conn.http.Get(ctx, req)
-	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return nil, err
 	}
+	defer sneakyBodyClose(resp.Body)
 	if err := checkStatusCodeOK(resp); err != nil {
 		return nil, err
 	}

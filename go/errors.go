@@ -17,10 +17,21 @@
 package scopedb
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 )
+
+// Error represents an error response from the ScopeDB server.
+type Error struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("%s: %s", e.Code, e.Message)
+}
 
 func checkStatusCodeOK(resp *http.Response) error {
 	return checkStatusCode(resp, 200)
@@ -35,7 +46,12 @@ func checkStatusCode(resp *http.Response, expected int) error {
 	if err != nil {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
-	return fmt.Errorf("unexpected status code: %d, message: %s", resp.StatusCode, string(data))
+	var errResp Error
+	err = json.Unmarshal(data, &errResp)
+	if err != nil {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	return &errResp
 }
 
 func checkResultFormat(actual ResultFormat, expected ResultFormat) error {

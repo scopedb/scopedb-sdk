@@ -82,10 +82,10 @@ func (conn *Connection) createIngestChannel(ctx context.Context, request *Create
 	}
 
 	resp, err := conn.http.Post(ctx, req, body)
-	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return "", err
 	}
+	defer sneakyBodyClose(resp.Body)
 	if err := checkStatusCodeOK(resp); err != nil {
 		return "", err
 	}
@@ -111,10 +111,10 @@ func (conn *Connection) ingestData(ctx context.Context, channel string, request 
 	}
 
 	resp, err := conn.http.Post(ctx, req, body)
-	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return err
 	}
+	defer sneakyBodyClose(resp.Body)
 	if err := checkStatusCodeOK(resp); err != nil {
 		return err
 	}
@@ -128,10 +128,10 @@ func (conn *Connection) commitIngest(ctx context.Context, channel string) error 
 	}
 
 	resp, err := conn.http.Post(ctx, req, nil)
-	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return err
 	}
+	defer sneakyBodyClose(resp.Body)
 	return checkStatusCodeOK(resp)
 }
 
@@ -142,9 +142,9 @@ func (conn *Connection) abortIngest(ctx context.Context, channel string) error {
 	}
 
 	resp, err := conn.http.Post(ctx, req, nil)
-	defer sneakyBodyClose(resp.Body)
 	if err != nil {
 		return err
 	}
+	defer sneakyBodyClose(resp.Body)
 	return checkStatusCodeOK(resp)
 }
