@@ -179,7 +179,7 @@ func (conn *Connection) submitStatement(ctx context.Context, request *StatementR
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStatusCodeOK(resp.StatusCode); err != nil {
+	if err := checkStatusCodeOK(resp); err != nil {
 		return nil, err
 	}
 
@@ -206,7 +206,7 @@ func (conn *Connection) fetchStatementResult(ctx context.Context, params *FetchS
 	if err != nil {
 		return nil, err
 	}
-	if err := checkStatusCodeOK(resp.StatusCode); err != nil {
+	if err := checkStatusCodeOK(resp); err != nil {
 		return nil, err
 	}
 

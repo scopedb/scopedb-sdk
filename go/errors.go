@@ -19,17 +19,23 @@ package scopedb
 import (
 	"fmt"
 	"io"
+	"net/http"
 )
 
-func checkStatusCodeOK(actual int) error {
-	return checkStatusCode(actual, 200)
+func checkStatusCodeOK(resp *http.Response) error {
+	return checkStatusCode(resp, 200)
 }
 
-func checkStatusCode(actual int, expected int) error {
-	if actual != expected {
-		return fmt.Errorf("unexpected status code: %d", actual)
+func checkStatusCode(resp *http.Response, expected int) error {
+	if resp.StatusCode == expected {
+		return nil
 	}
-	return nil
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	return fmt.Errorf("unexpected status code: %d, message: %s", resp.StatusCode, string(data))
 }
 
 func checkResultFormat(actual ResultFormat, expected ResultFormat) error {

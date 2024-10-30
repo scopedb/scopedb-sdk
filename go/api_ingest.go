@@ -86,7 +86,7 @@ func (conn *Connection) createIngestChannel(ctx context.Context, request *Create
 	if err != nil {
 		return "", err
 	}
-	if err := checkStatusCodeOK(resp.StatusCode); err != nil {
+	if err := checkStatusCodeOK(resp); err != nil {
 		return "", err
 	}
 
@@ -115,7 +115,7 @@ func (conn *Connection) ingestData(ctx context.Context, channel string, request 
 	if err != nil {
 		return err
 	}
-	if err := checkStatusCodeOK(resp.StatusCode); err != nil {
+	if err := checkStatusCodeOK(resp); err != nil {
 		return err
 	}
 	return nil
@@ -132,7 +132,7 @@ func (conn *Connection) commitIngest(ctx context.Context, channel string) error 
 	if err != nil {
 		return err
 	}
-	return checkStatusCodeOK(resp.StatusCode)
+	return checkStatusCodeOK(resp)
 }
 
 func (conn *Connection) abortIngest(ctx context.Context, channel string) error {
@@ -146,5 +146,5 @@ func (conn *Connection) abortIngest(ctx context.Context, channel string) error {
 	if err != nil {
 		return err
 	}
-	return checkStatusCodeOK(resp.StatusCode)
+	return checkStatusCodeOK(resp)
 }
