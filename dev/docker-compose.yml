@@ -45,6 +45,7 @@ services:
 
   scopedb:
     image: ghcr.io/scopedb/scopedb:edge
+    pull_policy: always
     depends_on:
       minio-server:
         condition: service_healthy

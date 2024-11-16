@@ -22,9 +22,10 @@ listen_addr = "0.0.0.0:6543"
 listen_addr = "0.0.0.0:6789"
 
 [server.default_storage]
-scheme = "s3"
+type = "s3"
 
 bucket = "test-bucket"
+prefix = "/"
 region = "us-east-1"
 endpoint = "http://minio-server:9000"
 access_key_id = "minioadmin"
@@ -37,16 +38,6 @@ max_files = 64
 
 [telemetry.log.stderr]
 filter = "INFO"
-
-[telemetry.log.opentelemetry]
-filter = "INFO"
-otlp_endpoint = "http://127.0.0.1:4317"
-
-[telemetry.trace]
-capture_log_filter = "INFO"
-
-[telemetry.trace.opentelemetry]
-otlp_endpoint = "http://127.0.0.1:4317"
 
 [runtime]
 api_runtime_threads = 1
