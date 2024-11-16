@@ -21,6 +21,15 @@ listen_addr = "0.0.0.0:6543"
 [server.internal]
 listen_addr = "0.0.0.0:6789"
 
+[server.default_storage]
+scheme = "s3"
+
+bucket = "test-bucket"
+region = "us-east-1"
+endpoint = "http://minio-server:9000"
+access_key_id = "minioadmin"
+secret_access_key = "minioadmin"
+
 [telemetry.log.file]
 filter = "INFO"
 dir = "logs"
