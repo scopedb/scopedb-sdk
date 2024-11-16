@@ -43,17 +43,7 @@ func TestReadAfterWrite(t *testing.T) {
 
 	conn := scopedb.Open(config)
 
-	statement := fmt.Sprintf(`
-create table %s (a int, v variant)
-with (
-	'storage.type' = 's3',
-	'storage.endpoint'='http://minio-server:9000',
-	'storage.bucket'='test-bucket',
-	'storage.region'='us-east-1',
-	'storage.access_key_id' = 'minioadmin',
-	'storage.secret_access_key' = 'minioadmin',
-);
-`, tableName)
+	statement := fmt.Sprintf("create table %s (a int, v variant)", tableName)
 	err = conn.Execute(ctx, &scopedb.StatementRequest{
 		Statement: statement,
 		Format:    scopedb.ArrowJSONFormat,
