@@ -22,7 +22,7 @@ import (
 	"github.com/apache/arrow/go/v17/arrow"
 	"github.com/apache/arrow/go/v17/arrow/array"
 	"github.com/apache/arrow/go/v17/arrow/memory"
-	scopedb "github.com/scopedb/scopedb-sdk/go/v0"
+	scopedb "github.com/scopedb/scopedb-sdk/go"
 )
 
 // prepareData creates a slice of arrow.Record

@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/lucasepe/codename"
-	scopedb "github.com/scopedb/scopedb-sdk/go/v0"
+	scopedb "github.com/scopedb/scopedb-sdk/go"
 )
 
 // LoadConfig loads the configuration from environment variables.

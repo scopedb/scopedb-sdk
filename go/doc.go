@@ -14,30 +14,7 @@
  * limitations under the License.
  */
 
-package main
-
-import (
-	"context"
-	"fmt"
-	scopedb "github.com/scopedb/scopedb-sdk/go"
-)
-
-func main() {
-	conn := scopedb.Open(&scopedb.Config{
-		Endpoint: "http://localhost:6543",
-	})
-
-	// Query data from ScopeDB
-	resultSet, err := conn.QueryAsArrowBatch(context.Background(), &scopedb.StatementRequest{
-		Statement:   "read information_schema.tables",
-		WaitTimeout: "60s",
-		Format:      scopedb.ArrowJSONFormat,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("%v\n", resultSet.StatementId)
-	fmt.Printf("%v\n", resultSet.Metadata)
-	fmt.Printf("%v\n", resultSet.Records)
-}
+/*
+Package scopedb provides a lightweight and easy-to-use client for interacting with a ScopeDB cluster.
+*/
+package scopedb
