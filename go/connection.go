@@ -18,8 +18,6 @@ package scopedb
 
 import (
 	"context"
-
-	"github.com/apache/arrow/go/v17/arrow"
 )
 
 type Connection struct {
@@ -33,47 +31,6 @@ func Open(config *Config) *Connection {
 		config: config,
 		http:   NewHTTPClient(),
 	}
-}
-
-// CreateIngestChannel creates a new ingest channel and returns the channel ID.
-func (conn *Connection) CreateIngestChannel(
-	ctx context.Context,
-	database string,
-	schema string,
-	table string,
-	merge *MergeOption,
-) (string, error) {
-	req := &CreateIngestChannelRequest{
-		Database: database,
-		Schema:   schema,
-		Table:    table,
-		Merge:    merge,
-	}
-	return conn.createIngestChannel(ctx, req)
-}
-
-// IngestData ingests data into the specified channel.
-func (conn *Connection) IngestData(ctx context.Context, channel string, batches []arrow.Record) error {
-	rows, err := encodeRecordBatches(batches)
-	if err != nil {
-		return err
-	}
-	req := &IngestDataRequest{
-		Data: &IngestData{
-			Rows: string(rows),
-		},
-	}
-	return conn.ingestData(ctx, channel, req)
-}
-
-// CommitIngest commits the specified ingest channel.
-func (conn *Connection) CommitIngest(ctx context.Context, channel string) error {
-	return conn.commitIngest(ctx, channel)
-}
-
-// AbortIngest aborts the specified ingest channel.
-func (conn *Connection) AbortIngest(ctx context.Context, channel string) error {
-	return conn.abortIngest(ctx, channel)
 }
 
 // Execute submits a statement to the server, waits for it to finish, and ignores the result.
