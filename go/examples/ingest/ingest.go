@@ -52,26 +52,21 @@ func ingest(data []arrow.Record) error {
 		Endpoint: "http://localhost:6543",
 	})
 
-	// Create an ingest channel
-	ingestId, err := conn.CreateIngestChannel(
-		context.Background(),
-		"database",
-		"schema",
-		"table",
-		nil,
-	)
+	ctx := context.Background()
 
+	// Create an ingest channel
+	ingester, err := scopedb.NewIngester(ctx, conn)
 	if err != nil {
 		return err
 	}
 
 	// Ingest data
-	if err := conn.IngestData(context.Background(), ingestId, data); err != nil {
+	if err := ingester.IngestData(ctx, data); err != nil {
 		return err
 	}
 
 	// Commit the ingest channel
-	if err := conn.CommitIngest(context.Background(), ingestId); err != nil {
+	if err := ingester.CommitIngest(ctx, "INSERT INTO database.schema.table"); err != nil {
 		return err
 	}
 
@@ -83,52 +78,26 @@ func ingestWithMerge(data []arrow.Record) error {
 		Endpoint: "http://localhost:6543",
 	})
 
-	// Specify merge option
-	// This is the same as query statement:
-	//
-	// MERGE INTO table
-	// USING source
-	// ON table.a = source.a
-	// WHEN MATCHED AND table.a < source.a THEN UPDATE ALL
-	// WHEN NOT MATCHED THEN INSERT ALL
-	extraCondition := "table.a < source.a"
-	merge := &scopedb.MergeOption{
-		SourceTableAlias:       "source",
-		SourceTableColumnNames: []string{"a", "b", "c"},
-		MatchCondition:         "table.a = source.a",
-		When: []scopedb.MergeAction{
-			{
-				Matched: true,
-				And:     &extraCondition,
-				Then:    "update_all",
-			},
-			{
-				Matched: false,
-				Then:    "insert_all",
-			},
-		},
-	}
+	ctx := context.Background()
 
 	// Create an ingest channel
-	ingestId, err := conn.CreateIngestChannel(
-		context.Background(),
-		"database",
-		"schema",
-		"table",
-		merge,
-	)
-
+	ingester, err := scopedb.NewIngester(ctx, conn)
 	if err != nil {
 		return err
 	}
 
 	// Ingest data
-	if err := conn.IngestData(context.Background(), ingestId, data); err != nil {
+	if err := ingester.IngestData(ctx, data); err != nil {
 		return err
 	}
 
 	// Commit the ingest channel
-	if err := conn.CommitIngest(context.Background(), ingestId); err != nil {
+	if err := ingester.CommitIngest(ctx, `
+    MERGE INTO table
+    ON table.a = $0
+    WHEN MATCHED AND table.a < $0 THEN UPDATE ALL
+    WHEN NOT MATCHED THEN INSERT ALL
+    `); err != nil {
 		return err
 	}
 

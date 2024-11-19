@@ -43,7 +43,7 @@ func TestReadAfterWrite(t *testing.T) {
 
 	conn := scopedb.Open(config)
 
-	statement := fmt.Sprintf("create table %s (a int, v variant)", tableName)
+	statement := fmt.Sprintf("CREATE TABLE %s (a INT, v VARIANT)", tableName)
 	err = conn.Execute(ctx, &scopedb.StatementRequest{
 		Statement: statement,
 		Format:    scopedb.ArrowJSONFormat,
@@ -57,12 +57,12 @@ func TestReadAfterWrite(t *testing.T) {
 	// 1. Simple ingest and verify the result
 	schema := makeSchema()
 	records := makeRecords(schema)
-	ingestId, err := conn.CreateIngestChannel(ctx, "scopedb", "public", tableName, nil)
+	ingester, err := scopedb.NewIngester(ctx, conn)
 	require.NoError(t, err)
-	require.NoError(t, conn.IngestData(ctx, ingestId, records))
-	require.NoError(t, conn.CommitIngest(ctx, ingestId))
+	require.NoError(t, ingester.IngestData(ctx, records))
+	require.NoError(t, ingester.CommitIngest(ctx, fmt.Sprintf("INSERT INTO %s", tableName)))
 
-	statement = fmt.Sprintf("from %s", tableName)
+	statement = fmt.Sprintf("FROM %s", tableName)
 	rs, err := conn.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
 		Statement: statement,
 		Format:    scopedb.ArrowJSONFormat,
@@ -73,24 +73,14 @@ func TestReadAfterWrite(t *testing.T) {
 
 	// 2. Merge data and verify the result
 	mergeRecords := makeMergeRecords(schema)
-	mergeOptions := &scopedb.MergeOption{
-		SourceTableAlias: "t1",
-		SourceTableColumnNames: []string{
-			"a",
-			"s",
-		},
-		MatchCondition: tableName + ".a = t1.a",
-		When: []scopedb.MergeAction{
-			{
-				Matched: true,
-				Then:    "update_all",
-			},
-		},
-	}
-	ingestId, err = conn.CreateIngestChannel(ctx, "scopedb", "public", tableName, mergeOptions)
+	ingester, err = scopedb.NewIngester(ctx, conn)
 	require.NoError(t, err)
-	require.NoError(t, conn.IngestData(ctx, ingestId, mergeRecords))
-	require.NoError(t, conn.CommitIngest(ctx, ingestId))
+	require.NoError(t, ingester.IngestData(ctx, mergeRecords))
+	require.NoError(t, ingester.CommitIngest(ctx, fmt.Sprintf(`
+    MERGE INTO %s
+    ON %s.a = $0
+    WHEN MATCHED THEN UPDATE ALL
+    `, tableName, tableName)))
 
 	rs, err = conn.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
 		Statement: statement,
