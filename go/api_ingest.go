@@ -88,15 +88,15 @@ func (i *Ingester) IngestData(ctx context.Context, batches []arrow.Record) error
 	})
 }
 
-// CommitIngest commits this ingester. Once committed, the ingester is invalid and cannot ingest more data.
-func (i *Ingester) CommitIngest(ctx context.Context, statement string) error {
+// Commit commits this ingester. Once committed, the ingester is invalid and cannot ingest more data.
+func (i *Ingester) Commit(ctx context.Context, statement string) error {
 	return i.conn.commitIngest(ctx, i.channel, &commitIngestRequest{
 		Statement: statement,
 	})
 }
 
-// AbortIngest aborts this ingester. Once aborted, the ingester is invalid and the staging data is discarded.
-func (i *Ingester) AbortIngest(ctx context.Context) error {
+// Abort aborts this ingester. Once aborted, the ingester is invalid and the staging data is discarded.
+func (i *Ingester) Abort(ctx context.Context) error {
 	return i.conn.abortIngest(ctx, i.channel)
 }
 

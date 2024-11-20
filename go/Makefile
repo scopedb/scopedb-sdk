@@ -34,10 +34,21 @@ dev/bin/golangci-lint:
 check-static: dev/bin/golangci-lint
 	GO111MODULE=on CGO_ENABLED=0 dev/bin/golangci-lint run -v
 
+.PHONY: fix-static
+fix-static: dev/bin/golangci-lint
+	GO111MODULE=on CGO_ENABLED=0 dev/bin/golangci-lint run --fix -v
+
 .PHONY: check-mod-tidy
 check-mod-tidy:
 	$(GO) mod tidy
 	git diff --exit-code go.sum
 
+.PHONY: fix-mod-tidy
+fix-mod-tidy:
+	$(GO) mod tidy
+
 .PHONY: check
 check: check-mod-tidy check-static
+
+.PHONY: fix
+fix: fix-mod-tidy fix-static

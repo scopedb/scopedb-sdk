@@ -66,7 +66,7 @@ func ingest(data []arrow.Record) error {
 	}
 
 	// Commit the ingest channel
-	if err := ingester.CommitIngest(ctx, "INSERT INTO database.schema.table"); err != nil {
+	if err := ingester.Commit(ctx, "INSERT INTO database.schema.table"); err != nil {
 		return err
 	}
 
@@ -92,7 +92,7 @@ func ingestWithMerge(data []arrow.Record) error {
 	}
 
 	// Commit the ingest channel
-	if err := ingester.CommitIngest(ctx, `
+	if err := ingester.Commit(ctx, `
     MERGE INTO table
     ON table.a = $0
     WHEN MATCHED AND table.a < $0 THEN UPDATE ALL
