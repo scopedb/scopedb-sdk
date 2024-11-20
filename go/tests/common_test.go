@@ -60,7 +60,7 @@ func TestReadAfterWrite(t *testing.T) {
 	ingester, err := scopedb.NewIngester(ctx, conn)
 	require.NoError(t, err)
 	require.NoError(t, ingester.IngestData(ctx, records))
-	require.NoError(t, ingester.CommitIngest(ctx, fmt.Sprintf("INSERT INTO %s", tableName)))
+	require.NoError(t, ingester.Commit(ctx, fmt.Sprintf("INSERT INTO %s", tableName)))
 
 	statement = fmt.Sprintf("FROM %s", tableName)
 	rs, err := conn.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
@@ -76,7 +76,7 @@ func TestReadAfterWrite(t *testing.T) {
 	ingester, err = scopedb.NewIngester(ctx, conn)
 	require.NoError(t, err)
 	require.NoError(t, ingester.IngestData(ctx, mergeRecords))
-	require.NoError(t, ingester.CommitIngest(ctx, fmt.Sprintf(`
+	require.NoError(t, ingester.Commit(ctx, fmt.Sprintf(`
     MERGE INTO %s
     ON %s.a = $0
     WHEN MATCHED THEN UPDATE ALL
