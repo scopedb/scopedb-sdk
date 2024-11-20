@@ -29,7 +29,7 @@ func main() {
 
 	// Query data from ScopeDB
 	resultSet, err := conn.QueryAsArrowBatch(context.Background(), &scopedb.StatementRequest{
-		Statement:   "read information_schema.tables",
+		Statement:   "from system.tables",
 		WaitTimeout: "60s",
 		Format:      scopedb.ArrowJSONFormat,
 	})
