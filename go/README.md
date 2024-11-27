@@ -1,6 +1,7 @@
 # ScopeDB SDK for Go
 
-[![](https://img.shields.io/:license-Apache%202-brightgreen.svg)](https://www.apache.org/licenses/LICENSE-2.0.txt)
+[![Apache License, Version 2.0](https://img.shields.io/:license-Apache%202-brightgreen.svg)](https://www.apache.org/licenses/LICENSE-2.0.txt)
+[![Go Reference](https://pkg.go.dev/badge/github.com/scopedb/scopedb-sdk/go.svg)](https://pkg.go.dev/github.com/scopedb/scopedb-sdk/go)
 
 This module provides a ScopeDB SDK for Go. You can use it to ingest data to or query over ScopeDB.
 
