@@ -27,6 +27,23 @@ Use the Open() function to create a database handle with connection parameters:
 
 # Ingest Data
 
+1. One-for-all API
+
+Use the Ingest() method to ingest data with a statement:
+
+	records := makeArrowRecords()
+	err := conn.IngestArrowBatch(ctx, records, "INSERT INTO target_table")
+
+Alternatively, use [MERGE INTO] to upsert data:
+
+	err := ingester.Commit(ctx, `
+	MERGE INTO target_table ON $0 = target_table.a
+	WHEN MATCHED THEN UPDATE ALL
+	WHEN NOT MATCHED THEN INSERT ALL
+	`)
+
+2. Staged API (deprecated)
+
 Use the NewIngester() function to create an ingester from a connection:
 
 	ingester, err := NewIngester(ctx, conn)
