@@ -18,6 +18,8 @@ package scopedb
 
 import (
 	"context"
+
+	"github.com/apache/arrow/go/v17/arrow"
 )
 
 type Connection struct {
@@ -92,4 +94,19 @@ func (conn *Connection) FetchResultSetAsArrowBatch(ctx context.Context, params *
 		return nil, err
 	}
 	return resp.ToArrowResultSet()
+}
+
+// IngestArrowBatch ingests the specified Arrow record batches into ScopeDB.
+func (conn *Connection) IngestArrowBatch(ctx context.Context, batches []arrow.Record, statement string) (*IngestResponse, error) {
+	rows, err := encodeRecordBatches(batches)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn.ingest(ctx, &ingestRequest{
+		Data: &ingestData{
+			Rows: string(rows),
+		},
+		Statement: statement,
+	})
 }

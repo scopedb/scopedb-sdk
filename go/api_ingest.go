@@ -32,12 +32,25 @@ type ingestAPI interface {
 	// ingestData ingests data into the specified channel.
 	ingestData(ctx context.Context, channel string, req *ingestDataRequest) error
 	// commitIngest commits the specified ingest channel.
-	commitIngest(ctx context.Context, channel string, req *commitIngestRequest) error
+	commitIngest(ctx context.Context, channel string, req *commitIngestRequest) (*IngestResponse, error)
 	// abortIngest aborts the specified ingest channel.
 	abortIngest(ctx context.Context, channel string) error
+	// ingest ingests data with the specified statement.
+	ingest(ctx context.Context, req *ingestRequest) (*IngestResponse, error)
 }
 
 var _ ingestAPI = (*Connection)(nil)
+
+type ingestRequest struct {
+	Data      *ingestData `json:"data"`
+	Statement string      `json:"statement"`
+}
+
+type IngestResponse struct {
+	NumRowsInserted int `json:"num_rows_inserted"`
+	NumRowsUpdated  int `json:"num_rows_updated"`
+	NumRowsDeleted  int `json:"num_rows_deleted"`
+}
 
 type createIngestChannelResponse struct {
 	Id string `json:"ingest_id"`
@@ -89,7 +102,7 @@ func (i *Ingester) IngestData(ctx context.Context, batches []arrow.Record) error
 }
 
 // Commit commits this ingester. Once committed, the ingester is invalid and cannot ingest more data.
-func (i *Ingester) Commit(ctx context.Context, statement string) error {
+func (i *Ingester) Commit(ctx context.Context, statement string) (*IngestResponse, error) {
 	return i.conn.commitIngest(ctx, i.channel, &commitIngestRequest{
 		Statement: statement,
 	})
@@ -98,6 +111,35 @@ func (i *Ingester) Commit(ctx context.Context, statement string) error {
 // Abort aborts this ingester. Once aborted, the ingester is invalid and the staging data is discarded.
 func (i *Ingester) Abort(ctx context.Context) error {
 	return i.conn.abortIngest(ctx, i.channel)
+}
+
+func (conn *Connection) ingest(ctx context.Context, request *ingestRequest) (*IngestResponse, error) {
+	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest_v2")
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := conn.http.Post(ctx, req, body)
+	if err != nil {
+		return nil, err
+	}
+	defer sneakyBodyClose(resp.Body)
+	if err := checkStatusCodeOK(resp); err != nil {
+		return nil, err
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var respData IngestResponse
+	err = json.Unmarshal(data, &respData)
+	return &respData, err
 }
 
 func (conn *Connection) createIngestChannel(ctx context.Context) (string, error) {
@@ -146,23 +188,33 @@ func (conn *Connection) ingestData(ctx context.Context, channel string, request 
 	return nil
 }
 
-func (conn *Connection) commitIngest(ctx context.Context, channel string, request *commitIngestRequest) error {
+func (conn *Connection) commitIngest(ctx context.Context, channel string, request *commitIngestRequest) (*IngestResponse, error) {
 	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest/" + channel + "/commit")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	body, err := json.Marshal(request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	resp, err := conn.http.Post(ctx, req, body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer sneakyBodyClose(resp.Body)
-	return checkStatusCodeOK(resp)
+	if err := checkStatusCodeOK(resp); err != nil {
+		return nil, err
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var respData IngestResponse
+	err = json.Unmarshal(data, &respData)
+	return &respData, err
 }
 
 func (conn *Connection) abortIngest(ctx context.Context, channel string) error {
