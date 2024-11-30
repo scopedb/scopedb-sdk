@@ -48,8 +48,7 @@ type IngestResponse struct {
 }
 
 func (conn *Connection) ingest(ctx context.Context, request *ingestRequest) (*IngestResponse, error) {
-	// TODO(tisonkun): use /v1/ingest once server changes released.
-	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest_v2")
+	req, err := url.Parse(conn.config.Endpoint + "/v1/ingest")
 	if err != nil {
 		return nil, err
 	}
