@@ -74,10 +74,7 @@ func TestReadAfterWrite(t *testing.T) {
 
 	// 2. Merge data and verify the result
 	mergeRecords := makeMergeRecords(schema)
-	ingester, err := scopedb.NewIngester(ctx, conn)
-	require.NoError(t, err)
-	require.NoError(t, ingester.IngestData(ctx, mergeRecords))
-	resp, err = ingester.Commit(ctx, fmt.Sprintf(`
+	resp, err = conn.IngestArrowBatch(ctx, mergeRecords, fmt.Sprintf(`
     MERGE INTO %s
     ON %s.a = $0
     WHEN MATCHED THEN UPDATE ALL

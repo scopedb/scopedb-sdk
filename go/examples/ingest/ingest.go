@@ -53,20 +53,7 @@ func ingest(data []arrow.Record) error {
 	})
 
 	ctx := context.Background()
-
-	// Create an ingest channel
-	ingester, err := scopedb.NewIngester(ctx, conn)
-	if err != nil {
-		return err
-	}
-
-	// Ingest data
-	if err := ingester.IngestData(ctx, data); err != nil {
-		return err
-	}
-
-	// Commit the ingest channel
-	if _, err := ingester.Commit(ctx, "INSERT INTO database.schema.table"); err != nil {
+	if _, err := conn.IngestArrowBatch(ctx, data, "INSERT INTO database.schema.table"); err != nil {
 		return err
 	}
 
@@ -79,20 +66,7 @@ func ingestWithMerge(data []arrow.Record) error {
 	})
 
 	ctx := context.Background()
-
-	// Create an ingest channel
-	ingester, err := scopedb.NewIngester(ctx, conn)
-	if err != nil {
-		return err
-	}
-
-	// Ingest data
-	if err := ingester.IngestData(ctx, data); err != nil {
-		return err
-	}
-
-	// Commit the ingest channel
-	if _, err := ingester.Commit(ctx, `
+	if _, err := conn.IngestArrowBatch(ctx, data, `
     MERGE INTO table
     ON table.a = $0
     WHEN MATCHED AND table.a < $0 THEN UPDATE ALL
