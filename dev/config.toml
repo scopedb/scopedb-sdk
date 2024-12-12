@@ -41,8 +41,6 @@ max_files = 64
 filter = "INFO"
 
 [runtime]
-api_runtime_threads = 1
+server_runtime_threads = 1
 exec_runtime_threads = 1
-meta_runtime_threads = 1
-data_runtime_threads = 1
-bg_runtime_threads = 1
+io_runtime_threads = 1
