@@ -27,7 +27,7 @@ For detailed documentation and basic usage examples, please see the documentatio
 
 ## Development
 
-The developer notes are hosted with the source code on [GitHub](https://github.com/scopedb/scopedb-sdk).
+The source code is hosted on [GitHub](https://github.com/scopedb/scopedb-sdk). You can check out the [CONTRIBUTING](CONTRIBUTING.md) guide to start developing.
 
 ## License
 
