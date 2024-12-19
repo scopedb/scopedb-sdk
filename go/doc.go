@@ -34,7 +34,7 @@ Use the Ingest() method to ingest data with a statement:
 
 Alternatively, use [MERGE INTO] to upsert data:
 
-	err := ingester.Commit(ctx, `
+	err := conn.IngestArrowBatch(ctx, records, `
 	MERGE INTO target_table ON $0 = target_table.a
 	WHEN MATCHED THEN UPDATE ALL
 	WHEN NOT MATCHED THEN INSERT ALL
