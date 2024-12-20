@@ -18,6 +18,7 @@ package scopedb_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -47,7 +48,7 @@ func GenerateTableName() (string, error) {
 
 func DropTable(ctx context.Context, conn *scopedb.Connection, tableName string) error {
 	return conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement: "drop table " + tableName,
+		Statement: fmt.Sprintf(`DROP TABLE %s`, tableName),
 		Format:    scopedb.ArrowJSONFormat,
 	})
 }
