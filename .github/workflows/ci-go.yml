@@ -61,12 +61,20 @@ jobs:
         run: docker compose -f ./dev/docker-compose.yml up -d
       - name: Run full tests
         if: ${{ github.repository == 'scopedb/scopedb-sdk' }}
+        timeout-minutes: 10
         run: make ci-test
         working-directory: go
       - name: Run tests
         if: ${{ github.repository != 'scopedb/scopedb-sdk' }}
+        timeout-minutes: 10
         run: make test
         working-directory: go
+      - name: Upload server logs
+        if: ${{ !success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-logs
+          path: dev/logs
 
   required:
     name: Required
