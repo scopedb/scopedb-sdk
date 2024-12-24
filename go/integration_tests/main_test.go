@@ -14,26 +14,43 @@
  * limitations under the License.
  */
 
-package scopedb_test
+package integration_tests
 
 import (
 	"context"
 	"fmt"
 	"os"
 	"strings"
+	"testing"
 
 	"github.com/lucasepe/codename"
 	scopedb "github.com/scopedb/scopedb-sdk/go"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 // LoadConfig loads the configuration from environment variables.
 func LoadConfig() *scopedb.Config {
-	if os.Getenv("SCOPEDB_ENDPOINT") == "" {
+	endpoint := os.Getenv("SCOPEDB_ENDPOINT")
+	if endpoint == "" {
 		return nil
 	}
-
 	return &scopedb.Config{
-		Endpoint: os.Getenv("SCOPEDB_ENDPOINT"),
+		Endpoint: endpoint,
+	}
+}
+
+// OptionEnabled returns true if the environment variable is set to a truthy value.
+func OptionEnabled(key string) bool {
+	value := os.Getenv(key)
+	switch strings.ToLower(value) {
+	case "1", "true", "y", "yes", "on":
+		return true
+	default:
+		return false
 	}
 }
 
