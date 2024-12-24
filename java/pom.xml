@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Copyright 2024 ScopeDB, Inc.
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.scopedb.sdk</groupId>
+    <artifactId>scopedb-sdk-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>ScopeDB SDK Parent</name>
+
+    <url>https://www.scopedb.io</url>
+    <modules>
+        <module>scopedb-client</module>
+    </modules>
+
+    <properties>
+        <!-- This value is for Reproducible Builds. It will be updated by Maven Release Plugin during releases. -->
+        <project.build.outputTimestamp>10</project.build.outputTimestamp>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- library dependencies -->
+        <arrow.version>17.0.0</arrow.version>
+        <assertj.version>3.23.1</assertj.version>
+        <dotenv.version>2.3.2</dotenv.version>
+        <lombok.version>1.18.34</lombok.version>
+        <junit.version>5.9.2</junit.version>
+        <okhttp.version>4.12.0</okhttp.version>
+        <slf4j.version>2.0.7</slf4j.version>
+
+        <!-- plugins dependencies -->
+        <maven-assembly-plugin.version>3.6.0</maven-assembly-plugin.version>
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <maven-javadoc-plugin.version>3.6.3</maven-javadoc-plugin.version>
+        <maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>
+        <gson.version>2.11.0</gson.version>
+        <jetbrains-annotations.version>24.0.1</jetbrains-annotations.version>
+        <palantir-java-format.version>2.36.0</palantir-java-format.version>
+        <spotless.version>2.39.0</spotless.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>${okhttp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.code.gson</groupId>
+                <artifactId>gson</artifactId>
+                <version>${gson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.arrow</groupId>
+                <artifactId>arrow-bom</artifactId>
+                <version>${arrow.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- annotations in compilation -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>${jetbrains-annotations.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- tests -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <version>${maven-assembly-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                    <release>8</release>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+            </plugin>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless.version}</version>
+                <configuration>
+                    <formats>
+                        <format>
+                            <includes>
+                                <include>*.md</include>
+                                <include>.gitignore</include>
+                                <include>pom.xml</include>
+                            </includes>
+                            <trimTrailingWhitespace/>
+                            <endWithNewline/>
+                            <indent>
+                                <spaces>true</spaces>
+                                <spacesPerTab>4</spacesPerTab>
+                            </indent>
+                        </format>
+                    </formats>
+                    <java>
+                        <palantirJavaFormat>
+                            <version>${palantir-java-format.version}</version>
+                        </palantirJavaFormat>
+                        <!-- static imports first, then others, no blank lines  -->
+                        <importOrder>
+                            <order>\#|</order>
+                        </importOrder>
+                        <removeUnusedImports/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                        <indent>
+                            <spaces>true</spaces>
+                            <spacesPerTab>4</spacesPerTab>
+                        </indent>
+                    </java>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
