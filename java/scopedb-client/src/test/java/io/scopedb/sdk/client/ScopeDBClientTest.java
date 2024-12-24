@@ -39,10 +39,12 @@ class ScopeDBClientTest {
 
         try (final BufferAllocator allocator = new RootAllocator()) {
             final ArrowBatchConvertor convertor = new ArrowBatchConvertor();
-            final List<VectorSchemaRoot> batches = client.execute(request).thenApply(r -> {
-                final String rows = r.getResultSet().getRows();
-                return convertor.readArrowBatches(rows, allocator);
-            }).join();
+            final List<VectorSchemaRoot> batches = client.execute(request)
+                    .thenApply(r -> {
+                        final String rows = r.getResultSet().getRows();
+                        return convertor.readArrowBatches(rows, allocator);
+                    })
+                    .join();
             for (VectorSchemaRoot batch : batches) {
                 System.out.println(batch.contentToTSVString());
                 batch.close();

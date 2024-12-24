@@ -48,16 +48,43 @@ public class ScopeDBClient {
         this.client = new OkHttpClient.Builder().build();
     }
 
-    public CompletableFuture<StatementResponse> execute(StatementRequest request) {
-        final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
-
+    private Request makeStatementRequest(StatementRequest request) {
         final HttpUrl url = HttpUrl.Companion.get(config.getEndpoint())
                 .newBuilder()
                 .addPathSegments("v1/statements")
                 .build();
         final RequestBody body = RequestBody.create(GSON.toJson(request), JSON);
-        final Request req = new Request.Builder().url(url).post(body).build();
+        return new Request.Builder().url(url).post(body).build();
+    }
 
+    private Request makeFetchStatementRequest(FetchStatementParams params) {
+        final HttpUrl url = HttpUrl.Companion.get(config.getEndpoint())
+                .newBuilder()
+                .addPathSegments("v1/statements")
+                .addPathSegment(params.getStatementId())
+                .addQueryParameter("format", params.getFormat().toParam())
+                .build();
+        return new Request.Builder().url(url).build();
+    }
+
+    public CompletableFuture<StatementResponse> submit(StatementRequest request) {
+        return execute(request, true);
+    }
+
+    public CompletableFuture<StatementResponse> execute(StatementRequest request) {
+        return execute(request, false);
+    }
+
+    public CompletableFuture<StatementResponse> fetch(FetchStatementParams params, boolean untilDone) {
+        final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
+        fetchWith(f, params, !untilDone);
+        return f;
+    }
+
+    private CompletableFuture<StatementResponse> execute(StatementRequest request, boolean forget) {
+        final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
+
+        final Request req = makeStatementRequest(request);
         client.newCall(req).enqueue(new Callback() {
             @Override
             public void onFailure(@NotNull Call call, @NotNull IOException e) {
@@ -69,21 +96,13 @@ public class ScopeDBClient {
                 final ResponseBody body = Objects.requireNonNull(response.body());
                 if (response.isSuccessful()) {
                     final StatementResponse resp = GSON.fromJson(body.string(), StatementResponse.class);
-                    if (resp.getStatus() != StatementStatus.Finished) {
+                    if (resp.getStatus() != StatementStatus.Finished && !forget) {
                         final String statementId = resp.getStatementId();
                         final FetchStatementParams params = FetchStatementParams.builder()
                                 .statementId(statementId)
                                 .format(request.getFormat())
                                 .build();
-                        final CompletableFuture<StatementResponse> fut = new CompletableFuture<>();
-                        fut.whenComplete((r, e) -> {
-                            if (e != null) {
-                                f.completeExceptionally(e);
-                            } else {
-                                f.complete(r);
-                            }
-                        });
-                        ScopeDBClient.this.fetchWithUtilDone(fut, params);
+                        ScopeDBClient.this.fetchWith(f, params, false);
                     } else {
                         f.complete(resp);
                     }
@@ -97,14 +116,8 @@ public class ScopeDBClient {
         return f;
     }
 
-    private void fetchWithUtilDone(CompletableFuture<StatementResponse> f, FetchStatementParams params) {
-        final HttpUrl url = HttpUrl.Companion.get(config.getEndpoint())
-                .newBuilder()
-                .addPathSegments("v1/statements")
-                .addPathSegment(params.getStatementId())
-                .addQueryParameter("format", params.getFormat().toParam())
-                .build();
-        final Request req = new Request.Builder().url(url).build();
+    private void fetchWith(CompletableFuture<StatementResponse> f, FetchStatementParams params, boolean forget) {
+        final Request req = makeFetchStatementRequest(params);
 
         client.newCall(req).enqueue(new Callback() {
             @Override
@@ -117,8 +130,8 @@ public class ScopeDBClient {
                 final ResponseBody body = Objects.requireNonNull(response.body());
                 if (response.isSuccessful()) {
                     final StatementResponse resp = GSON.fromJson(body.string(), StatementResponse.class);
-                    if (resp.getStatus() != StatementStatus.Finished) {
-                        ScopeDBClient.this.fetchWithUtilDone(f, params);
+                    if (resp.getStatus() != StatementStatus.Finished && !forget) {
+                        ScopeDBClient.this.fetchWith(f, params, false);
                     } else {
                         f.complete(resp);
                     }
