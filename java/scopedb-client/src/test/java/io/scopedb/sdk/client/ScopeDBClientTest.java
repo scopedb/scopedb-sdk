@@ -16,9 +16,13 @@
 
 package io.scopedb.sdk.client;
 
+import io.scopedb.sdk.client.arrow.ArrowBatchConvertor;
 import io.scopedb.sdk.client.request.ResultFormat;
 import io.scopedb.sdk.client.request.StatementRequest;
 import java.util.List;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.VectorSchemaRoot;
 import org.junit.jupiter.api.Test;
 
 class ScopeDBClientTest {
@@ -32,7 +36,17 @@ class ScopeDBClientTest {
                 .format(ResultFormat.ArrowJson)
                 .waitTimeout("60s")
                 .build();
-        final List<String> batches = client.queryAsArrowBatch(request).join();
-        System.out.println(batches);
+
+        try (final BufferAllocator allocator = new RootAllocator()) {
+            final ArrowBatchConvertor convertor = new ArrowBatchConvertor();
+            final List<VectorSchemaRoot> batches = client.execute(request).thenApply(r -> {
+                final String rows = r.getResultSet().getRows();
+                return convertor.readArrowBatches(rows, allocator);
+            }).join();
+            for (VectorSchemaRoot batch : batches) {
+                System.out.println(batch.contentToTSVString());
+                batch.close();
+            }
+        }
     }
 }

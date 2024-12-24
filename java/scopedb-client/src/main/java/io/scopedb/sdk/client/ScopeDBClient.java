@@ -22,12 +22,7 @@ import io.scopedb.sdk.client.request.FetchStatementParams;
 import io.scopedb.sdk.client.request.StatementRequest;
 import io.scopedb.sdk.client.request.StatementResponse;
 import io.scopedb.sdk.client.request.StatementStatus;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import okhttp3.Call;
@@ -39,9 +34,6 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
-import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
-import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.jetbrains.annotations.NotNull;
 
 public class ScopeDBClient {
@@ -56,33 +48,7 @@ public class ScopeDBClient {
         this.client = new OkHttpClient.Builder().build();
     }
 
-    public CompletableFuture<Void> execute(StatementRequest request) {
-        return this.query(request).thenApply(r -> null);
-    }
-
-    public CompletableFuture<List<String>> queryAsArrowBatch(StatementRequest request) {
-        // TODO(tisonkun): perhaps execute decode in a dedicated thread pool
-        return this.query(request).thenApply(r -> {
-            final String rows = r.getResultSet().getRows();
-            final byte[] data = Base64.getDecoder().decode(rows);
-            final List<String> batches = new ArrayList<>();
-            // TODO(tisonkun): figure out whether a global allocator helps
-            try (final BufferAllocator rootAllocator = new RootAllocator()) {
-                try (final ArrowStreamReader reader =
-                        new ArrowStreamReader(new ByteArrayInputStream(data), rootAllocator)) {
-                    while (reader.loadNextBatch()) {
-                        // TODO(tisonkun): how to unload a VectorSchemaRoot reasonably?
-                        batches.add(reader.getVectorSchemaRoot().contentToTSVString());
-                    }
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return batches;
-        });
-    }
-
-    private CompletableFuture<StatementResponse> query(StatementRequest request) {
+    public CompletableFuture<StatementResponse> execute(StatementRequest request) {
         final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
 
         final HttpUrl url = HttpUrl.Companion.get(config.getEndpoint())
