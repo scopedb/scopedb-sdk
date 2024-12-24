@@ -29,6 +29,12 @@ type HTTPClient interface {
 	Get(context.Context, *url.URL) (*http.Response, error)
 	// Post sends a POST request to the ScopeDB server.
 	Post(context.Context, *url.URL, []byte) (*http.Response, error)
+	// Close closes the HTTP client.
+	//
+	// You don't typically need to call this as the garbage collector will release
+	// the resources when the client is no longer referenced. However, it can be
+	// useful to call this if you want to release the resources immediately.
+	Close()
 }
 
 type httpClient struct {
@@ -61,4 +67,8 @@ func (c *httpClient) Post(ctx context.Context, u *url.URL, body []byte) (*http.R
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.client.Do(req)
 	return resp, err
+}
+
+func (c *httpClient) Close() {
+	c.client.CloseIdleConnections()
 }

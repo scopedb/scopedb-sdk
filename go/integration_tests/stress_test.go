@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package scopedb_test
+package integration_tests
 
 import (
 	"context"
@@ -189,6 +189,10 @@ func queryColumns(t *testing.T, conn *scopedb.Connection) {
 const (
 	IngestDataBatch = 10000
 	IngestDataMax   = 1000000
+
+	TaskParallelism = 8
+	TaskInterval    = 50 * time.Millisecond
+	TaskDuration    = 10 * time.Second
 )
 
 func TestStressHeavyReadWrite(t *testing.T) {
@@ -200,6 +204,10 @@ func TestStressHeavyReadWrite(t *testing.T) {
 		t.Skip("Connection config is not set")
 	}
 
+	if !OptionEnabled("ENABLE_STRESS_TEST") {
+		t.Skip("Stress test is disabled")
+	}
+
 	tableName, err := GenerateTableName()
 	logTableName := fmt.Sprintf("%s_log", tableName)
 	stageTableName := fmt.Sprintf("%s_stage", tableName)
@@ -207,6 +215,7 @@ func TestStressHeavyReadWrite(t *testing.T) {
 	t.Logf("With tableName: %s", tableName)
 
 	conn := scopedb.Open(config)
+	defer conn.Close()
 	initDatabase(t, ctx, conn, tableName)
 
 	ingestLogs(t, conn, logTableName, IngestDataBatch, idGen.Load())
@@ -216,28 +225,28 @@ func TestStressHeavyReadWrite(t *testing.T) {
 	idGen.Add(IngestDataBatch)
 
 	wg := sync.WaitGroup{}
-	jobs := make(chan func(), 100)
-	for i := 0; i < 8; i++ {
+	tasks := make(chan func(), 1024)
+	for i := 0; i < TaskParallelism; i++ {
+		wg.Add(1)
 		go func() {
-			for job := range jobs {
-				wg.Add(1)
-				job()
-				wg.Done()
+			defer wg.Done()
+			for task := range tasks {
+				task()
 			}
 		}()
 	}
 
-	c := time.After(1 * time.Minute)
-
+	c := time.After(TaskDuration)
 	for {
 		select {
 		case <-c:
+			close(tasks)
 			wg.Wait()
 			fmt.Println("Ingested:", idGen.Load())
 			fmt.Println("Shutting down...")
 			return
 		default:
-			jobs <- func() {
+			tasks <- func() {
 				n, err := rand.Int(rand.Reader, big.NewInt(4))
 				require.NoError(t, err)
 				switch n.Int64() {
@@ -249,19 +258,19 @@ func TestStressHeavyReadWrite(t *testing.T) {
 					}
 					fallthrough
 				case 1:
+					queryTables(t, conn)
+				case 2:
 					if idGen.Load() < IngestDataMax {
 						ingestStageLog(t, conn, stageTableName, IngestDataBatch, idGen.Load())
 						idGen.Add(IngestDataBatch)
 						break
 					}
 					fallthrough
-				case 2:
-					queryTables(t, conn)
 				case 3:
 					queryColumns(t, conn)
 				}
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(TaskInterval)
 		}
 	}
 }

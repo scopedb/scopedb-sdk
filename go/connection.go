@@ -35,6 +35,15 @@ func Open(config *Config) *Connection {
 	}
 }
 
+// Close closes the database connection.
+//
+// You don't typically need to call this as the garbage collector will release
+// the resources when the connection is no longer referenced. However, it can be
+// useful to call this if you want to release the resources immediately.
+func (conn *Connection) Close() {
+	conn.http.Close()
+}
+
 // Execute submits a statement to the server, waits for it to finish, and ignores the result.
 func (conn *Connection) Execute(ctx context.Context, req *StatementRequest) error {
 	resp, err := conn.submitStatement(ctx, req)

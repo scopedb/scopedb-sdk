@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package scopedb_test
+package integration_tests
 
 import (
 	"context"
@@ -42,6 +42,7 @@ func TestReadAfterWrite(t *testing.T) {
 	t.Logf("With tableName: %s", tableName)
 
 	conn := scopedb.Open(config)
+	defer conn.Close()
 
 	statement := fmt.Sprintf("CREATE TABLE %s (a INT, v VARIANT)", tableName)
 	err = conn.Execute(ctx, &scopedb.StatementRequest{
@@ -75,10 +76,10 @@ func TestReadAfterWrite(t *testing.T) {
 	// 2. Merge data and verify the result
 	mergeRecords := makeMergeRecords(schema)
 	resp, err = conn.IngestArrowBatch(ctx, mergeRecords, fmt.Sprintf(`
-    MERGE INTO %s
-    ON %s.a = $0
-    WHEN MATCHED THEN UPDATE ALL
-    `, tableName, tableName))
+	MERGE INTO %s
+	ON %s.a = $0
+	WHEN MATCHED THEN UPDATE ALL
+	`, tableName, tableName))
 	require.NoError(t, err)
 	require.Equal(t, resp.NumRowsInserted, 0)
 	require.Equal(t, resp.NumRowsUpdated, 1)

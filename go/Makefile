@@ -24,7 +24,9 @@ test:
 
 .PHONY: ci-test
 ci-test:
-	SCOPEDB_ENDPOINT=http://localhost:6543 $(GO) test -v ./...
+	SCOPEDB_ENDPOINT=http://localhost:6543 \
+	ENABLE_STRESS_TEST=true \
+		$(GO) test -v ./...
 
 dev/bin/golangci-lint:
 	# Build from source is not recommend. See https://golangci-lint.run/welcome/install/
