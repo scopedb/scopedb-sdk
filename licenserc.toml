@@ -16,9 +16,11 @@ headerPath = "Apache-2.0.txt"
 
 includes = [
   '*.go',
+  '*.java',
   '*.toml',
   '*.yml',
   '*.yaml',
+  'pom.xml',
 ]
 
 [properties]
