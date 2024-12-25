@@ -40,8 +40,7 @@ class ScopeDBClientTest {
         final ScopeDBConfig config =
                 ScopeDBConfig.builder().endpoint("http://localhost:6543").build();
 
-
-        final ScopeDBClientNG client = new ScopeDBClientNG(config);
+        final ScopeDBClient client = new ScopeDBClient(config);
 
         final List<AutoCloseable> allocated = new ArrayList<>();
         try {
@@ -89,7 +88,7 @@ class ScopeDBClientTest {
         return Collections.singletonList(root);
     }
 
-    private static void process(ScopeDBClientNG client, StatementRequest request, BufferAllocator allocator) {
+    private static void process(ScopeDBClient client, StatementRequest request, BufferAllocator allocator) {
         final List<VectorSchemaRoot> batches = client.submit(request, true)
                 .thenApply(r -> {
                     final String rows = r.getResultSet().getRows();

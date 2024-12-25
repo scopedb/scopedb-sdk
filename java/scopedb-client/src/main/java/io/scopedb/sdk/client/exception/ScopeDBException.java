@@ -62,7 +62,6 @@ public class ScopeDBException extends Exception {
         }
     }
 
-
     public static ScopeDBException fromResponse(int statusCode, String body) {
         try {
             if (body != null) {
