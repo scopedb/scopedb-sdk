@@ -39,7 +39,9 @@ class ScopeDBClientTest {
     public void testReadAfterWrite() throws Exception {
         final ScopeDBConfig config =
                 ScopeDBConfig.builder().endpoint("http://localhost:6543").build();
-        final ScopeDBClient client = new ScopeDBClient(config);
+
+
+        final ScopeDBClientNG client = new ScopeDBClientNG(config);
 
         final List<AutoCloseable> allocated = new ArrayList<>();
         try {
@@ -50,7 +52,6 @@ class ScopeDBClientTest {
             final StatementRequest createTableRequest = StatementRequest.builder()
                     .statement("CREATE TABLE IF NOT EXISTS t(i INT)")
                     .format(ResultFormat.ArrowJson)
-                    .waitTimeout("60s")
                     .build();
             process(client, createTableRequest, allocator);
 
@@ -65,7 +66,6 @@ class ScopeDBClientTest {
             final StatementRequest readTableRequest = StatementRequest.builder()
                     .statement("FROM t")
                     .format(ResultFormat.ArrowJson)
-                    .waitTimeout("60s")
                     .build();
             process(client, readTableRequest, allocator);
         } finally {
@@ -89,8 +89,8 @@ class ScopeDBClientTest {
         return Collections.singletonList(root);
     }
 
-    private static void process(ScopeDBClient client, StatementRequest request, BufferAllocator allocator) {
-        final List<VectorSchemaRoot> batches = client.execute(request)
+    private static void process(ScopeDBClientNG client, StatementRequest request, BufferAllocator allocator) {
+        final List<VectorSchemaRoot> batches = client.submit(request, true)
                 .thenApply(r -> {
                     final String rows = r.getResultSet().getRows();
                     return ArrowBatchConvertor.readArrowBatch(rows, allocator);

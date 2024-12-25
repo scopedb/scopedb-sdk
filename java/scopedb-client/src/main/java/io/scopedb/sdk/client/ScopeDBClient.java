@@ -85,7 +85,8 @@ public class ScopeDBClient {
                     final IngestResponse resp = GSON.fromJson(body.string(), IngestResponse.class);
                     f.complete(resp);
                 } else {
-                    final ScopeDBException e = ScopeDBException.fromResponse(response.code(), body.string());
+                    final ScopeDBException e =
+                            ScopeDBException.fromResponse(response.code(), body.string());
                     f.completeExceptionally(e);
                 }
             }
@@ -108,7 +109,6 @@ public class ScopeDBClient {
                 .newBuilder()
                 .addPathSegments("v1/statements")
                 .addPathSegment(params.getStatementId())
-                .addQueryParameter("format", params.getFormat().toParam())
                 .build();
         return new Request.Builder().url(url).build();
     }
@@ -152,7 +152,8 @@ public class ScopeDBClient {
                         f.complete(resp);
                     }
                 } else {
-                    final ScopeDBException e = ScopeDBException.fromResponse(response.code(), body.string());
+                    final ScopeDBException e =
+                            ScopeDBException.fromResponse(response.code(), body.string());
                     f.completeExceptionally(e);
                 }
             }
@@ -181,7 +182,8 @@ public class ScopeDBClient {
                         f.complete(resp);
                     }
                 } else {
-                    final ScopeDBException e = ScopeDBException.fromResponse(response.code(), body.string());
+                    final ScopeDBException e =
+                            ScopeDBException.fromResponse(response.code(), body.string());
                     f.completeExceptionally(e);
                 }
             }
