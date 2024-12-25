@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/url"
 	"time"
@@ -65,8 +64,9 @@ const (
 type QueryStatus string
 
 const (
-	QueryStatusStarted  QueryStatus = "started"
-	QueryStatusRunning  QueryStatus = "running"
+	// QueryStatusRunning indicates the query is not finished yet.
+	QueryStatusRunning QueryStatus = "running"
+	// QueryStatusFinished indicates the query is finished.
 	QueryStatusFinished QueryStatus = "finished"
 )
 
@@ -125,16 +125,13 @@ func NewResultSetFetcher(conn *Connection, params *FetchStatementParams) *Result
 }
 
 const (
-	defaultFetchTimeout  = 60 * time.Second
 	defaultFetchInterval = 1 * time.Second
 )
 
+// FetchResultSet fetches the result set of the configured fetch params.
+//
+// It polls the server until the query is finished, with fix delay of 1 second.
 func (f *ResultSetFetcher) FetchResultSet(ctx context.Context) (*StatementResponse, error) {
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		deadline = time.Now().Add(defaultFetchTimeout)
-	}
-
 	ticker := time.NewTicker(defaultFetchInterval)
 	defer ticker.Stop()
 
@@ -143,24 +140,23 @@ func (f *ResultSetFetcher) FetchResultSet(ctx context.Context) (*StatementRespon
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-ticker.C:
-			if time.Now().After(deadline) {
-				return nil, fmt.Errorf("fetch result set timeout after after %v: %s", time.Since(deadline), f.fetchParams.StatementId)
-			}
-
-			resp, err := f.conn.fetchStatementResult(ctx, f.fetchParams)
+			resp, err := f.FetchResultSetOnce(ctx)
 			if err != nil {
 				return nil, err
 			}
-			switch resp.Status {
-			case QueryStatusStarted:
-				continue
-			case QueryStatusRunning:
-				continue
-			case QueryStatusFinished:
+			if resp.Status == QueryStatusFinished {
 				return resp, nil
 			}
 		}
 	}
+}
+
+// FetchResultSetOnce fetches the result set of the configured fetch params once.
+//
+// Either the query is finished or not, it returns the StatementResponse. This is useful
+// when you would like to combine the fetch function with custom retry policy.
+func (f *ResultSetFetcher) FetchResultSetOnce(ctx context.Context) (*StatementResponse, error) {
+	return f.conn.fetchStatementResult(ctx, f.fetchParams)
 }
 
 func (conn *Connection) submitStatement(ctx context.Context, request *StatementRequest) (*StatementResponse, error) {
