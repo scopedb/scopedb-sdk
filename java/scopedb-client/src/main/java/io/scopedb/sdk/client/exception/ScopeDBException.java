@@ -17,40 +17,61 @@
 package io.scopedb.sdk.client.exception;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import lombok.Data;
 import lombok.Getter;
 
-@Getter
 public class ScopeDBException extends Exception {
     private static final Gson GSON = new Gson();
 
-    private final int statusCode;
-    private final Code errorCode;
-
-    private ScopeDBException(int statusCode, Code errorCode, String message) {
-        super(renderErrorMessage(errorCode, message));
-        this.statusCode = statusCode;
-        this.errorCode = errorCode;
+    private ScopeDBException(String message) {
+        super(message);
     }
 
-    private static String renderErrorMessage(Code errorCode, String message) {
-        return String.format("%s: %s", errorCode, message);
+    @Getter
+    public static class Server extends ScopeDBException {
+        private final int statusCode;
+        private final Code errorCode;
+
+        private Server(int statusCode, Code errorCode, String message) {
+            super(String.format("%d [%s]: %s", statusCode, errorCode, message));
+            this.statusCode = statusCode;
+            this.errorCode = errorCode;
+        }
+
+        public enum Code {
+            Unexpected,
+            NotFound,
+            AlreadyExists,
+        }
+
+        @Data
+        private static class Response {
+            private final String code;
+            private final String message;
+        }
     }
 
-    public enum Code {
-        Unexpected,
-        NotFound,
-        AlreadyExists,
+    @Getter
+    public static class Client extends ScopeDBException {
+        private final int statusCode;
+
+        private Client(int statusCode, String message) {
+            super(String.format("%d: %s", statusCode, message));
+            this.statusCode = statusCode;
+        }
     }
 
     public static ScopeDBException fromResponse(int statusCode, String body) {
-        final Response response = GSON.fromJson(body, Response.class);
-        return new ScopeDBException(statusCode, Code.valueOf(response.code), response.message);
-    }
-
-    @Data
-    private static class Response {
-        private final String code;
-        private final String message;
+        try {
+            if (body != null) {
+                final Server.Response response = GSON.fromJson(body, Server.Response.class);
+                final Server.Code errorCode = Server.Code.valueOf(response.code);
+                return new ScopeDBException.Server(statusCode, errorCode, response.message);
+            }
+        } catch (JsonSyntaxException ignored) {
+            // passthrough
+        }
+        return new ScopeDBException.Client(statusCode, body);
     }
 }

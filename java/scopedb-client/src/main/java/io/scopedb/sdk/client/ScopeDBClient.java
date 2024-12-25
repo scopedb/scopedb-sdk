@@ -16,175 +16,191 @@
 
 package io.scopedb.sdk.client;
 
-import com.google.gson.Gson;
+import com.google.gson.annotations.SerializedName;
+import dev.failsafe.RetryPolicy;
+import dev.failsafe.RetryPolicyBuilder;
+import dev.failsafe.retrofit.FailsafeCall;
 import io.scopedb.sdk.client.arrow.ArrowBatchConvertor;
 import io.scopedb.sdk.client.exception.ScopeDBException;
 import io.scopedb.sdk.client.request.FetchStatementParams;
 import io.scopedb.sdk.client.request.IngestData;
 import io.scopedb.sdk.client.request.IngestRequest;
 import io.scopedb.sdk.client.request.IngestResponse;
+import io.scopedb.sdk.client.request.ResultFormat;
 import io.scopedb.sdk.client.request.StatementRequest;
 import io.scopedb.sdk.client.request.StatementResponse;
 import io.scopedb.sdk.client.request.StatementStatus;
-import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Type;
+import java.time.Duration;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.HttpUrl;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 import okhttp3.ResponseBody;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.jetbrains.annotations.NotNull;
+import retrofit2.Call;
+import retrofit2.Converter;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+import retrofit2.http.Body;
+import retrofit2.http.GET;
+import retrofit2.http.POST;
+import retrofit2.http.Path;
+import retrofit2.http.Query;
 
 public class ScopeDBClient {
-    private static final MediaType JSON = MediaType.get("application/json");
-    private static final Gson GSON = new Gson();
+    private interface ScopeDBService {
+        @POST("/v1/ingest")
+        Call<IngestResponse> ingest(@Body IngestRequest request);
 
-    private final ScopeDBConfig config;
-    private final OkHttpClient client;
+        @POST("/v1/statements")
+        Call<StatementResponse> submit(@Body StatementRequest request);
+
+        @GET("/v1/statements/{statement_id}")
+        Call<StatementResponse> fetch(@Path("statement_id") String statementId, @Query("format") ResultFormat format);
+    }
+
+    private static final class EnumConverterFactory extends Converter.Factory {
+        private EnumConverterFactory() {}
+
+        @Override
+        public Converter<?, String> stringConverter(
+                @NotNull Type type, Annotation @NotNull [] annotations, @NotNull Retrofit retrofit) {
+            if (getRawType(type).isEnum()) {
+                return new EnumConverter();
+            }
+            return null;
+        }
+
+        private static final class EnumConverter implements Converter<Enum<?>, String> {
+            @Override
+            public String convert(@NotNull Enum<?> o) {
+                try {
+                    final Field f = o.getClass().getField(o.name());
+                    final SerializedName name = f.getAnnotation(SerializedName.class);
+                    if (name != null) {
+                        return name.value();
+                    }
+                } catch (Exception ignored) {
+                    // passthrough
+                }
+                return o.name();
+            }
+        }
+    }
+
+    private final ScopeDBService service;
 
     public ScopeDBClient(ScopeDBConfig config) {
-        this.config = config;
-        this.client = new OkHttpClient.Builder().build();
-    }
-
-    public CompletableFuture<StatementResponse> submit(StatementRequest request) {
-        return execute(request, true);
-    }
-
-    public CompletableFuture<StatementResponse> execute(StatementRequest request) {
-        return execute(request, false);
-    }
-
-    public CompletableFuture<StatementResponse> fetch(FetchStatementParams params, boolean untilDone) {
-        final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
-        fetchWith(f, params, !untilDone);
-        return f;
+        final Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(config.getEndpoint())
+                .addConverterFactory(GsonConverterFactory.create())
+                .addConverterFactory(new EnumConverterFactory())
+                .build();
+        this.service = retrofit.create(ScopeDBService.class);
     }
 
     public CompletableFuture<IngestResponse> ingestArrowBatch(List<VectorSchemaRoot> batches, String statement) {
-        final CompletableFuture<IngestResponse> f = new CompletableFuture<>();
+        final RetryPolicyBuilder<Response<IngestResponse>> retryPolicyBuilder = createSharedRetryPolicyBuilder();
+        final RetryPolicy<Response<IngestResponse>> retryPolicy = retryPolicyBuilder.build();
 
-        final Request req = makeIngestRequest(ArrowBatchConvertor.writeArrowBatch(batches), statement);
-        client.newCall(req).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                f.completeExceptionally(e);
-            }
-
-            @Override
-            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
-                final ResponseBody body = Objects.requireNonNull(response.body());
-                if (response.isSuccessful()) {
-                    final IngestResponse resp = GSON.fromJson(body.string(), IngestResponse.class);
-                    f.complete(resp);
-                } else {
-                    final ScopeDBException e = ScopeDBException.fromResponse(response.code(), body.string());
-                    f.completeExceptionally(e);
-                }
-            }
-        });
-
-        return f;
-    }
-
-    private Request makeStatementRequest(StatementRequest request) {
-        final HttpUrl url = HttpUrl.Companion.get(config.getEndpoint())
-                .newBuilder()
-                .addPathSegments("v1/statements")
-                .build();
-        final RequestBody body = RequestBody.create(GSON.toJson(request), JSON);
-        return new Request.Builder().url(url).post(body).build();
-    }
-
-    private Request makeFetchStatementRequest(FetchStatementParams params) {
-        final HttpUrl url = HttpUrl.Companion.get(config.getEndpoint())
-                .newBuilder()
-                .addPathSegments("v1/statements")
-                .addPathSegment(params.getStatementId())
-                .addQueryParameter("format", params.getFormat().toParam())
-                .build();
-        return new Request.Builder().url(url).build();
-    }
-
-    private Request makeIngestRequest(String rows, String statement) {
-        final HttpUrl url = HttpUrl.Companion.get(config.getEndpoint())
-                .newBuilder()
-                .addPathSegments("v1/ingest")
-                .build();
+        final String rows = ArrowBatchConvertor.writeArrowBatch(batches);
         final IngestRequest request = IngestRequest.builder()
-                .statement(statement)
                 .data(IngestData.builder().rows(rows).build())
+                .statement(statement)
                 .build();
-        final RequestBody body = RequestBody.create(GSON.toJson(request), JSON);
-        return new Request.Builder().url(url).post(body).build();
-    }
 
-    private CompletableFuture<StatementResponse> execute(StatementRequest request, boolean forget) {
-        final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
-
-        final Request req = makeStatementRequest(request);
-        client.newCall(req).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                f.completeExceptionally(e);
-            }
-
-            @Override
-            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
-                final ResponseBody body = Objects.requireNonNull(response.body());
-                if (response.isSuccessful()) {
-                    final StatementResponse resp = GSON.fromJson(body.string(), StatementResponse.class);
-                    if (resp.getStatus() != StatementStatus.Finished && !forget) {
-                        final String statementId = resp.getStatementId();
-                        final FetchStatementParams params = FetchStatementParams.builder()
-                                .statementId(statementId)
-                                .format(request.getFormat())
-                                .build();
-                        ScopeDBClient.this.fetchWith(f, params, false);
-                    } else {
-                        f.complete(resp);
-                    }
-                } else {
-                    final ScopeDBException e = ScopeDBException.fromResponse(response.code(), body.string());
-                    f.completeExceptionally(e);
-                }
-            }
-        });
-
+        final CompletableFuture<IngestResponse> f = new CompletableFuture<>();
+        final Call<IngestResponse> call = service.ingest(request);
+        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete((r, t) -> resolveResponse(r, t, f));
         return f;
     }
 
-    private void fetchWith(CompletableFuture<StatementResponse> f, FetchStatementParams params, boolean forget) {
-        final Request req = makeFetchStatementRequest(params);
+    public CompletableFuture<StatementResponse> submit(StatementRequest request, boolean waitUntilDone) {
+        final RetryPolicyBuilder<Response<StatementResponse>> retryPolicyBuilder = createSharedRetryPolicyBuilder();
+        final RetryPolicy<Response<StatementResponse>> retryPolicy = retryPolicyBuilder.build();
 
-        client.newCall(req).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                f.completeExceptionally(e);
-            }
-
-            @Override
-            public void onResponse(@NotNull Call call, @NotNull Response response) throws IOException {
-                final ResponseBody body = Objects.requireNonNull(response.body());
-                if (response.isSuccessful()) {
-                    final StatementResponse resp = GSON.fromJson(body.string(), StatementResponse.class);
-                    if (resp.getStatus() != StatementStatus.Finished && !forget) {
-                        ScopeDBClient.this.fetchWith(f, params, false);
-                    } else {
-                        f.complete(resp);
-                    }
-                } else {
-                    final ScopeDBException e = ScopeDBException.fromResponse(response.code(), body.string());
-                    f.completeExceptionally(e);
+        final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
+        final Call<StatementResponse> call = service.submit(request);
+        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete((r, t) -> {
+            if (waitUntilDone && r.isSuccessful()) {
+                final StatementResponse resp = r.body();
+                if (resp != null && resp.getStatus() != StatementStatus.Finished) {
+                    final FetchStatementParams params = FetchStatementParams.builder()
+                            .statementId(resp.getStatementId())
+                            .format(request.getFormat())
+                            .build();
+                    fetch(params, true).whenComplete((response, throwable) -> {
+                        if (throwable != null) {
+                            f.completeExceptionally(throwable);
+                        } else {
+                            f.complete(response);
+                        }
+                    });
+                    return;
                 }
             }
+
+            resolveResponse(r, t, f);
         });
+        return f;
+    }
+
+    public CompletableFuture<StatementResponse> fetch(FetchStatementParams params, boolean retryUntilDone) {
+        final RetryPolicyBuilder<Response<StatementResponse>> retryPolicyBuilder = createSharedRetryPolicyBuilder();
+        final RetryPolicy<Response<StatementResponse>> retryPolicy;
+        if (retryUntilDone) {
+            retryPolicy = retryPolicyBuilder
+                    .handleResultIf(response -> {
+                        // statement is not done; retry
+                        if (response.isSuccessful()) {
+                            final StatementResponse statementResponse = response.body();
+                            return statementResponse != null
+                                    && statementResponse.getStatus() != StatementStatus.Finished;
+                        }
+
+                        // all non-200 responses are considered as permanently failed
+                        return false;
+                    })
+                    .build();
+        } else {
+            retryPolicy = retryPolicyBuilder.build();
+        }
+
+        final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
+        final Call<StatementResponse> call = service.fetch(params.getStatementId(), params.getFormat());
+        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete((r, t) -> resolveResponse(r, t, f));
+        return f;
+    }
+
+    private static <T> RetryPolicyBuilder<Response<T>> createSharedRetryPolicyBuilder() {
+        return RetryPolicy.<Response<T>>builder()
+                .withJitter(0.15)
+                .withMaxDuration(Duration.ofSeconds(60))
+                .withDelay(Duration.ofSeconds(1));
+    }
+
+    private static <T> void resolveResponse(Response<T> r, Throwable t, CompletableFuture<T> f) {
+        if (t != null) {
+            f.completeExceptionally(t);
+            return;
+        }
+
+        if (r.isSuccessful()) {
+            f.complete(r.body());
+            return;
+        }
+
+        try (final ResponseBody error = r.errorBody()) {
+            if (error != null) {
+                f.completeExceptionally(ScopeDBException.fromResponse(r.code(), error.string()));
+            } else {
+                f.completeExceptionally(ScopeDBException.fromResponse(r.code(), null));
+            }
+        } catch (Exception e) {
+            f.completeExceptionally(e);
+        }
     }
 }
