@@ -19,9 +19,7 @@ package integration_tests
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
-	"log"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -32,41 +30,56 @@ import (
 	"github.com/apache/arrow/go/v17/arrow/array"
 	"github.com/apache/arrow/go/v17/arrow/memory"
 	scopedb "github.com/scopedb/scopedb-sdk/go"
+	testkit "github.com/scopedb/scopedb-sdk/go/integration_tests/internal"
 	"github.com/stretchr/testify/require"
 )
 
-func initDatabase(t *testing.T, ctx context.Context, conn *scopedb.Connection, tableName string) {
-	logTableName := fmt.Sprintf("%s_log", tableName)
-	stageTableName := fmt.Sprintf("%s_stage", tableName)
+const (
+	IngestDataBatch = 10000
+	TaskParallelism = 8
+	TaskInterval    = 50 * time.Millisecond
+	TaskDuration    = 10 * time.Second
+)
 
-	stmt := fmt.Sprintf(`CREATE TABLE %s (id INT, message STRING, var VARIANT)`, logTableName)
-	err := conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement:   stmt,
-		Format:      scopedb.ArrowJSONFormat,
-		WaitTimeout: "60s",
-	})
-	require.NoError(t, err)
+type stressSuite struct {
+	t  testing.TB
+	tk *testkit.TestKit
 
-	stmt = fmt.Sprintf(`CREATE TABLE %s (id INT, message STRING, var VARIANT)`, stageTableName)
-	err = conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement:   stmt,
-		Format:      scopedb.ArrowJSONFormat,
-		WaitTimeout: "30s",
-	})
-	require.NoError(t, err)
+	idGen          *atomic.Int64
+	tableName      string
+	logTableName   string
+	stageTableName string
+}
 
-	stmt = fmt.Sprintf(`CREATE TASK %s_compact_log
+func newStressSuite(t testing.TB, tk *testkit.TestKit) *stressSuite {
+	tableName := tk.RandomName()
+
+	return &stressSuite{
+		t:              t,
+		tk:             tk,
+		idGen:          &atomic.Int64{},
+		tableName:      tableName,
+		logTableName:   fmt.Sprintf("%s_log", tableName),
+		stageTableName: fmt.Sprintf("%s_stage", tableName),
+	}
+}
+
+func (suite *stressSuite) init(ctx context.Context) {
+	stmt := fmt.Sprintf(`CREATE TABLE %s (id INT, message STRING, var VARIANT)`, suite.logTableName)
+	suite.tk.NewTable(ctx, suite.logTableName, stmt)
+
+	stmt = fmt.Sprintf(`CREATE TABLE %s (id INT, message STRING, var VARIANT)`, suite.stageTableName)
+	suite.tk.NewTable(ctx, suite.stageTableName, stmt)
+
+	taskName := fmt.Sprintf(`%s_compact_log`, suite.tableName)
+	stmt = fmt.Sprintf(`CREATE TASK %s
 		SCHEDULE = '* * * * * Asia/Shanghai'
 		NODEGROUP = 'default' AS
-		OPTIMIZE TABLE scopedb.public.%s`, tableName, logTableName)
-	err = conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement:   stmt,
-		Format:      scopedb.ArrowJSONFormat,
-		WaitTimeout: "30s",
-	})
-	require.NoError(t, err)
+		OPTIMIZE TABLE scopedb.public.%s`, taskName, suite.logTableName)
+	suite.tk.NewTask(ctx, taskName, stmt)
 
-	stmt = fmt.Sprintf(`CREATE TASK %[1]v_merge_stage
+	taskName = fmt.Sprintf(`%s_compact_stage`, suite.tableName)
+	stmt = fmt.Sprintf(`CREATE TASK %[1]v
 		SCHEDULE = '* * * * * Asia/Shanghai'
 		NODEGROUP = 'default' AS
 		BEGIN
@@ -75,30 +88,31 @@ func initDatabase(t *testing.T, ctx context.Context, conn *scopedb.Connection, t
 				WHEN MATCHED THEN UPDATE ALL
 				WHEN NOT MATCHED THEN INSERT ALL;
 			DELETE FROM %[3]v;
-		END`, tableName, logTableName, stageTableName)
-	err = conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement:   stmt,
+		END`, taskName, suite.logTableName, suite.stageTableName)
+	suite.tk.NewTask(ctx, taskName, stmt)
+}
+
+func (suite *stressSuite) queryColumns(ctx context.Context) {
+	start := time.Now()
+	_ = suite.tk.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
+		Statement:   "FROM system.columns",
+		WaitTimeout: "60s",
 		Format:      scopedb.ArrowJSONFormat,
-		WaitTimeout: "30s",
 	})
-	require.NoError(t, err)
+	suite.t.Logf("Queried columns in %s", time.Since(start))
 }
 
-func generateRandomString(length int) (string, error) {
-	if length <= 0 {
-		return "", fmt.Errorf("length must be greater than 0")
-	}
-
-	bytes := make([]byte, length)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(bytes)[:length], nil
+func (suite *stressSuite) queryTables(ctx context.Context) {
+	start := time.Now()
+	_ = suite.tk.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
+		Statement:   "FROM system.tables",
+		WaitTimeout: "60s",
+		Format:      scopedb.ArrowJSONFormat,
+	})
+	suite.t.Logf("Queried tables in %s", time.Since(start))
 }
 
-func ingestLogs(t *testing.T, conn *scopedb.Connection, tableName string, batchSize int, idStart int64) {
+func (suite *stressSuite) ingestLogs(ctx context.Context) {
 	schema := arrow.NewSchema([]arrow.Field{
 		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
 		{Name: "message", Type: arrow.BinaryTypes.String},
@@ -108,10 +122,9 @@ func ingestLogs(t *testing.T, conn *scopedb.Connection, tableName string, batchS
 	b := array.NewRecordBuilder(memory.DefaultAllocator, schema)
 	defer b.Release()
 
-	msg, err := generateRandomString(1024)
-	require.NoError(t, err)
-
-	for i := 0; i < batchSize; i++ {
+	msg := suite.tk.RandomString(1024)
+	idStart := suite.idGen.Load()
+	for i := 0; i < IngestDataBatch; i++ {
 		b.Field(0).(*array.Int64Builder).Append(int64(i) + idStart)
 		b.Field(1).(*array.StringBuilder).Append("[INFO] 2024/02/02 00:00:00 path/to/file.go:123 - " + msg)
 		b.Field(2).(*array.StringBuilder).Append(fmt.Sprintf(`{"%d": 1, "k_%d": 1 , "v_%d": 1 }`, i, i, i))
@@ -120,15 +133,13 @@ func ingestLogs(t *testing.T, conn *scopedb.Connection, tableName string, batchS
 	rec := b.NewRecord()
 	defer rec.Release()
 
-	_, err = conn.IngestArrowBatch(context.Background(), []arrow.Record{
-		rec,
-	}, fmt.Sprintf(`SELECT $0, $1, PARSE_JSON($2) INSERT INTO scopedb.public.%s`, tableName))
-	require.NoError(t, err)
-
-	log.Printf("Ingested %d logs into %s", batchSize, tableName)
+	stmt := fmt.Sprintf(`SELECT $0, $1, PARSE_JSON($2) INSERT INTO scopedb.public.%s`, suite.logTableName)
+	suite.tk.IngestArrowBatch(ctx, []arrow.Record{rec}, stmt)
+	suite.idGen.Add(IngestDataBatch)
+	suite.t.Logf("Ingested %d logs into %s", IngestDataBatch, suite.logTableName)
 }
 
-func ingestStageLog(t *testing.T, conn *scopedb.Connection, tableName string, batchSize int, idStart int64) {
+func (suite *stressSuite) ingestStageLog(ctx context.Context) {
 	schema := arrow.NewSchema([]arrow.Field{
 		{Name: "id", Type: arrow.PrimitiveTypes.Int64},
 		{Name: "message", Type: arrow.BinaryTypes.String},
@@ -138,10 +149,9 @@ func ingestStageLog(t *testing.T, conn *scopedb.Connection, tableName string, ba
 	b := array.NewRecordBuilder(memory.DefaultAllocator, schema)
 	defer b.Release()
 
-	msg, err := generateRandomString(1024)
-	require.NoError(t, err)
-
-	for i := 0; i < batchSize; i++ {
+	msg := suite.tk.RandomString(1024)
+	idStart := suite.idGen.Load()
+	for i := 0; i < IngestDataBatch; i++ {
 		b.Field(0).(*array.Int64Builder).Append(int64(i) + idStart)
 		b.Field(1).(*array.StringBuilder).Append("[INFO] 2024/02/02 00:00:00 path/to/file.go:123 - " + msg)
 		b.Field(2).(*array.StringBuilder).Append(fmt.Sprintf(`{"%d": 1, "k_%d": 1 , "v_%d": 1 }`, i, i, i))
@@ -150,79 +160,22 @@ func ingestStageLog(t *testing.T, conn *scopedb.Connection, tableName string, ba
 	rec := b.NewRecord()
 	defer rec.Release()
 
-	_, err = conn.IngestArrowBatch(context.Background(), []arrow.Record{
-		rec,
-	}, fmt.Sprintf(`SELECT $0, $1, PARSE_JSON($2) INSERT INTO scopedb.public.%s`, tableName))
-	require.NoError(t, err)
-
-	log.Printf("Ingested %d logs into %s", batchSize, tableName)
+	stmt := fmt.Sprintf(`SELECT $0, $1, PARSE_JSON($2) INSERT INTO scopedb.public.%s`, suite.stageTableName)
+	suite.tk.IngestArrowBatch(ctx, []arrow.Record{rec}, stmt)
+	suite.idGen.Add(IngestDataBatch)
+	suite.t.Logf("Ingested %d logs into %s", IngestDataBatch, suite.stageTableName)
 }
 
-func queryTables(t *testing.T, conn *scopedb.Connection) {
-	stmt := "FROM system.tables"
+func BenchmarkStressHeavyReadWrite(b *testing.B) {
+	tk := testkit.NewTestKit(b)
+	if tk == nil {
+		b.Skip("nil testkit")
+	}
+	defer tk.Close()
 
-	start := time.Now()
-	_, err := conn.QueryAsArrowBatch(context.Background(), &scopedb.StatementRequest{
-		Statement:   stmt,
-		Format:      scopedb.ArrowJSONFormat,
-		WaitTimeout: "30s",
-	})
-	require.NoError(t, err)
-
-	log.Printf("Queried tables in %s", time.Since(start))
-}
-
-func queryColumns(t *testing.T, conn *scopedb.Connection) {
-	stmt := "FROM system.columns"
-
-	start := time.Now()
-	_, err := conn.QueryAsArrowBatch(context.Background(), &scopedb.StatementRequest{
-		Statement:   stmt,
-		Format:      scopedb.ArrowJSONFormat,
-		WaitTimeout: "30s",
-	})
-	require.NoError(t, err)
-
-	log.Printf("Queried columns in %s", time.Since(start))
-}
-
-const (
-	IngestDataBatch = 10000
-	IngestDataMax   = 1000000
-
-	TaskParallelism = 8
-	TaskInterval    = 50 * time.Millisecond
-	TaskDuration    = 10 * time.Second
-)
-
-func TestStressHeavyReadWrite(t *testing.T) {
 	ctx := context.Background()
-	idGen := &atomic.Int64{}
-
-	config := LoadConfig()
-	if config == nil {
-		t.Skip("Connection config is not set")
-	}
-
-	if !OptionEnabled("ENABLE_STRESS_TEST") {
-		t.Skip("Stress test is disabled")
-	}
-
-	tableName, err := GenerateTableName()
-	logTableName := fmt.Sprintf("%s_log", tableName)
-	stageTableName := fmt.Sprintf("%s_stage", tableName)
-	require.NoError(t, err)
-	t.Logf("With tableName: %s", tableName)
-
-	conn := scopedb.Open(config)
-	defer conn.Close()
-	initDatabase(t, ctx, conn, tableName)
-
-	ingestLogs(t, conn, logTableName, IngestDataBatch, idGen.Load())
-	idGen.Add(IngestDataBatch)
-
-	ingestStageLog(t, conn, stageTableName, IngestDataBatch, idGen.Load())
-	idGen.Add(IngestDataBatch)
+	suite := newStressSuite(b, tk)
+	suite.init(ctx)
 
 	wg := sync.WaitGroup{}
 	tasks := make(chan func(), 1024)
@@ -237,37 +190,28 @@ func TestStressHeavyReadWrite(t *testing.T) {
 	}
 
 	c := time.After(TaskDuration)
+
 	for {
 		select {
 		case <-c:
 			close(tasks)
 			wg.Wait()
-			fmt.Println("Ingested:", idGen.Load())
+			fmt.Println("Ingested:", suite.idGen.Load())
 			fmt.Println("Shutting down...")
 			return
 		default:
 			tasks <- func() {
 				n, err := rand.Int(rand.Reader, big.NewInt(4))
-				require.NoError(t, err)
+				require.NoError(b, err)
 				switch n.Int64() {
 				case 0:
-					if idGen.Load() < IngestDataMax {
-						ingestLogs(t, conn, logTableName, IngestDataBatch, idGen.Load())
-						idGen.Add(IngestDataBatch)
-						break
-					}
-					fallthrough
+					suite.ingestLogs(ctx)
 				case 1:
-					queryTables(t, conn)
+					suite.queryTables(ctx)
 				case 2:
-					if idGen.Load() < IngestDataMax {
-						ingestStageLog(t, conn, stageTableName, IngestDataBatch, idGen.Load())
-						idGen.Add(IngestDataBatch)
-						break
-					}
-					fallthrough
+					suite.ingestStageLog(ctx)
 				case 3:
-					queryColumns(t, conn)
+					suite.queryColumns(ctx)
 				}
 			}
 			time.Sleep(TaskInterval)
