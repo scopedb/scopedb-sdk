@@ -20,58 +20,48 @@ import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import lombok.Data;
 import lombok.Getter;
+import org.jetbrains.annotations.Nullable;
 
+/**
+ * Exception from a ScopeDB server error response.
+ */
+@Getter
 public class ScopeDBException extends Exception {
     private static final Gson GSON = new Gson();
 
-    private ScopeDBException(String message) {
-        super(message);
+    private final int statusCode;
+
+    @Nullable
+    private final Code errorCode;
+
+    private ScopeDBException(int statusCode, @Nullable Code errorCode, String message) {
+        super(String.format("%d [%s]: %s", statusCode, errorCode, message));
+        this.statusCode = statusCode;
+        this.errorCode = errorCode;
     }
 
-    @Getter
-    public static class Server extends ScopeDBException {
-        private final int statusCode;
-        private final Code errorCode;
-
-        private Server(int statusCode, Code errorCode, String message) {
-            super(String.format("%d [%s]: %s", statusCode, errorCode, message));
-            this.statusCode = statusCode;
-            this.errorCode = errorCode;
-        }
-
-        public enum Code {
-            Unexpected,
-            NotFound,
-            AlreadyExists,
-        }
-
-        @Data
-        private static class Response {
-            private final String code;
-            private final String message;
-        }
+    public enum Code {
+        Unexpected,
+        NotFound,
+        AlreadyExists,
     }
 
-    @Getter
-    public static class Client extends ScopeDBException {
-        private final int statusCode;
-
-        private Client(int statusCode, String message) {
-            super(String.format("%d: %s", statusCode, message));
-            this.statusCode = statusCode;
-        }
+    @Data
+    private static class Response {
+        private final String code;
+        private final String message;
     }
 
-    public static ScopeDBException fromResponse(int statusCode, String body) {
+    public static ScopeDBException of(int statusCode, String body) {
         try {
             if (body != null) {
-                final Server.Response response = GSON.fromJson(body, Server.Response.class);
-                final Server.Code errorCode = Server.Code.valueOf(response.code);
-                return new ScopeDBException.Server(statusCode, errorCode, response.message);
+                final Response response = GSON.fromJson(body, Response.class);
+                final Code errorCode = Code.valueOf(response.code);
+                return new ScopeDBException(statusCode, errorCode, response.message);
             }
         } catch (JsonSyntaxException ignored) {
             // passthrough
         }
-        return new ScopeDBException.Client(statusCode, body);
+        return new ScopeDBException(statusCode, null, body);
     }
 }

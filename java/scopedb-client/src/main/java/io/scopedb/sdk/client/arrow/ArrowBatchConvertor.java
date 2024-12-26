@@ -18,11 +18,11 @@ package io.scopedb.sdk.client.arrow;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import lombok.Cleanup;
+import lombok.SneakyThrows;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.VectorSchemaRoot;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
@@ -37,32 +37,34 @@ public final class ArrowBatchConvertor {
      * @param allocator BufferAllocator to allocate memory
      * @return Arrow batches as a list of {@link VectorSchemaRoot}
      */
+    @SneakyThrows // IOException
     public static List<VectorSchemaRoot> readArrowBatch(String rows, BufferAllocator allocator) {
         final List<VectorSchemaRoot> batches = new ArrayList<>();
         final byte[] data = Base64.getDecoder().decode(rows);
-        final ByteArrayInputStream stream = new ByteArrayInputStream(data);
-        try (final ArrowStreamReader reader = new ArrowStreamReader(stream, allocator)) {
-            while (reader.loadNextBatch()) {
-                batches.add(new Table(reader.getVectorSchemaRoot()).toVectorSchemaRoot());
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+
+        @Cleanup ByteArrayInputStream stream = new ByteArrayInputStream(data);
+        @Cleanup ArrowStreamReader reader = new ArrowStreamReader(stream, allocator);
+        while (reader.loadNextBatch()) {
+            batches.add(new Table(reader.getVectorSchemaRoot()).toVectorSchemaRoot());
         }
         return batches;
     }
 
+    /**
+     * Write arrow batches to BASE64 encoded rows string.
+     *
+     * @param batches Arrow batches as a list of {@link VectorSchemaRoot}
+     * @return BASE64 encoded rows string
+     */
+    @SneakyThrows // IOException
     public static String writeArrowBatch(List<VectorSchemaRoot> batches) {
-        try (final ByteArrayOutputStream stream = new ByteArrayOutputStream()) {
-            for (VectorSchemaRoot batch : batches) {
-                try (final ArrowStreamWriter writer = new ArrowStreamWriter(batch, null, stream)) {
-                    writer.start();
-                    writer.writeBatch();
-                    writer.end();
-                }
-            }
-            return Base64.getEncoder().encodeToString(stream.toByteArray());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        @Cleanup ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        for (VectorSchemaRoot batch : batches) {
+            @Cleanup ArrowStreamWriter writer = new ArrowStreamWriter(batch, null, stream);
+            writer.start();
+            writer.writeBatch();
+            writer.end();
         }
+        return Base64.getEncoder().encodeToString(stream.toByteArray());
     }
 }
