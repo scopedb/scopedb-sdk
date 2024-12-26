@@ -26,70 +26,54 @@ import (
 	"github.com/apache/arrow/go/v17/arrow/memory"
 	"github.com/gkampitakis/go-snaps/snaps"
 	scopedb "github.com/scopedb/scopedb-sdk/go"
+	testkit "github.com/scopedb/scopedb-sdk/go/integration_tests/internal"
 	"github.com/stretchr/testify/require"
 )
 
 func TestReadAfterWrite(t *testing.T) {
+	tk := testkit.NewTestKit(t)
+	if tk == nil {
+		t.Skip("nil testkit")
+	}
+	defer tk.Close()
+
 	ctx := context.Background()
 
-	config := LoadConfig()
-	if config == nil {
-		t.Skip("Connection config is not set")
-	}
-
-	tableName, err := GenerateTableName()
-	require.NoError(t, err)
-	t.Logf("With tableName: %s", tableName)
-
-	conn := scopedb.Open(config)
-	defer conn.Close()
-
+	tableName := tk.RandomName()
 	statement := fmt.Sprintf("CREATE TABLE %s (a INT, v VARIANT)", tableName)
-	err = conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement: statement,
-		Format:    scopedb.ArrowJSONFormat,
-	})
-	require.NoError(t, err)
-	defer func() {
-		err := DropTable(ctx, conn, tableName)
-		require.NoError(t, err)
-	}()
+	tk.NewTable(ctx, tableName, statement)
 
 	// 1. Simple ingest and verify the result
 	schema := makeSchema()
 	records := makeRecords(schema)
-	resp, err := conn.IngestArrowBatch(ctx, records, fmt.Sprintf("INSERT INTO %s", tableName))
-	require.NoError(t, err)
+	resp := tk.IngestArrowBatch(ctx, records, fmt.Sprintf("INSERT INTO %s", tableName))
 	require.Equal(t, resp.NumRowsInserted, 2)
 	require.Equal(t, resp.NumRowsUpdated, 0)
 	require.Equal(t, resp.NumRowsDeleted, 0)
 
 	statement = fmt.Sprintf("FROM %s", tableName)
-	rs, err := conn.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
+	rs := tk.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
 		Statement: statement,
 		Format:    scopedb.ArrowJSONFormat,
 	})
-	require.NoError(t, err)
 	snaps.MatchSnapshot(t, rs.Metadata)
 	snaps.MatchSnapshot(t, fmt.Sprintf("%v", rs.Records))
 
 	// 2. Merge data and verify the result
 	mergeRecords := makeMergeRecords(schema)
-	resp, err = conn.IngestArrowBatch(ctx, mergeRecords, fmt.Sprintf(`
+	resp = tk.IngestArrowBatch(ctx, mergeRecords, fmt.Sprintf(`
 	MERGE INTO %s
 	ON %s.a = $0
 	WHEN MATCHED THEN UPDATE ALL
 	`, tableName, tableName))
-	require.NoError(t, err)
 	require.Equal(t, resp.NumRowsInserted, 0)
 	require.Equal(t, resp.NumRowsUpdated, 1)
 	require.Equal(t, resp.NumRowsDeleted, 0)
 
-	rs, err = conn.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
+	rs = tk.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
 		Statement: statement,
 		Format:    scopedb.ArrowJSONFormat,
 	})
-	require.NoError(t, err)
 	snaps.MatchSnapshot(t, rs.Metadata)
 	snaps.MatchSnapshot(t, fmt.Sprintf("%v", rs.Records))
 }

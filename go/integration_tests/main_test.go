@@ -17,55 +17,11 @@
 package integration_tests
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"strings"
 	"testing"
 
-	"github.com/lucasepe/codename"
-	scopedb "github.com/scopedb/scopedb-sdk/go"
 	"go.uber.org/goleak"
 )
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
-}
-
-// LoadConfig loads the configuration from environment variables.
-func LoadConfig() *scopedb.Config {
-	endpoint := os.Getenv("SCOPEDB_ENDPOINT")
-	if endpoint == "" {
-		return nil
-	}
-	return &scopedb.Config{
-		Endpoint: endpoint,
-	}
-}
-
-// OptionEnabled returns true if the environment variable is set to a truthy value.
-func OptionEnabled(key string) bool {
-	value := os.Getenv(key)
-	switch strings.ToLower(value) {
-	case "1", "true", "y", "yes", "on":
-		return true
-	default:
-		return false
-	}
-}
-
-func GenerateTableName() (string, error) {
-	rng, err := codename.DefaultRNG()
-	if err != nil {
-		return "", err
-	}
-	tableName := strings.ReplaceAll(codename.Generate(rng, 10), "-", "_")
-	return tableName, nil
-}
-
-func DropTable(ctx context.Context, conn *scopedb.Connection, tableName string) error {
-	return conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement: fmt.Sprintf(`DROP TABLE %s`, tableName),
-		Format:    scopedb.ArrowJSONFormat,
-	})
 }
