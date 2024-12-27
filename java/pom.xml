@@ -40,6 +40,7 @@
 
         <!-- library dependencies -->
         <arrow.version>17.0.0</arrow.version>
+        <asciitable.version>0.3.2</asciitable.version>
         <assertj.version>3.23.1</assertj.version>
         <failsafe.version>3.3.2</failsafe.version>
         <lombok.version>1.18.34</lombok.version>
@@ -102,6 +103,11 @@
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp</artifactId>
                 <version>${okhttp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>de.vandermeer</groupId>
+                <artifactId>asciitable</artifactId>
+                <version>${asciitable.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
