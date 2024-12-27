@@ -24,10 +24,12 @@ import java.util.List;
 import lombok.Cleanup;
 import lombok.SneakyThrows;
 import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.vector.VectorLoader;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.VectorUnloader;
 import org.apache.arrow.vector.ipc.ArrowStreamReader;
 import org.apache.arrow.vector.ipc.ArrowStreamWriter;
-import org.apache.arrow.vector.table.Table;
+import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
 
 public final class ArrowBatchConvertor {
     /**
@@ -45,7 +47,11 @@ public final class ArrowBatchConvertor {
         @Cleanup ByteArrayInputStream stream = new ByteArrayInputStream(data);
         @Cleanup ArrowStreamReader reader = new ArrowStreamReader(stream, allocator);
         while (reader.loadNextBatch()) {
-            batches.add(new Table(reader.getVectorSchemaRoot()).toVectorSchemaRoot());
+            final VectorSchemaRoot source = reader.getVectorSchemaRoot();
+            final VectorSchemaRoot copy = VectorSchemaRoot.create(source.getSchema(), allocator);
+            @Cleanup ArrowRecordBatch recordBatch = new VectorUnloader(source).getRecordBatch();
+            new VectorLoader(copy).load(recordBatch);
+            batches.add(copy);
         }
         return batches;
     }
