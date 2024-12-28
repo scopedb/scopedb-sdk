@@ -16,6 +16,7 @@ name: CI (Go SDK)
 on:
   pull_request:
     branches: [ main ]
+    paths: [ 'go/**' ]
   schedule:
     # ScopeDB edge is cut every day at 02:04, so we run the CI at 04:02 to ensure the latest version is tested.
     - cron: '2 4 * * *'

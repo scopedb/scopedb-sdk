@@ -57,6 +57,9 @@
         <jetbrains-annotations.version>26.0.1</jetbrains-annotations.version>
         <palantir-java-format.version>2.50.0</palantir-java-format.version>
         <spotless.version>2.43.0</spotless.version>
+
+        <!-- optionally set based on JDK versions -->
+        <scopedb.surefire.argLine/>
     </properties>
 
     <dependencyManagement>
@@ -148,6 +151,20 @@
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>jdk11</id>
+            <activation>
+                <jdk>[11,)</jdk>
+            </activation>
+            <properties>
+                <scopedb.surefire.argLine>
+                    --add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED
+                </scopedb.surefire.argLine>
+            </properties>
+        </profile>
+    </profiles>
+
     <build>
         <pluginManagement>
             <plugins>
@@ -180,7 +197,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
-                    <argLine>--add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED</argLine>
+                    <argLine>${scopedb.surefire.argLine}</argLine>
                 </configuration>
             </plugin>
             <plugin>
