@@ -33,6 +33,8 @@ type statementAPI interface {
 	submitStatement(ctx context.Context, req *StatementRequest) (*StatementResponse, error)
 	// fetchStatementResult fetches the result of a statement by its ID.
 	fetchStatementResult(ctx context.Context, params *FetchStatementParams) (*StatementResponse, error)
+	// cancelStatement cancels a statement by its ID.
+	cancelStatement(ctx context.Context, statementId string) error
 }
 
 var _ statementAPI = (*Connection)(nil)
@@ -61,19 +63,28 @@ const (
 	ArrowJSONFormat ResultFormat = "arrow-json"
 )
 
-type QueryStatus string
+type StatementStatus string
 
 const (
-	// QueryStatusRunning indicates the query is not finished yet.
-	QueryStatusRunning QueryStatus = "running"
-	// QueryStatusFinished indicates the query is finished.
-	QueryStatusFinished QueryStatus = "finished"
+	// StatementStatusRunning indicates the query is not finished yet.
+	StatementStatusRunning StatementStatus = "running"
+	// StatementStatusFinished indicates the query is finished.
+	StatementStatusFinished StatementStatus = "finished"
 )
 
 type StatementResponse struct {
-	StatementId string      `json:"statement_id"`
-	Status      QueryStatus `json:"status"`
-	ResultSet   *ResultSet  `json:"result_set"`
+	StatementId string            `json:"statement_id"`
+	Progress    StatementProgress `json:"progress"`
+	Status      StatementStatus   `json:"status"`
+	ResultSet   *ResultSet        `json:"result_set"`
+}
+
+type StatementProgress struct {
+	// TotalProgress is the total progress in percentage: [0.0, 100.0].
+	TotalProgress float64 `json:"total_progress"`
+
+	// TotalNanos is the execution time in nanoseconds.
+	TotalNanos int64 `json:"total_nanos"`
 }
 
 type ResultSet struct {
@@ -144,7 +155,7 @@ func (f *ResultSetFetcher) FetchResultSet(ctx context.Context) (*StatementRespon
 			if err != nil {
 				return nil, err
 			}
-			if resp.Status == QueryStatusFinished {
+			if resp.Status == StatementStatusFinished {
 				return resp, nil
 			}
 		}
@@ -186,6 +197,20 @@ func (conn *Connection) submitStatement(ctx context.Context, request *StatementR
 	var respData StatementResponse
 	err = json.Unmarshal(data, &respData)
 	return &respData, err
+}
+
+func (conn *Connection) cancelStatement(ctx context.Context, statementId string) error {
+	req, err := url.Parse(conn.config.Endpoint + "/v1/statements/" + statementId + "/cancel")
+	if err != nil {
+		return err
+	}
+
+	resp, err := conn.http.Post(ctx, req, []byte{})
+	if err != nil {
+		return err
+	}
+	defer sneakyBodyClose(resp.Body)
+	return checkStatusCodeOK(resp)
 }
 
 func (conn *Connection) fetchStatementResult(ctx context.Context, params *FetchStatementParams) (*StatementResponse, error) {

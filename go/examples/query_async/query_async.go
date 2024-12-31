@@ -30,7 +30,7 @@ func main() {
 	ctx := context.Background()
 
 	// Submit the statement to ScopeDB
-	response, err := conn.SubmitQuery(ctx, "from system.tables")
+	response, err := conn.SubmitStatement(ctx, "from system.tables")
 	if err != nil {
 		panic(err)
 	}
@@ -49,7 +49,7 @@ func main() {
 				panic(err)
 			}
 
-			if resp.Status == scopedb.QueryStatusFinished {
+			if resp.Status == scopedb.StatementStatusFinished {
 				respCh <- resp
 			}
 		}
