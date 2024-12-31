@@ -50,7 +50,7 @@ func (conn *Connection) Execute(ctx context.Context, req *StatementRequest) erro
 	if err != nil {
 		return err
 	}
-	if resp.Status == QueryStatusFinished {
+	if resp.Status == StatementStatusFinished {
 		return nil
 	}
 	f := NewResultSetFetcher(conn, &FetchStatementParams{
@@ -61,15 +61,21 @@ func (conn *Connection) Execute(ctx context.Context, req *StatementRequest) erro
 	return err
 }
 
-// SubmitQuery submits a query to the server and returns immediately.
-// The Status of the returned StatementResponse may be QueryStatusFinished if the query is finished immediately.
+// SubmitStatement submits a statement to the server and returns immediately.
+//
+// The Status of the returned StatementResponse may be StatementStatusFinished if the query is finished immediately.
 // If so, the result set is in ArrowJSONFormat. Otherwise, you can fetch the result set by NewResultSetFetcher
 // and calling 'FetchResultSet'.
-func (conn *Connection) SubmitQuery(ctx context.Context, statement string) (*StatementResponse, error) {
+func (conn *Connection) SubmitStatement(ctx context.Context, statement string) (*StatementResponse, error) {
 	return conn.submitStatement(ctx, &StatementRequest{
 		Statement: statement,
 		Format:    ArrowJSONFormat,
 	})
+}
+
+// CancelStatement cancels a statement by its ID.
+func (conn *Connection) CancelStatement(ctx context.Context, statementId string) error {
+	return conn.cancelStatement(ctx, statementId)
 }
 
 // QueryAsArrowBatch submits a query to the server and returns the result set as Arrow's record batches.
@@ -82,7 +88,7 @@ func (conn *Connection) QueryAsArrowBatch(ctx context.Context, req *StatementReq
 	if err != nil {
 		return nil, err
 	}
-	if resp.Status == QueryStatusFinished {
+	if resp.Status == StatementStatusFinished {
 		return resp.ToArrowResultSet()
 	}
 	return conn.FetchResultSetAsArrowBatch(ctx, &FetchStatementParams{

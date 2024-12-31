@@ -55,13 +55,13 @@ as decoded Arrow batches:
 		Format:    scopedb.ArrowJSONFormat,
 	})
 
-2. SubmitQuery and ResultSetFetcher
+2. SubmitStatement and ResultSetFetcher
 
-Use the SubmitQuery() method to submits a query to the server and returns immediately.
+Use the SubmitStatement() method to submits a query to the server and returns immediately.
 
-	resp, err := conn.SubmitQuery(ctx, "FROM table")
+	resp, err := conn.SubmitStatement(ctx, "FROM table")
 
-The Status of the returned StatementResponse may be QueryStatusFinished if the query is finished immediately.
+The Status of the returned StatementResponse may be StatementStatusFinished if the query is finished immediately.
 If so, the result set is in ArrowJSONFormat. Otherwise, you can fetch the result set by NewResultSetFetcher
 and calling its FetchResultSet method.
 
