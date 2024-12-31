@@ -54,6 +54,9 @@ public class ScopeDBClient {
 
         @GET("/v1/statements/{statement_id}")
         Call<StatementResponse> fetch(@Path("statement_id") String statementId, @Query("format") ResultFormat format);
+
+        @POST("/v1/statements/{statement_id}/cancel")
+        Call<Void> cancel(@Path("statement_id") String statementId);
     }
 
     private final ScopeDBService service;
@@ -78,6 +81,15 @@ public class ScopeDBClient {
         final Call<IngestResponse> call = service.ingest(request);
 
         final CompletableFuture<IngestResponse> f = new CompletableFuture<>();
+        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(FutureUtils.translateResponse(f));
+        return f;
+    }
+
+    public CompletableFuture<Void> cancel(String statementId) {
+        final RetryPolicy<Response<Void>> retryPolicy = createBasicRetryPolicy();
+        final Call<Void> call = service.cancel(statementId);
+
+        final CompletableFuture<Void> f = new CompletableFuture<>();
         FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(FutureUtils.translateResponse(f));
         return f;
     }

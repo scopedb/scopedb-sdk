@@ -25,16 +25,16 @@ import lombok.RequiredArgsConstructor;
 @Builder
 @Data
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-public class StatementResponse {
-    @SerializedName("statement_id")
-    private final String statementId;
+public class StatementProgress {
+    /**
+     * Total progress in percentage: [0.0, 100.0].
+     */
+    @SerializedName("total_progress")
+    private final double totalProgress;
 
-    @SerializedName("progress")
-    private final StatementProgress progress;
-
-    @SerializedName("status")
-    private final StatementStatus status;
-
-    @SerializedName("result_set")
-    private final ResultSet resultSet;
+    /**
+     * Total execution time in nanoseconds.
+     */
+    @SerializedName("total_nanos")
+    private final long totalNanos;
 }
