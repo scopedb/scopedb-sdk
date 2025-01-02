@@ -36,13 +36,13 @@ public class StatementProgress {
      * Duration in nanoseconds since the statement is submitted.
      */
     @SerializedName("nanos_from_submitted")
-    private final long nanos_from_submitted;
+    private final long nanosFromSubmitted;
 
     /**
      * Duration in nanoseconds since the statement is started.
      */
     @SerializedName("nanos_from_started")
-    private final long nanos_from_started;
+    private final long nanosFromStarted;
 
     /**
      * Duration in nanoseconds for estimated to finish the statement.
