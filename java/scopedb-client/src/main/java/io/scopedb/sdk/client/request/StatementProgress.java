@@ -29,12 +29,24 @@ public class StatementProgress {
     /**
      * Total progress in percentage: [0.0, 100.0].
      */
-    @SerializedName("total_progress")
-    private final double totalProgress;
+    @SerializedName("total_percentage")
+    private final double totalPercentage;
 
     /**
-     * Total execution time in nanoseconds.
+     * Duration in nanoseconds since the statement is submitted.
      */
-    @SerializedName("total_nanos")
-    private final long totalNanos;
+    @SerializedName("nanos_from_submitted")
+    private final long nanos_from_submitted;
+
+    /**
+     * Duration in nanoseconds since the statement is started.
+     */
+    @SerializedName("nanos_from_started")
+    private final long nanos_from_started;
+
+    /**
+     * Duration in nanoseconds for estimated to finish the statement.
+     */
+    @SerializedName("nanos_to_finish")
+    private final long nanosToFinish;
 }
