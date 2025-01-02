@@ -80,11 +80,17 @@ type StatementResponse struct {
 }
 
 type StatementProgress struct {
-	// TotalProgress is the total progress in percentage: [0.0, 100.0].
-	TotalProgress float64 `json:"total_progress"`
+	// TotalPercentage denotes the total progress in percentage: [0.0, 100.0].
+	TotalPercentage float64 `json:"total_percentage"`
 
-	// TotalNanos is the execution time in nanoseconds.
-	TotalNanos int64 `json:"total_nanos"`
+	// NanosFromSubmitted denotes the duration in nanoseconds since the statement is submitted.
+	NanosFromSubmitted int64 `json:"nanos_from_submitted"`
+
+	// NanosFromStarted denotes the duration in nanoseconds since the statement is started.
+	NanosFromStarted int64 `json:"nanos_from_started"`
+
+	// NanosToFinish denotes the estimated duration in nanoseconds to finish the statement.
+	NanosToFinish int64 `json:"nanos_to_finish"`
 }
 
 type ResultSet struct {
