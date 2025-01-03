@@ -16,12 +16,12 @@
 
 package io.scopedb.sdk.client.request;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public enum ResultFormat {
     /**
      * Arrow format with variant rendered as JSON (BASE64 encoded).
      */
-    @SerializedName("arrow-json")
+    @JsonProperty("arrow-json")
     ArrowJson,
 }
