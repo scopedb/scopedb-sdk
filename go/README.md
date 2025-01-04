@@ -25,6 +25,13 @@ go get -u github.com/scopedb/scopedb-sdk/go
 
 For detailed documentation and basic usage examples, please see the documentation at [godoc.org](https://godoc.org/github.com/scopedb/scopedb-sdk/go).
 
+## Compatibility
+
+| Go SDK Version | ScopeDB Version |
+| -------------- | --------------- |
+| 0.2.2          | >= 0.1.5        |
+| < 0.2.2        | archived        |
+
 ## Development
 
 The source code is hosted on [GitHub](https://github.com/scopedb/scopedb-sdk). You can check out the [CONTRIBUTING](CONTRIBUTING.md) guide to start developing.
