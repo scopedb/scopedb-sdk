@@ -16,22 +16,24 @@
 
 package io.scopedb.sdk.client.request;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.jackson.Jacksonized;
 
 @Builder
 @Data
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+@Jacksonized
 public class StatementRequest {
-    @SerializedName("statement")
+    @JsonProperty("statement")
     private final String statement;
 
-    @SerializedName("wait_timeout")
+    @JsonProperty("wait_timeout")
     private final String waitTimeout;
 
-    @SerializedName("format")
+    @JsonProperty("format")
     private final ResultFormat format;
 }

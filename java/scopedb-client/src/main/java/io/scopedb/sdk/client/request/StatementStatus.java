@@ -16,7 +16,7 @@
 
 package io.scopedb.sdk.client.request;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.scopedb.sdk.client.exception.ScopeDBException;
 
 /**
@@ -25,8 +25,8 @@ import io.scopedb.sdk.client.exception.ScopeDBException;
  * <p>Failures are exported as {@link ScopeDBException}.
  */
 public enum StatementStatus {
-    @SerializedName("running")
+    @JsonProperty("running")
     Running,
-    @SerializedName("finished")
+    @JsonProperty("finished")
     Finished,
 }

@@ -99,7 +99,9 @@ type ResultSet struct {
 }
 
 type ResultSetMetadata struct {
-	Fields []*ResultSetField `json:"fields"`
+	Fields  []*ResultSetField `json:"fields"`
+	Format  ResultFormat      `json:"format"`
+	NumRows int64             `json:"num_rows"`
 }
 
 type ResultSetField struct {

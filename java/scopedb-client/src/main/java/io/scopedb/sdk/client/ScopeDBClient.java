@@ -21,7 +21,7 @@ import dev.failsafe.RetryPolicyBuilder;
 import dev.failsafe.retrofit.FailsafeCall;
 import io.scopedb.sdk.client.arrow.ArrowBatchConvertor;
 import io.scopedb.sdk.client.helper.EnumConverterFactory;
-import io.scopedb.sdk.client.helper.FutureUtils;
+import io.scopedb.sdk.client.helper.Futures;
 import io.scopedb.sdk.client.request.FetchStatementParams;
 import io.scopedb.sdk.client.request.IngestData;
 import io.scopedb.sdk.client.request.IngestRequest;
@@ -37,7 +37,7 @@ import org.apache.arrow.vector.VectorSchemaRoot;
 import retrofit2.Call;
 import retrofit2.Response;
 import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
+import retrofit2.converter.jackson.JacksonConverterFactory;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
@@ -64,7 +64,7 @@ public class ScopeDBClient {
     public ScopeDBClient(ScopeDBConfig config) {
         final Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(config.getEndpoint())
-                .addConverterFactory(GsonConverterFactory.create())
+                .addConverterFactory(JacksonConverterFactory.create())
                 .addConverterFactory(new EnumConverterFactory())
                 .build();
         this.service = retrofit.create(ScopeDBService.class);
@@ -73,7 +73,7 @@ public class ScopeDBClient {
     public CompletableFuture<IngestResponse> ingestArrowBatch(List<VectorSchemaRoot> batches, String statement) {
         final String rows = ArrowBatchConvertor.writeArrowBatch(batches);
         final IngestRequest request = IngestRequest.builder()
-                .data(IngestData.builder().rows(rows).build())
+                .data(IngestData.Arrow.builder().rows(rows).build())
                 .statement(statement)
                 .build();
 
@@ -81,7 +81,7 @@ public class ScopeDBClient {
         final Call<IngestResponse> call = service.ingest(request);
 
         final CompletableFuture<IngestResponse> f = new CompletableFuture<>();
-        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(FutureUtils.translateResponse(f));
+        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(Futures.translateResponse(f));
         return f;
     }
 
@@ -90,7 +90,7 @@ public class ScopeDBClient {
         final Call<Void> call = service.cancel(statementId);
 
         final CompletableFuture<Void> f = new CompletableFuture<>();
-        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(FutureUtils.translateResponse(f));
+        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(Futures.translateResponse(f));
         return f;
     }
 
@@ -106,12 +106,12 @@ public class ScopeDBClient {
             }
             if (!waitUntilDone) {
                 // return immediately
-                FutureUtils.translateResponse(f).accept(r, null);
+                Futures.translateResponse(f).accept(r, null);
                 return;
             }
             if (!r.isSuccessful()) {
                 // all non-200 responses are considered as permanently failed
-                FutureUtils.translateResponse(f).accept(r, null);
+                Futures.translateResponse(f).accept(r, null);
                 return;
             }
 
@@ -129,7 +129,7 @@ public class ScopeDBClient {
                     .statementId(resp.getStatementId())
                     .format(request.getFormat())
                     .build();
-            fetch(params, true).whenComplete(FutureUtils.forward(f));
+            fetch(params, true).whenComplete(Futures.forward(f));
         });
         return f;
     }
@@ -139,7 +139,7 @@ public class ScopeDBClient {
         final Call<StatementResponse> call = service.fetch(params.getStatementId(), params.getFormat());
 
         final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
-        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(FutureUtils.translateResponse(f));
+        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(Futures.translateResponse(f));
         return f;
     }
 

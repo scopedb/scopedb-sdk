@@ -16,7 +16,7 @@
 
 package io.scopedb.sdk.client.helper;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Type;
@@ -24,7 +24,7 @@ import org.jetbrains.annotations.NotNull;
 import retrofit2.Converter;
 import retrofit2.Retrofit;
 
-public final class EnumConverterFactory extends Converter.Factory {
+public class EnumConverterFactory extends Converter.Factory {
     @Override
     public Converter<?, String> stringConverter(
             @NotNull Type type, Annotation @NotNull [] annotations, @NotNull Retrofit retrofit) {
@@ -33,20 +33,20 @@ public final class EnumConverterFactory extends Converter.Factory {
         }
         return null;
     }
-}
 
-final class EnumConverter implements Converter<Enum<?>, String> {
-    @Override
-    public String convert(@NotNull Enum<?> o) {
-        try {
-            final Field f = o.getClass().getField(o.name());
-            final SerializedName name = f.getAnnotation(SerializedName.class);
-            if (name != null) {
-                return name.value();
+    private static final class EnumConverter implements Converter<Enum<?>, String> {
+        @Override
+        public String convert(@NotNull Enum<?> o) {
+            try {
+                final Field f = o.getClass().getField(o.name());
+                final JsonProperty name = f.getAnnotation(JsonProperty.class);
+                if (name != null) {
+                    return name.value();
+                }
+            } catch (Exception ignored) {
+                // passthrough
             }
-        } catch (Exception ignored) {
-            // passthrough
+            return o.name();
         }
-        return o.name();
     }
 }

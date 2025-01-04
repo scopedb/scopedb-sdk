@@ -16,25 +16,27 @@
 
 package io.scopedb.sdk.client.request;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.jackson.Jacksonized;
 
 @Builder
 @Data
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+@Jacksonized
 public class StatementResponse {
-    @SerializedName("statement_id")
+    @JsonProperty("statement_id")
     private final String statementId;
 
-    @SerializedName("progress")
+    @JsonProperty("progress")
     private final StatementProgress progress;
 
-    @SerializedName("status")
+    @JsonProperty("status")
     private final StatementStatus status;
 
-    @SerializedName("result_set")
+    @JsonProperty("result_set")
     private final ResultSet resultSet;
 }

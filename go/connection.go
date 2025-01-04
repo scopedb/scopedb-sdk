@@ -120,7 +120,8 @@ func (conn *Connection) IngestArrowBatch(ctx context.Context, batches []arrow.Re
 
 	return conn.ingest(ctx, &ingestRequest{
 		Data: &ingestData{
-			Rows: string(rows),
+			Format: ingestFormatArrow,
+			Rows:   string(rows),
 		},
 		Statement: statement,
 	})

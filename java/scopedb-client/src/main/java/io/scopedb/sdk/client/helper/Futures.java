@@ -24,7 +24,7 @@ import okhttp3.ResponseBody;
 import retrofit2.Response;
 
 @UtilityClass
-public class FutureUtils {
+public class Futures {
     public static <T> BiConsumer<? super T, ? super Throwable> forward(CompletableFuture<T> f) {
         return (r, t) -> {
             if (t != null) {

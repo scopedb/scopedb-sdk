@@ -16,16 +16,36 @@
 
 package io.scopedb.sdk.client.request;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.jackson.Jacksonized;
 
-@Builder
-@Data
-@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-public class IngestData {
-    @SerializedName("rows")
-    private final String rows;
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "format")
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = IngestData.Arrow.class, name = "arrow"),
+    @JsonSubTypes.Type(value = IngestData.CSV.class, name = "csv"),
+})
+public interface IngestData {
+    @Builder
+    @Data
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+    @Jacksonized
+    class Arrow implements IngestData {
+        @JsonProperty("rows")
+        private final String rows;
+    }
+
+    @Builder
+    @Data
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+    @Jacksonized
+    class CSV implements IngestData {
+        @JsonProperty("rows")
+        private final String rows;
+    }
 }
