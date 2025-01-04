@@ -16,8 +16,8 @@
 
 package io.scopedb.sdk.client.exception;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.Getter;
 import org.jetbrains.annotations.Nullable;
@@ -27,7 +27,7 @@ import org.jetbrains.annotations.Nullable;
  */
 @Getter
 public class ScopeDBException extends Exception {
-    private static final Gson GSON = new Gson();
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final int statusCode;
 
@@ -55,11 +55,11 @@ public class ScopeDBException extends Exception {
     public static ScopeDBException of(int statusCode, String body) {
         try {
             if (body != null) {
-                final Response response = GSON.fromJson(body, Response.class);
+                final Response response = MAPPER.readValue(body, Response.class);
                 final Code errorCode = Code.valueOf(response.code);
                 return new ScopeDBException(statusCode, errorCode, response.message);
             }
-        } catch (JsonSyntaxException ignored) {
+        } catch (JsonProcessingException e) {
             // passthrough
         }
         return new ScopeDBException(statusCode, null, body);

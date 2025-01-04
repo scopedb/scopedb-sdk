@@ -36,8 +36,18 @@ type ingestRequest struct {
 	Statement string      `json:"statement"`
 }
 
+type ingestFormat string
+
+const (
+	ingestFormatArrow ingestFormat = "arrow"
+)
+
 type ingestData struct {
-	// Rows is a base64 encoded string, contains arrow record batches
+	// Format is the format of the data to ingest.
+	Format ingestFormat `json:"format"`
+	// Rows is the payload of the data to ingest.
+	//
+	// If Format is "arrow", Rows should be the arrow record batches in BASE64 encoding.
 	Rows string `json:"rows"`
 }
 

@@ -16,37 +16,39 @@
 
 package io.scopedb.sdk.client.request;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.jackson.Jacksonized;
 
 @Builder
 @Data
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+@Jacksonized
 public class StatementProgress {
     /**
      * Total progress in percentage: [0.0, 100.0].
      */
-    @SerializedName("total_percentage")
+    @JsonProperty("total_percentage")
     private final double totalPercentage;
 
     /**
      * Duration in nanoseconds since the statement is submitted.
      */
-    @SerializedName("nanos_from_submitted")
+    @JsonProperty("nanos_from_submitted")
     private final long nanosFromSubmitted;
 
     /**
      * Duration in nanoseconds since the statement is started.
      */
-    @SerializedName("nanos_from_started")
+    @JsonProperty("nanos_from_started")
     private final long nanosFromStarted;
 
     /**
      * Duration in nanoseconds for estimated to finish the statement.
      */
-    @SerializedName("nanos_to_finish")
+    @JsonProperty("nanos_to_finish")
     private final long nanosToFinish;
 }

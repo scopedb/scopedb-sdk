@@ -5,6 +5,8 @@
         &scopedb.ResultSetField{Name:"a", DataType:"int"},
         &scopedb.ResultSetField{Name:"v", DataType:"variant"},
     },
+    Format:  "arrow-json",
+    NumRows: 2,
 }
 ---
 
@@ -26,6 +28,8 @@
         &scopedb.ResultSetField{Name:"a", DataType:"int"},
         &scopedb.ResultSetField{Name:"v", DataType:"variant"},
     },
+    Format:  "arrow-json",
+    NumRows: 2,
 }
 ---
 

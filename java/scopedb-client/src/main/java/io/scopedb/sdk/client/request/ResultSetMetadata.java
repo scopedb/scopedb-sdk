@@ -16,17 +16,25 @@
 
 package io.scopedb.sdk.client.request;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.jackson.Jacksonized;
 
 @Builder
 @Data
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+@Jacksonized
 public class ResultSetMetadata {
-    @SerializedName("fields")
+    @JsonProperty("fields")
     private final List<ResultSetField> fields;
+
+    @JsonProperty("format")
+    private final ResultFormat format;
+
+    @JsonProperty("num_rows")
+    private final long numberOfRows;
 }

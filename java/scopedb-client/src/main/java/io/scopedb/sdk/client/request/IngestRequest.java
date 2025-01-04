@@ -16,19 +16,21 @@
 
 package io.scopedb.sdk.client.request;
 
-import com.google.gson.annotations.SerializedName;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.jackson.Jacksonized;
 
 @Builder
 @Data
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+@Jacksonized
 public class IngestRequest {
-    @SerializedName("data")
+    @JsonProperty("data")
     private final IngestData data;
 
-    @SerializedName("statement")
+    @JsonProperty("statement")
     private final String statement;
 }
