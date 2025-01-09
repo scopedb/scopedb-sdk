@@ -27,6 +27,7 @@ import io.scopedb.sdk.client.request.IngestData;
 import io.scopedb.sdk.client.request.IngestRequest;
 import io.scopedb.sdk.client.request.IngestResponse;
 import io.scopedb.sdk.client.request.ResultFormat;
+import io.scopedb.sdk.client.request.StatementCancelResponse;
 import io.scopedb.sdk.client.request.StatementRequest;
 import io.scopedb.sdk.client.request.StatementResponse;
 import io.scopedb.sdk.client.request.StatementStatus;
@@ -56,7 +57,7 @@ public class ScopeDBClient {
         Call<StatementResponse> fetch(@Path("statement_id") String statementId, @Query("format") ResultFormat format);
 
         @POST("/v1/statements/{statement_id}/cancel")
-        Call<Void> cancel(@Path("statement_id") String statementId);
+        Call<StatementCancelResponse> cancel(@Path("statement_id") String statementId);
     }
 
     private final ScopeDBService service;
@@ -85,11 +86,11 @@ public class ScopeDBClient {
         return f;
     }
 
-    public CompletableFuture<Void> cancel(String statementId) {
-        final RetryPolicy<Response<Void>> retryPolicy = createBasicRetryPolicy();
-        final Call<Void> call = service.cancel(statementId);
+    public CompletableFuture<StatementCancelResponse> cancel(String statementId) {
+        final RetryPolicy<Response<StatementCancelResponse>> retryPolicy = createBasicRetryPolicy();
+        final Call<StatementCancelResponse> call = service.cancel(statementId);
 
-        final CompletableFuture<Void> f = new CompletableFuture<>();
+        final CompletableFuture<StatementCancelResponse> f = new CompletableFuture<>();
         FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(Futures.translateResponse(f));
         return f;
     }

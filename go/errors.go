@@ -29,7 +29,7 @@ type Error struct {
 }
 
 func (e *Error) Error() string {
-	return fmt.Sprintf("%s", e.Message)
+	return e.Message
 }
 
 func checkStatusCodeOK(resp *http.Response) error {

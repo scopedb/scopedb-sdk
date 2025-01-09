@@ -74,7 +74,10 @@ func (conn *Connection) SubmitStatement(ctx context.Context, statement string) (
 }
 
 // CancelStatement cancels a statement by its ID.
-func (conn *Connection) CancelStatement(ctx context.Context, statementId string) error {
+//
+// The Status of the returned StatementStatus may be StatementStatusCancelled if the query is cancelled successfully.
+// Otherwise, it may be StatementStatusFinished or StatementStatusFailed if the query is already finished or failed.
+func (conn *Connection) CancelStatement(ctx context.Context, statementId string) (*StatementStatus, error) {
 	return conn.cancelStatement(ctx, statementId)
 }
 

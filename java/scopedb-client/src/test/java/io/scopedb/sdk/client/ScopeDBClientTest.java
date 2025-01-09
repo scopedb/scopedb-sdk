@@ -19,7 +19,9 @@ package io.scopedb.sdk.client;
 import io.scopedb.sdk.client.arrow.ArrowBatchConvertor;
 import io.scopedb.sdk.client.request.IngestResponse;
 import io.scopedb.sdk.client.request.ResultFormat;
+import io.scopedb.sdk.client.request.StatementCancelResponse;
 import io.scopedb.sdk.client.request.StatementRequest;
+import io.scopedb.sdk.client.request.StatementResponse;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -52,7 +54,7 @@ class ScopeDBClientTest {
                     .statement("CREATE TABLE IF NOT EXISTS t(i INT)")
                     .format(ResultFormat.ArrowJson)
                     .build();
-            process(client, createTableRequest, allocator);
+            client.submit(createTableRequest, true).join();
 
             System.out.println("Ingest Data...");
             final List<VectorSchemaRoot> batches = makeBatches(allocator);
@@ -62,11 +64,23 @@ class ScopeDBClientTest {
             System.out.println("Ingested: " + ingestResponse);
 
             System.out.println("Query Data...");
+
             final StatementRequest readTableRequest = StatementRequest.builder()
                     .statement("FROM t")
                     .format(ResultFormat.ArrowJson)
                     .build();
-            process(client, readTableRequest, allocator);
+
+            final StatementResponse response =
+                    client.submit(readTableRequest, true).join();
+            final String rows = response.getResultSet().getRows();
+            for (VectorSchemaRoot batch : ArrowBatchConvertor.readArrowBatch(rows, allocator)) {
+                System.out.println(batch.contentToTSVString());
+                batch.close();
+            }
+
+            final StatementCancelResponse cancelResponse =
+                    client.cancel(response.getStatementId()).join();
+            System.out.println("Cancelled: " + cancelResponse);
         } finally {
             Collections.reverse(allocated);
             AutoCloseables.close(allocated);
@@ -86,18 +100,5 @@ class ScopeDBClientTest {
         v.set(2, -21);
         root.setRowCount(3);
         return Collections.singletonList(root);
-    }
-
-    private static void process(ScopeDBClient client, StatementRequest request, BufferAllocator allocator) {
-        final List<VectorSchemaRoot> batches = client.submit(request, true)
-                .thenApply(r -> {
-                    final String rows = r.getResultSet().getRows();
-                    return ArrowBatchConvertor.readArrowBatch(rows, allocator);
-                })
-                .join();
-        for (VectorSchemaRoot batch : batches) {
-            System.out.println(batch.contentToTSVString());
-            batch.close();
-        }
     }
 }
