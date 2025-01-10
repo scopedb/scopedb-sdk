@@ -73,7 +73,7 @@ const (
 	// StatementStatusFinished indicates the query is finished.
 	StatementStatusFinished StatementStatus = "finished"
 	// StatementStatusFailed indicates the query is failed.
-	StatementStatusFailed StatementStatus = "pending"
+	StatementStatusFailed StatementStatus = "failed"
 	// StatementStatusCancelled indicates the query is cancelled.
 	StatementStatusCancelled StatementStatus = "cancelled"
 )
