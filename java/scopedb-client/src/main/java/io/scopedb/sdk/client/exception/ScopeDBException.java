@@ -20,7 +20,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.Getter;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Exception from a ScopeDB server error response.
@@ -31,37 +30,27 @@ public class ScopeDBException extends Exception {
 
     private final int statusCode;
 
-    @Nullable
-    private final Code errorCode;
-
-    private ScopeDBException(int statusCode, @Nullable Code errorCode, String message) {
-        super(String.format("%d [%s]: %s", statusCode, errorCode, message));
+    private ScopeDBException(int statusCode, String message) {
+        super(String.format("%d: %s", statusCode, message));
         this.statusCode = statusCode;
-        this.errorCode = errorCode;
-    }
-
-    public enum Code {
-        Unexpected,
-        NotFound,
-        AlreadyExists,
     }
 
     @Data
     private static class Response {
-        private final String code;
         private final String message;
     }
 
     public static ScopeDBException of(int statusCode, String body) {
+        if (body == null) {
+            return new ScopeDBException(statusCode, null);
+        }
+
         try {
-            if (body != null) {
-                final Response response = MAPPER.readValue(body, Response.class);
-                final Code errorCode = Code.valueOf(response.code);
-                return new ScopeDBException(statusCode, errorCode, response.message);
-            }
+            final Response response = MAPPER.readValue(body, Response.class);
+            return new ScopeDBException(statusCode, response.message);
         } catch (JsonProcessingException e) {
             // passthrough
         }
-        return new ScopeDBException(statusCode, null, body);
+        return new ScopeDBException(statusCode, body);
     }
 }

@@ -61,20 +61,19 @@ func (conn *Connection) Execute(ctx context.Context, req *StatementRequest) erro
 	return err
 }
 
-// SubmitStatement submits a statement to the server and returns immediately.
+// SubmitStatement submits a statement to the server.
 //
-// The Status of the returned StatementResponse may be StatementStatusFinished if the query is finished immediately.
-// If so, the result set is in ArrowJSONFormat. Otherwise, you can fetch the result set by NewResultSetFetcher
-// and calling 'FetchResultSet'.
-func (conn *Connection) SubmitStatement(ctx context.Context, statement string) (*StatementResponse, error) {
-	return conn.submitStatement(ctx, &StatementRequest{
-		Statement: statement,
-		Format:    ArrowJSONFormat,
-	})
+// The Status of the returned StatementResponse may be StatementStatusFinished if the query is finished.
+// Otherwise, you can fetch the result set by NewResultSetFetcher and calling 'FetchResultSet'.
+func (conn *Connection) SubmitStatement(ctx context.Context, req *StatementRequest) (*StatementResponse, error) {
+	return conn.submitStatement(ctx, req)
 }
 
 // CancelStatement cancels a statement by its ID.
-func (conn *Connection) CancelStatement(ctx context.Context, statementId string) error {
+//
+// The Status of the returned StatementStatus may be StatementStatusCancelled if the query is cancelled successfully.
+// Otherwise, it may be StatementStatusFinished or StatementStatusFailed if the query is already finished or failed.
+func (conn *Connection) CancelStatement(ctx context.Context, statementId string) (*StatementStatus, error) {
 	return conn.cancelStatement(ctx, statementId)
 }
 

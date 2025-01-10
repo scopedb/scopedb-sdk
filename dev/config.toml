@@ -32,12 +32,12 @@ access_key_id = "minioadmin"
 secret_access_key = "minioadmin"
 virtual_host_style = false
 
-[telemetry.log.file]
+[telemetry.logs.file]
 filter = "INFO"
 dir = "logs"
 max_files = 64
 
-[telemetry.log.stderr]
+[telemetry.logs.stderr]
 filter = "INFO"
 
 [runtime]

@@ -34,7 +34,7 @@ type statementAPI interface {
 	// fetchStatementResult fetches the result of a statement by its ID.
 	fetchStatementResult(ctx context.Context, params *FetchStatementParams) (*StatementResponse, error)
 	// cancelStatement cancels a statement by its ID.
-	cancelStatement(ctx context.Context, statementId string) error
+	cancelStatement(ctx context.Context, statementId string) (*StatementStatus, error)
 }
 
 var _ statementAPI = (*Connection)(nil)
@@ -66,10 +66,16 @@ const (
 type StatementStatus string
 
 const (
+	// StatementStatusPending indicates the query is not started yet.
+	StatementStatusPending StatementStatus = "pending"
 	// StatementStatusRunning indicates the query is not finished yet.
 	StatementStatusRunning StatementStatus = "running"
 	// StatementStatusFinished indicates the query is finished.
 	StatementStatusFinished StatementStatus = "finished"
+	// StatementStatusFailed indicates the query is failed.
+	StatementStatusFailed StatementStatus = "pending"
+	// StatementStatusCancelled indicates the query is cancelled.
+	StatementStatusCancelled StatementStatus = "cancelled"
 )
 
 type StatementResponse struct {
@@ -207,18 +213,32 @@ func (conn *Connection) submitStatement(ctx context.Context, request *StatementR
 	return &respData, err
 }
 
-func (conn *Connection) cancelStatement(ctx context.Context, statementId string) error {
+type statementCancelResponse struct {
+	Status StatementStatus `json:"status"`
+}
+
+func (conn *Connection) cancelStatement(ctx context.Context, statementId string) (*StatementStatus, error) {
 	req, err := url.Parse(conn.config.Endpoint + "/v1/statements/" + statementId + "/cancel")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	resp, err := conn.http.Post(ctx, req, []byte{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer sneakyBodyClose(resp.Body)
-	return checkStatusCodeOK(resp)
+	if err := checkStatusCodeOK(resp); err != nil {
+		return nil, err
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var respData statementCancelResponse
+	err = json.Unmarshal(data, &respData)
+	return &respData.Status, err
 }
 
 func (conn *Connection) fetchStatementResult(ctx context.Context, params *FetchStatementParams) (*StatementResponse, error) {

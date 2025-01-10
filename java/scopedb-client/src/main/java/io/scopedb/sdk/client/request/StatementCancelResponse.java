@@ -17,22 +17,26 @@
 package io.scopedb.sdk.client.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.scopedb.sdk.client.exception.ScopeDBException;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.jackson.Jacksonized;
 
-/**
- * Statement execution status.
- *
- * <p>Failures are exported as {@link ScopeDBException}.
- */
-public enum StatementStatus {
-    @JsonProperty("pending")
-    Pending,
-    @JsonProperty("running")
-    Running,
-    @JsonProperty("finished")
-    Finished,
-    @JsonProperty("failed")
-    Failed,
-    @JsonProperty("cancelled")
-    Cancelled,
+@Builder
+@Data
+@RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+@Jacksonized
+public class StatementCancelResponse {
+    @JsonProperty("statement_id")
+    private final String statementId;
+
+    @JsonProperty("status")
+    private final StatementStatus status;
+
+    @JsonProperty("message")
+    private final String message;
+
+    @JsonProperty("created_at")
+    private final String createdAt;
 }

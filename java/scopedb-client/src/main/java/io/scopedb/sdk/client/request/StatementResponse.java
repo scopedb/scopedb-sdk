@@ -31,11 +31,14 @@ public class StatementResponse {
     @JsonProperty("statement_id")
     private final String statementId;
 
-    @JsonProperty("progress")
-    private final StatementProgress progress;
-
     @JsonProperty("status")
     private final StatementStatus status;
+
+    @JsonProperty("created_at")
+    private final String createdAt;
+
+    @JsonProperty("progress")
+    private final StatementProgress progress;
 
     @JsonProperty("result_set")
     private final ResultSet resultSet;

@@ -30,7 +30,10 @@ func main() {
 	ctx := context.Background()
 
 	// Submit the statement to ScopeDB
-	response, err := conn.SubmitStatement(ctx, "from system.tables")
+	response, err := conn.SubmitStatement(ctx, &scopedb.StatementRequest{
+		Statement: "from system.tables",
+		Format:    scopedb.ArrowJSONFormat,
+	})
 	if err != nil {
 		panic(err)
 	}
