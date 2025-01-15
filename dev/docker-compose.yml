@@ -44,7 +44,7 @@ services:
       retries: 5
 
   scopedb:
-    image: ghcr.io/scopedb/scopedb:edge
+    image: scopedb/scopedb:edge
     pull_policy: always
     depends_on:
       minio-server:
