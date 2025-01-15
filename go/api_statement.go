@@ -45,6 +45,10 @@ type StatementRequest struct {
 	// WaitTimeout is the maximum time to wait for the statement to finish.
 	// Possible values like "60s".
 	WaitTimeout string `json:"wait_timeout,omitempty"`
+	// ExecTimeout is the maximum time to for statement execution. If the total
+	// execution time exceeds this value, the statement is failed timed out.
+	// Possible values like "1h".
+	ExecTimeout string `json:"exec_timeout,omitempty"`
 	// Format is the format of the result set.
 	Format ResultFormat `json:"format"`
 }

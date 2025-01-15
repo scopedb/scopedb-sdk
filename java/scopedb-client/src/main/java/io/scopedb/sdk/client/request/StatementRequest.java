@@ -34,6 +34,9 @@ public class StatementRequest {
     @JsonProperty("wait_timeout")
     private final String waitTimeout;
 
+    @JsonProperty("exec_timeout")
+    private final String execTimeout;
+
     @JsonProperty("format")
     private final ResultFormat format;
 }
