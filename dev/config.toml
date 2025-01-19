@@ -13,7 +13,7 @@
 # limitations under the License.
 
 [server.meta]
-service_url = "postgres://scopedb:my_secret_password@localhost:5432/scopedb_meta"
+service_url = "postgres://scopedb:my_secret_password@postgres:5432/scopedb_meta"
 
 [server.http]
 listen_addr = "0.0.0.0:6543"
@@ -26,7 +26,7 @@ type = "s3"
 bucket = "test-bucket"
 region = "us-east-1"
 prefix = "/"
-endpoint = "http://127.0.0.1:9000"
+endpoint = "http://minio-server:9000"
 access_key_id = "minioadmin"
 secret_access_key = "minioadmin"
 virtual_host_style = false
@@ -53,7 +53,7 @@ filter = "INFO"
 #otlp_endpoint = "http://127.0.0.1:4317"
 #push_interval = "30s"
 
-#[runtime]
+[runtime]
 #server_runtime_threads = 2
 #exec_runtime_threads = <available_cores>
 #io_runtime_threads = <available_cores>
