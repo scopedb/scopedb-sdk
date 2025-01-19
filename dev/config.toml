@@ -53,7 +53,7 @@ filter = "INFO"
 #otlp_endpoint = "http://127.0.0.1:4317"
 #push_interval = "30s"
 
-#[runtime]
+[runtime]
 #server_runtime_threads = 2
 #exec_runtime_threads = <available_cores>
 #io_runtime_threads = <available_cores>
