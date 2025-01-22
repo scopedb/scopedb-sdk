@@ -18,6 +18,7 @@ package scopedb
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"net/http"
 	"net/url"
@@ -60,11 +61,21 @@ func (c *httpClient) Get(ctx context.Context, u *url.URL) (*http.Response, error
 }
 
 func (c *httpClient) Post(ctx context.Context, u *url.URL, body []byte) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
+	var b bytes.Buffer
+	g := gzip.NewWriter(&b)
+	if _, err := g.Write(body); err != nil {
+		return nil, err
+	}
+	if err := g.Close(); err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), &b)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
 	resp, err := c.client.Do(req)
 	return resp, err
 }
