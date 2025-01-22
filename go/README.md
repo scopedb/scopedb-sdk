@@ -29,8 +29,8 @@ For detailed documentation and basic usage examples, please see the documentatio
 
 | Go SDK Version | ScopeDB Version |
 |----------------|-----------------|
-| 0.2.3          | >= 0.1.14       |
-| <= 0.2.2       | archived        |
+| 0.2.4          | >= 0.1.21       |
+| <= 0.2.3       | archived        |
 
 ## Development
 
