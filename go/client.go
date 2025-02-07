@@ -22,6 +22,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 // HTTPClient is the interface for HTTP client.
@@ -61,6 +62,8 @@ func (c *httpClient) Get(ctx context.Context, u *url.URL) (*http.Response, error
 }
 
 func (c *httpClient) Post(ctx context.Context, u *url.URL, body []byte) (*http.Response, error) {
+	uncompressedContentLength := len(body)
+
 	var b bytes.Buffer
 	g := gzip.NewWriter(&b)
 	if _, err := g.Write(body); err != nil {
@@ -76,6 +79,7 @@ func (c *httpClient) Post(ctx context.Context, u *url.URL, body []byte) (*http.R
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("X-ScopeDB-Uncompressed-Content-Length", strconv.Itoa(uncompressedContentLength))
 	resp, err := c.client.Do(req)
 	return resp, err
 }
