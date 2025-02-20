@@ -6,3 +6,4 @@ Welcome to the ScopeDB SDKs monorepo!
 
 * [Go SDK](go/README.md)
 * [Java SDK](java/README.md)
+* [Rust SDK](rust/README.md)

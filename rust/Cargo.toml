@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-headerPath = "Apache-2.0.txt"
+[package]
+name = "scopedb-client"
+version = "0.1.0"
+edition = "2024"
 
-includes = [
-  '*.rs',
-  '*.go',
-  '*.java',
-  '*.toml',
-  '*.yml',
-  '*.yaml',
-  'pom.xml',
-]
+[dependencies]
+arrow = { version = "54.2.0", default-features = false, features = ["ipc"]}
+base64 = "0.22.1"
+reqwest = { version = "0.12.12", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
 
-[properties]
-copyrightOwner = "ScopeDB, Inc."
-inceptionYear = 2024
+[dev-dependencies]
+insta = { version = "1.42.1", features = ["json"] }
