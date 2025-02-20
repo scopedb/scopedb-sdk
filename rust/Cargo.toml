@@ -16,9 +16,15 @@
 name = "scopedb-client"
 version = "0.1.0"
 edition = "2024"
+license = "Apache-2.0"
+description = "ScopeDB client for Rust"
+homepage = "https://scopedb.io"
+repository = "https://github.com/scopedb/scopedb-sdk/tree/main/rust"
+categories = ["database"]
+keywords = ["scopedb"]
 
 [dependencies]
-arrow = { version = "54.2.0", default-features = false, features = ["ipc"]}
+arrow = { version = "54.2.0", default-features = false, features = ["ipc"] }
 base64 = "0.22.1"
 reqwest = { version = "0.12.12", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
