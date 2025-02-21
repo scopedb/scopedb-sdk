@@ -99,7 +99,7 @@ impl Connection {
     }
 
     /// Insert record batches into a table with custom transforms.
-    /// 
+    ///
     /// # Example
     /// ```ignore
     /// let conn = Connection::connect("http://localhost:6543");
