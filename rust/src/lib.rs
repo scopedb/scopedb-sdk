@@ -97,4 +97,36 @@ impl Connection {
 
         Ok(())
     }
+
+    /// Insert record batches into a table with custom transforms.
+    /// 
+    /// # Example
+    /// ```ignore
+    /// let conn = Connection::connect("http://localhost:6543");
+    /// conn.insert_with_transform(
+    ///     "database",
+    ///     "schema",
+    ///     "table",
+    ///     &[record_batch],
+    ///     "select $1 as foo where foo is not null",
+    /// ).await.unwrap();
+    /// ```
+    pub async fn insert_with_transform(
+        &self,
+        database: &str,
+        schema: &str,
+        table: &str,
+        data: &[RecordBatch],
+        transform: &str,
+    ) -> Result<(), Error> {
+        let data = codec::encode_arrow(data)?;
+        let ingest_data = IngestData {
+            format: IngestFormat::Arrow,
+            rows: data,
+        };
+        let statement = format!("{transform} insert into {database}.{schema}.{table}");
+        do_ingest(&self.client, &self.config.endpoint, ingest_data, &statement).await?;
+
+        Ok(())
+    }
 }
