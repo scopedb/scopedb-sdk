@@ -5,6 +5,7 @@ go 1.22.0
 require (
 	github.com/apache/arrow/go/v17 v17.0.0
 	github.com/gkampitakis/go-snaps v0.5.7
+	github.com/google/uuid v1.6.0
 	github.com/lucasepe/codename v0.2.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/goleak v1.3.0

@@ -25,6 +25,7 @@ import (
 	"github.com/apache/arrow/go/v17/arrow/array"
 	"github.com/apache/arrow/go/v17/arrow/memory"
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/google/uuid"
 	scopedb "github.com/scopedb/scopedb-sdk/go"
 	testkit "github.com/scopedb/scopedb-sdk/go/integration_tests/internal"
 	"github.com/stretchr/testify/require"
@@ -70,9 +71,13 @@ func TestReadAfterWrite(t *testing.T) {
 	require.Equal(t, resp.NumRowsUpdated, 1)
 	require.Equal(t, resp.NumRowsDeleted, 0)
 
+	id, err := uuid.NewRandom()
+	require.NoError(t, err)
+
 	rs = tk.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
-		Statement: statement,
-		Format:    scopedb.ArrowJSONFormat,
+		StatementId: &id,
+		Statement:   statement,
+		Format:      scopedb.ArrowJSONFormat,
 	})
 	snaps.MatchSnapshot(t, rs.Metadata)
 	snaps.MatchSnapshot(t, fmt.Sprintf("%v", rs.Records))
