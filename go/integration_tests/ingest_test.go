@@ -75,7 +75,7 @@ func TestReadAfterWrite(t *testing.T) {
 	require.NoError(t, err)
 
 	rs = tk.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
-		StatementId: id,
+		StatementId: &id,
 		Statement:   statement,
 		Format:      scopedb.ArrowJSONFormat,
 	})

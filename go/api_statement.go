@@ -45,7 +45,7 @@ type StatementRequest struct {
 	//
 	// If provided, the ID must be a UUID, and the server uses the provided ID;
 	// otherwise, the server will generate a new UUID for the statement submitted.
-	StatementId uuid.UUID `json:"statement_id,omitempty"`
+	StatementId *uuid.UUID `json:"statement_id,omitempty"`
 	// Statement is the ScopeQL statement to execute.
 	Statement string `json:"statement"`
 	// WaitTimeout is the maximum time to wait for the statement to finish.
