@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow/go/v17/arrow"
+	"github.com/google/uuid"
 )
 
 // statementAPI defines interfaces under /v1/statements.
@@ -40,6 +41,11 @@ type statementAPI interface {
 var _ statementAPI = (*Connection)(nil)
 
 type StatementRequest struct {
+	// StatementId is the ID of the statement.
+	//
+	// If provided, the ID must be a UUID, and the server uses the provided ID;
+	// otherwise, the server will generate a new UUID for the statement submitted.
+	StatementId uuid.UUID `json:"statement_id,omitempty"`
 	// Statement is the ScopeQL statement to execute.
 	Statement string `json:"statement"`
 	// WaitTimeout is the maximum time to wait for the statement to finish.
