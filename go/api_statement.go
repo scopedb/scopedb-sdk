@@ -164,7 +164,8 @@ const (
 //
 // It polls the server until the query is finished, with fix delay of 1 second.
 func (f *ResultSetFetcher) FetchResultSet(ctx context.Context) (*StatementResponse, error) {
-	ticker := time.NewTicker(defaultFetchInterval)
+	tick := 10 * time.Millisecond
+	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 
 	for {
@@ -178,6 +179,10 @@ func (f *ResultSetFetcher) FetchResultSet(ctx context.Context) (*StatementRespon
 			}
 			if resp.Status == StatementStatusFinished {
 				return resp, nil
+			}
+			if tick < defaultFetchInterval {
+				tick = min(tick*2, defaultFetchInterval)
+				ticker.Reset(tick)
 			}
 		}
 	}
