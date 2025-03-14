@@ -59,18 +59,16 @@ func (tk *TestKit) Close() {
 
 	for _, table := range tk.tables {
 		err := tk.conn.Execute(ctx, &scopedb.StatementRequest{
-			Statement:   fmt.Sprintf(`DROP TABLE %s`, table),
-			WaitTimeout: "60s",
-			Format:      scopedb.ArrowJSONFormat,
+			Statement: fmt.Sprintf(`DROP TABLE %s`, table),
+			Format:    scopedb.ArrowJSONFormat,
 		})
 		require.NoError(tk.t, err)
 	}
 
 	for _, tasks := range tk.tasks {
 		err := tk.conn.Execute(ctx, &scopedb.StatementRequest{
-			Statement:   fmt.Sprintf(`DROP TASK %s`, tasks),
-			WaitTimeout: "60s",
-			Format:      scopedb.ArrowJSONFormat,
+			Statement: fmt.Sprintf(`DROP TASK %s`, tasks),
+			Format:    scopedb.ArrowJSONFormat,
 		})
 		require.NoError(tk.t, err)
 	}
@@ -99,9 +97,8 @@ func (tk *TestKit) RandomString(n int) string {
 // NewTable creates a new table and track it for close.
 func (tk *TestKit) NewTable(ctx context.Context, tableName string, createTableStatement string) {
 	err := tk.conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement:   createTableStatement,
-		WaitTimeout: "60s",
-		Format:      scopedb.ArrowJSONFormat,
+		Statement: createTableStatement,
+		Format:    scopedb.ArrowJSONFormat,
 	})
 	require.NoError(tk.t, err)
 	tk.tables = append(tk.tables, tableName)
@@ -110,9 +107,8 @@ func (tk *TestKit) NewTable(ctx context.Context, tableName string, createTableSt
 // NewTask creates a new task and track it for close.
 func (tk *TestKit) NewTask(ctx context.Context, taskName string, createTaskStatement string) {
 	err := tk.conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement:   createTaskStatement,
-		WaitTimeout: "60s",
-		Format:      scopedb.ArrowJSONFormat,
+		Statement: createTaskStatement,
+		Format:    scopedb.ArrowJSONFormat,
 	})
 	require.NoError(tk.t, err)
 	tk.tasks = append(tk.tasks, taskName)

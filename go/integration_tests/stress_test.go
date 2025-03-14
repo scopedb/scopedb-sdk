@@ -95,9 +95,8 @@ func (suite *stressSuite) init(ctx context.Context) {
 func (suite *stressSuite) queryColumns(ctx context.Context) {
 	start := time.Now()
 	_ = suite.tk.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
-		Statement:   "FROM system.columns",
-		WaitTimeout: "60s",
-		Format:      scopedb.ArrowJSONFormat,
+		Statement: "FROM system.columns",
+		Format:    scopedb.ArrowJSONFormat,
 	})
 	suite.t.Logf("Queried columns in %s", time.Since(start))
 }
@@ -105,9 +104,8 @@ func (suite *stressSuite) queryColumns(ctx context.Context) {
 func (suite *stressSuite) queryTables(ctx context.Context) {
 	start := time.Now()
 	_ = suite.tk.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
-		Statement:   "FROM system.tables",
-		WaitTimeout: "60s",
-		Format:      scopedb.ArrowJSONFormat,
+		Statement: "FROM system.tables",
+		Format:    scopedb.ArrowJSONFormat,
 	})
 	suite.t.Logf("Queried tables in %s", time.Since(start))
 }

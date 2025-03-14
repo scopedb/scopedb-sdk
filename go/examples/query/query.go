@@ -29,9 +29,8 @@ func main() {
 
 	// Query data from ScopeDB
 	resultSet, err := conn.QueryAsArrowBatch(context.Background(), &scopedb.StatementRequest{
-		Statement:   "from system.tables",
-		WaitTimeout: "60s",
-		Format:      scopedb.ArrowJSONFormat,
+		Statement: "from system.tables",
+		Format:    scopedb.ArrowJSONFormat,
 	})
 	if err != nil {
 		panic(err)
