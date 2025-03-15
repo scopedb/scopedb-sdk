@@ -48,9 +48,6 @@ type StatementRequest struct {
 	StatementId *uuid.UUID `json:"statement_id,omitempty"`
 	// Statement is the ScopeQL statement to execute.
 	Statement string `json:"statement"`
-	// WaitTimeout is the maximum time to wait for the statement to finish.
-	// Possible values like "60s".
-	WaitTimeout string `json:"wait_timeout,omitempty"`
 	// ExecTimeout is the maximum time to for statement execution. If the total
 	// execution time exceeds this value, the statement is failed timed out.
 	// Possible values like "1h".
@@ -167,7 +164,8 @@ const (
 //
 // It polls the server until the query is finished, with fix delay of 1 second.
 func (f *ResultSetFetcher) FetchResultSet(ctx context.Context) (*StatementResponse, error) {
-	ticker := time.NewTicker(defaultFetchInterval)
+	tick := 10 * time.Millisecond
+	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 
 	for {
@@ -181,6 +179,10 @@ func (f *ResultSetFetcher) FetchResultSet(ctx context.Context) (*StatementRespon
 			}
 			if resp.Status == StatementStatusFinished {
 				return resp, nil
+			}
+			if tick < defaultFetchInterval {
+				tick = min(tick*2, defaultFetchInterval)
+				ticker.Reset(tick)
 			}
 		}
 	}
