@@ -17,7 +17,6 @@
 package io.scopedb.sdk.client;
 
 import dev.failsafe.RetryPolicy;
-import dev.failsafe.RetryPolicyBuilder;
 import dev.failsafe.retrofit.FailsafeCall;
 import io.scopedb.sdk.client.arrow.ArrowBatchConvertor;
 import io.scopedb.sdk.client.helper.EnumConverterFactory;
@@ -60,6 +59,11 @@ public class ScopeDBClient {
         Call<StatementCancelResponse> cancel(@Path("statement_id") String statementId);
     }
 
+    // Configuration
+    private static final Duration MAX_RETRY_DURATION = Duration.ofSeconds(60);
+    private static final Duration INITIAL_DELAY = Duration.ofSeconds(1);
+    private static final double JITTER = 0.15;
+
     private final ScopeDBService service;
 
     public ScopeDBClient(ScopeDBConfig config) {
@@ -78,102 +82,85 @@ public class ScopeDBClient {
                 .statement(statement)
                 .build();
 
-        final RetryPolicy<Response<IngestResponse>> retryPolicy = createBasicRetryPolicy();
-        final Call<IngestResponse> call = service.ingest(request);
-
-        final CompletableFuture<IngestResponse> f = new CompletableFuture<>();
-        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(Futures.translateResponse(f));
-        return f;
+        return executeWithRetry(service.ingest(request), createBasicRetryPolicy());
     }
 
     public CompletableFuture<StatementCancelResponse> cancel(String statementId) {
-        final RetryPolicy<Response<StatementCancelResponse>> retryPolicy = createBasicRetryPolicy();
-        final Call<StatementCancelResponse> call = service.cancel(statementId);
-
-        final CompletableFuture<StatementCancelResponse> f = new CompletableFuture<>();
-        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(Futures.translateResponse(f));
-        return f;
+        return executeWithRetry(service.cancel(statementId), createBasicRetryPolicy());
     }
 
     public CompletableFuture<StatementResponse> submit(StatementRequest request, boolean waitUntilDone) {
-        final RetryPolicy<Response<StatementResponse>> retryPolicy = createBasicRetryPolicy();
-        final Call<StatementResponse> call = service.submit(request);
+        if (!waitUntilDone) {
+            return executeWithRetry(service.submit(request), createBasicRetryPolicy());
+        }
 
-        final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
-        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete((r, t) -> {
-            if (t != null) {
-                f.completeExceptionally(t);
-                return;
-            }
-            if (!waitUntilDone) {
-                // return immediately
-                Futures.translateResponse(f).accept(r, null);
-                return;
-            }
-            if (!r.isSuccessful()) {
-                // all non-200 responses are considered as permanently failed
-                Futures.translateResponse(f).accept(r, null);
-                return;
-            }
+        final CompletableFuture<StatementResponse> future = new CompletableFuture<>();
 
-            final StatementResponse resp = r.body();
-            if (resp == null) {
-                f.completeExceptionally(new NullPointerException("empty response body"));
-                return;
-            }
-            if (resp.getStatus() == StatementStatus.Finished) {
-                f.complete(resp);
-                return;
-            }
+        executeWithRetry(service.submit(request), createBasicRetryPolicy())
+            .whenComplete((response, throwable) -> {
+                if (throwable != null) {
+                    future.completeExceptionally(throwable);
+                    return;
+                }
 
-            final FetchStatementParams params = FetchStatementParams.builder()
-                    .statementId(resp.getStatementId())
-                    .format(request.getFormat())
-                    .build();
-            fetch(params, true).whenComplete(Futures.forward(f));
-        });
-        return f;
+                if (response.getStatus() == StatementStatus.Finished) {
+                    future.complete(response);
+                    return;
+                }
+
+                final FetchStatementParams params = FetchStatementParams.builder()
+                        .statementId(response.getStatementId())
+                        .format(request.getFormat())
+                        .build();
+
+                fetch(params, true).whenComplete(Futures.forward(future));
+            });
+
+        return future;
     }
 
     public CompletableFuture<StatementResponse> fetch(FetchStatementParams params, boolean retryUntilDone) {
-        final RetryPolicy<Response<StatementResponse>> retryPolicy = createFetchRetryPolicy(retryUntilDone);
         final Call<StatementResponse> call = service.fetch(params.getStatementId(), params.getFormat());
 
-        final CompletableFuture<StatementResponse> f = new CompletableFuture<>();
-        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(Futures.translateResponse(f));
-        return f;
+        if (retryUntilDone) {
+            return executeWithRetry(call, createStatementCompletionRetryPolicy());
+        } else {
+            return executeWithRetry(call, createBasicRetryPolicy());
+        }
     }
 
-    private static <T> RetryPolicyBuilder<Response<T>> createSharedRetryPolicyBuilder() {
-        return RetryPolicy.<Response<T>>builder()
-                .withJitter(0.15)
-                .withMaxDuration(Duration.ofSeconds(60))
-                .withDelay(Duration.ofSeconds(1));
+    private <T> CompletableFuture<T> executeWithRetry(Call<T> call, RetryPolicy<Response<T>> retryPolicy) {
+        final CompletableFuture<T> future = new CompletableFuture<>();
+        FailsafeCall.with(retryPolicy)
+          .compose(call)
+          .executeAsync()
+          .whenComplete(Futures.translateResponse(future));
+        return future;
     }
 
     private static <T> RetryPolicy<Response<T>> createBasicRetryPolicy() {
-        final RetryPolicyBuilder<Response<T>> retryPolicyBuilder = createSharedRetryPolicyBuilder();
-        return retryPolicyBuilder.build();
+        return RetryPolicy.<Response<T>>builder()
+                 .withJitter(JITTER)
+                 .withMaxDuration(MAX_RETRY_DURATION)
+                 .withDelay(INITIAL_DELAY)
+                 .build();
     }
 
-    private static RetryPolicy<Response<StatementResponse>> createFetchRetryPolicy(boolean retryUntilDone) {
-        final RetryPolicyBuilder<Response<StatementResponse>> retryPolicyBuilder = createSharedRetryPolicyBuilder();
-        if (retryUntilDone) {
-            return retryPolicyBuilder
-                    .handleResultIf(response -> {
-                        // statement is not done; retry
-                        if (response.isSuccessful()) {
-                            final StatementResponse statementResponse = response.body();
-                            return statementResponse != null
-                                    && statementResponse.getStatus() != StatementStatus.Finished;
-                        }
-
-                        // all non-200 responses are considered as permanently failed
-                        return false;
-                    })
-                    .build();
-        } else {
-            return retryPolicyBuilder.build();
-        }
+    private static RetryPolicy<Response<StatementResponse>> createStatementCompletionRetryPolicy() {
+        return RetryPolicy.<Response<StatementResponse>>builder()
+                 .withJitter(JITTER)
+                 .withMaxDuration(MAX_RETRY_DURATION)
+                 .withDelay(INITIAL_DELAY)
+                 .handleResultIf(response -> {
+                      // statement is not done; retry
+                      if (response.isSuccessful()) {
+                          final StatementResponse statementResponse = response.body();
+                          return statementResponse != null
+                                   && statementResponse.getStatus() != StatementStatus.Finished;
+                      }
+                      // all non-200 responses are considered as permanently failed
+                      return false;
+                })
+        .build();
     }
 }
