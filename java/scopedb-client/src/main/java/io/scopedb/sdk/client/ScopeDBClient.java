@@ -96,25 +96,24 @@ public class ScopeDBClient {
 
         final CompletableFuture<StatementResponse> future = new CompletableFuture<>();
 
-        executeWithRetry(service.submit(request), createBasicRetryPolicy())
-            .whenComplete((response, throwable) -> {
-                if (throwable != null) {
-                    future.completeExceptionally(throwable);
-                    return;
-                }
+        executeWithRetry(service.submit(request), createBasicRetryPolicy()).whenComplete((response, throwable) -> {
+            if (throwable != null) {
+                future.completeExceptionally(throwable);
+                return;
+            }
 
-                if (response.getStatus() == StatementStatus.Finished) {
-                    future.complete(response);
-                    return;
-                }
+            if (response.getStatus() == StatementStatus.Finished) {
+                future.complete(response);
+                return;
+            }
 
-                final FetchStatementParams params = FetchStatementParams.builder()
-                        .statementId(response.getStatementId())
-                        .format(request.getFormat())
-                        .build();
+            final FetchStatementParams params = FetchStatementParams.builder()
+                    .statementId(response.getStatementId())
+                    .format(request.getFormat())
+                    .build();
 
-                fetch(params, true).whenComplete(Futures.forward(future));
-            });
+            fetch(params, true).whenComplete(Futures.forward(future));
+        });
 
         return future;
     }
@@ -131,36 +130,32 @@ public class ScopeDBClient {
 
     private <T> CompletableFuture<T> executeWithRetry(Call<T> call, RetryPolicy<Response<T>> retryPolicy) {
         final CompletableFuture<T> future = new CompletableFuture<>();
-        FailsafeCall.with(retryPolicy)
-          .compose(call)
-          .executeAsync()
-          .whenComplete(Futures.translateResponse(future));
+        FailsafeCall.with(retryPolicy).compose(call).executeAsync().whenComplete(Futures.translateResponse(future));
         return future;
     }
 
     private static <T> RetryPolicy<Response<T>> createBasicRetryPolicy() {
         return RetryPolicy.<Response<T>>builder()
-                 .withJitter(JITTER)
-                 .withMaxDuration(MAX_RETRY_DURATION)
-                 .withDelay(INITIAL_DELAY)
-                 .build();
+                .withJitter(JITTER)
+                .withMaxDuration(MAX_RETRY_DURATION)
+                .withDelay(INITIAL_DELAY)
+                .build();
     }
 
     private static RetryPolicy<Response<StatementResponse>> createStatementCompletionRetryPolicy() {
         return RetryPolicy.<Response<StatementResponse>>builder()
-                 .withJitter(JITTER)
-                 .withMaxDuration(MAX_RETRY_DURATION)
-                 .withDelay(INITIAL_DELAY)
-                 .handleResultIf(response -> {
-                      // statement is not done; retry
-                      if (response.isSuccessful()) {
-                          final StatementResponse statementResponse = response.body();
-                          return statementResponse != null
-                                   && statementResponse.getStatus() != StatementStatus.Finished;
-                      }
-                      // all non-200 responses are considered as permanently failed
-                      return false;
+                .withJitter(JITTER)
+                .withMaxDuration(MAX_RETRY_DURATION)
+                .withDelay(INITIAL_DELAY)
+                .handleResultIf(response -> {
+                    // statement is not done; retry
+                    if (response.isSuccessful()) {
+                        final StatementResponse statementResponse = response.body();
+                        return statementResponse != null && statementResponse.getStatus() != StatementStatus.Finished;
+                    }
+                    // all non-200 responses are considered as permanently failed
+                    return false;
                 })
-        .build();
+                .build();
     }
 }
