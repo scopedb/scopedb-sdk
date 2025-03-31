@@ -36,9 +36,9 @@ import (
 
 const (
 	IngestDataBatch = 10000
-	TaskParallelism = 8
-	TaskInterval    = 50 * time.Millisecond
-	TaskDuration    = 10 * time.Second
+	JobParallelism  = 8
+	JobInterval     = 50 * time.Millisecond
+	JobDuration     = 10 * time.Second
 )
 
 type stressSuite struct {
@@ -71,15 +71,15 @@ func (suite *stressSuite) init(ctx context.Context) {
 	stmt = fmt.Sprintf(`CREATE TABLE %s (id INT, message STRING, var VARIANT)`, suite.stageTableName)
 	suite.tk.NewTable(ctx, suite.stageTableName, stmt)
 
-	taskName := fmt.Sprintf(`%s_compact_log`, suite.tableName)
-	stmt = fmt.Sprintf(`CREATE TASK %s
+	jobName := fmt.Sprintf(`%s_compact_log`, suite.tableName)
+	stmt = fmt.Sprintf(`CREATE JOB %s
 		SCHEDULE = '* * * * * Asia/Shanghai'
 		NODEGROUP = 'default' AS
-		OPTIMIZE TABLE scopedb.public.%s`, taskName, suite.logTableName)
-	suite.tk.NewTask(ctx, taskName, stmt)
+		OPTIMIZE TABLE scopedb.public.%s`, jobName, suite.logTableName)
+	suite.tk.NewJob(ctx, jobName, stmt)
 
-	taskName = fmt.Sprintf(`%s_compact_stage`, suite.tableName)
-	stmt = fmt.Sprintf(`CREATE TASK %[1]v
+	jobName = fmt.Sprintf(`%s_compact_stage`, suite.tableName)
+	stmt = fmt.Sprintf(`CREATE JOB %[1]v
 		SCHEDULE = '* * * * * Asia/Shanghai'
 		NODEGROUP = 'default' AS
 		BEGIN
@@ -88,8 +88,8 @@ func (suite *stressSuite) init(ctx context.Context) {
 				WHEN MATCHED THEN UPDATE ALL
 				WHEN NOT MATCHED THEN INSERT ALL;
 			DELETE FROM %[3]v;
-		END`, taskName, suite.logTableName, suite.stageTableName)
-	suite.tk.NewTask(ctx, taskName, stmt)
+		END`, jobName, suite.logTableName, suite.stageTableName)
+	suite.tk.NewJob(ctx, jobName, stmt)
 }
 
 func (suite *stressSuite) queryColumns(ctx context.Context) {
@@ -176,29 +176,29 @@ func BenchmarkStressHeavyReadWrite(b *testing.B) {
 	suite.init(ctx)
 
 	wg := sync.WaitGroup{}
-	tasks := make(chan func(), 1024)
-	for i := 0; i < TaskParallelism; i++ {
+	jobs := make(chan func(), 1024)
+	for i := 0; i < JobParallelism; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for task := range tasks {
-				task()
+			for job := range jobs {
+				job()
 			}
 		}()
 	}
 
-	c := time.After(TaskDuration)
+	c := time.After(JobDuration)
 
 	for {
 		select {
 		case <-c:
-			close(tasks)
+			close(jobs)
 			wg.Wait()
 			fmt.Println("Ingested:", suite.idGen.Load())
 			fmt.Println("Shutting down...")
 			return
 		default:
-			tasks <- func() {
+			jobs <- func() {
 				n, err := rand.Int(rand.Reader, big.NewInt(4))
 				require.NoError(b, err)
 				switch n.Int64() {
@@ -212,7 +212,7 @@ func BenchmarkStressHeavyReadWrite(b *testing.B) {
 					suite.queryColumns(ctx)
 				}
 			}
-			time.Sleep(TaskInterval)
+			time.Sleep(JobInterval)
 		}
 	}
 }
