@@ -37,7 +37,7 @@ type TestKit struct {
 	conn *scopedb.Connection
 
 	tables []string
-	tasks  []string
+	jobs   []string
 }
 
 func NewTestKit(t testing.TB) *TestKit {
@@ -65,9 +65,9 @@ func (tk *TestKit) Close() {
 		require.NoError(tk.t, err)
 	}
 
-	for _, tasks := range tk.tasks {
+	for _, job := range tk.jobs {
 		err := tk.conn.Execute(ctx, &scopedb.StatementRequest{
-			Statement: fmt.Sprintf(`DROP TASK %s`, tasks),
+			Statement: fmt.Sprintf(`DROP JOB %s`, job),
 			Format:    scopedb.ArrowJSONFormat,
 		})
 		require.NoError(tk.t, err)
@@ -104,14 +104,14 @@ func (tk *TestKit) NewTable(ctx context.Context, tableName string, createTableSt
 	tk.tables = append(tk.tables, tableName)
 }
 
-// NewTask creates a new task and track it for close.
-func (tk *TestKit) NewTask(ctx context.Context, taskName string, createTaskStatement string) {
+// NewJob creates a new job and track it for close.
+func (tk *TestKit) NewJob(ctx context.Context, jobName string, createJobStatement string) {
 	err := tk.conn.Execute(ctx, &scopedb.StatementRequest{
-		Statement: createTaskStatement,
+		Statement: createJobStatement,
 		Format:    scopedb.ArrowJSONFormat,
 	})
 	require.NoError(tk.t, err)
-	tk.tasks = append(tk.tasks, taskName)
+	tk.jobs = append(tk.jobs, jobName)
 }
 
 func (tk *TestKit) IngestArrowBatch(ctx context.Context, batches []arrow.Record, statement string) *scopedb.IngestResponse {
