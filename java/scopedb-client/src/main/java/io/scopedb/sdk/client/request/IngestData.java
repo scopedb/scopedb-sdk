@@ -28,8 +28,6 @@ import lombok.extern.jackson.Jacksonized;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "format")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = IngestData.Arrow.class, name = "arrow"),
-    @JsonSubTypes.Type(value = IngestData.CSV.class, name = "csv"),
-    @JsonSubTypes.Type(value = IngestData.JSON.class, name = "json"),
 })
 public interface IngestData {
     /**
@@ -40,30 +38,6 @@ public interface IngestData {
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     @Jacksonized
     class Arrow implements IngestData {
-        @JsonProperty("rows")
-        private final String rows;
-    }
-
-    /**
-     * CSV data in rows, with first line as header.
-     */
-    @Builder
-    @Data
-    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    @Jacksonized
-    class CSV implements IngestData {
-        @JsonProperty("rows")
-        private final String rows;
-    }
-
-    /**
-     * JSON lines.
-     */
-    @Builder
-    @Data
-    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    @Jacksonized
-    class JSON implements IngestData {
         @JsonProperty("rows")
         private final String rows;
     }

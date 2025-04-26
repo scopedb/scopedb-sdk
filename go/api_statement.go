@@ -95,25 +95,42 @@ type StatementResponse struct {
 type StatementProgress struct {
 	// TotalPercentage denotes the total progress in percentage: [0.0, 100.0].
 	TotalPercentage float64 `json:"total_percentage"`
-
 	// NanosFromSubmitted denotes the duration in nanoseconds since the statement is submitted.
 	NanosFromSubmitted int64 `json:"nanos_from_submitted"`
-
 	// NanosFromStarted denotes the duration in nanoseconds since the statement is started.
 	NanosFromStarted int64 `json:"nanos_from_started"`
-
 	// NanosToFinish denotes the estimated duration in nanoseconds to finish the statement.
 	NanosToFinish int64 `json:"nanos_to_finish"`
+	// TotalStages denotes the total number of stages to execute.
+	TotalStages int64 `json:"total_stages"`
+	// TotalPartitions denotes the estimated total number of partitions to scan.
+	TotalPartitions int64 `json:"total_partitions"`
+	// TotalRows denotes the estimated total number of rows to scan.
+	TotalRows int64 `json:"total_rows"`
+	// TotalCompressedBytes denotes the estimated total number of compressed bytes to scan.
+	TotalCompressedBytes int64 `json:"total_compressed_bytes"`
+	// TotalUncompressedBytes denotes the estimated total number of uncompressed bytes to scan.
+	TotalUncompressedBytes int64 `json:"total_uncompressed_bytes"`
+	// TotalStages denotes the total number of stages executed.
+	ScannedStages int64 `json:"scanned_stages"`
+	// ScannedPartitions denotes the number of partitions scanned.
+	ScannedPartitions int64 `json:"scanned_partitions"`
+	// ScannedRows denotes the number of rows scanned.
+	ScannedRows int64 `json:"scanned_rows"`
+	// ScannedCompressedBytes denotes the number of compressed bytes scanned.
+	ScannedCompressedBytes int64 `json:"scanned_compressed_bytes"`
+	// ScannedUncompressedBytes denotes the number of uncompressed bytes scanned.
+	ScannedUncompressedBytes int64 `json:"scanned_uncompressed_bytes"`
 }
 
 type ResultSet struct {
 	Metadata *ResultSetMetadata `json:"metadata"`
+	Format   ResultFormat       `json:"format"`
 	Rows     string             `json:"rows"`
 }
 
 type ResultSetMetadata struct {
 	Fields  []*ResultSetField `json:"fields"`
-	Format  ResultFormat      `json:"format"`
 	NumRows int64             `json:"num_rows"`
 }
 
