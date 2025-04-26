@@ -32,9 +32,6 @@ public class ResultSetMetadata {
     @JsonProperty("fields")
     private final List<ResultSetField> fields;
 
-    @JsonProperty("format")
-    private final ResultFormat format;
-
     @JsonProperty("num_rows")
     private final long numberOfRows;
 }

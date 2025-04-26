@@ -31,6 +31,9 @@ public class ResultSet {
     @JsonProperty("metadata")
     private final ResultSetMetadata metadata;
 
+    @JsonProperty("format")
+    private final ResultFormat format;
+
     @JsonProperty("rows")
     private final String rows;
 }

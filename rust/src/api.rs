@@ -42,18 +42,34 @@ pub struct StatementProgress {
     pub nanos_from_submitted: i64,
     pub nanos_from_started: i64,
     pub nanos_to_finish: i64,
+    #[serde(flatten)]
+    pub details: StatementProgress,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
+pub struct StatementProgress {
+    pub total_stages: i64,
+    pub total_partitions: i64,
+    pub total_rows: i64,
+    pub total_compressed_bytes: i64,
+    pub total_uncompressed_bytes: i64,
+    pub scanned_stages: i64,
+    pub scanned_partitions: i64,
+    pub scanned_rows: i64,
+    pub scanned_compressed_bytes: i64,
+    pub scanned_uncompressed_bytes: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResultSet {
     pub metadata: ResultSetMetadata,
+    pub format: ResultFormat,
     pub rows: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResultSetMetadata {
     pub fields: Vec<ResultSetField>,
-    pub format: ResultFormat,
     pub num_rows: i64,
 }
 
