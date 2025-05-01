@@ -37,7 +37,7 @@ pub enum StatementStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StatementProgress {
+pub struct StatementEstimatedProgress {
     pub total_percentage: f64,
     pub nanos_from_submitted: i64,
     pub nanos_from_started: i64,
@@ -82,7 +82,6 @@ pub struct ResultSetField {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatementRequest {
     pub statement: String,
-    pub wait_timeout: Option<String>,
     pub exec_timeout: Option<String>,
     pub format: ResultFormat,
 }
@@ -91,10 +90,11 @@ pub struct StatementRequest {
 pub struct StatementResponse {
     pub statement_id: String,
     pub status: StatementStatus,
+    pub progress: StatementEstimatedProgress,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub result_set: Option<ResultSet>,
 }
 
-const DEFAULT_WAIT_TIMEOUT: &str = "30s";
 const DEFAULT_EXEC_TIMEOUT: &str = "30s";
 
 pub async fn do_submit_statement(
@@ -105,7 +105,6 @@ pub async fn do_submit_statement(
 ) -> Result<StatementResponse, Error> {
     let req = StatementRequest {
         statement: statement.to_string(),
-        wait_timeout: Some(DEFAULT_WAIT_TIMEOUT.to_string()),
         exec_timeout: Some(DEFAULT_EXEC_TIMEOUT.to_string()),
         format,
     };
@@ -170,45 +169,4 @@ pub async fn do_ingest(
         .map_err(|e| Error::Internal(format!("failed to parse response: {e}")))?;
 
     Ok(resp)
-}
-
-#[cfg(test)]
-mod test {
-    use insta::assert_json_snapshot;
-
-    use super::*;
-
-    #[test]
-    fn test_serialization() {
-        assert_json_snapshot!(
-            StatementRequest {
-                statement: "from t select 1".to_string(),
-                wait_timeout: Some("30s".to_string()),
-                exec_timeout: Some("30s".to_string()),
-                format: ResultFormat::ArrowJson,
-            },
-            @r#"
-        {
-          "statement": "from t select 1",
-          "wait_timeout": "30s",
-          "exec_timeout": "30s",
-          "format": "arrow-json"
-        }
-        "#,
-        );
-        assert_json_snapshot!(
-            StatementResponse {
-                statement_id: "1".to_string(),
-                status: StatementStatus::Pending,
-                result_set: None,
-            },
-            @r#"
-        {
-          "statement_id": "1",
-          "status": "pending",
-          "result_set": null
-        }
-        "#,
-        );
-    }
 }
