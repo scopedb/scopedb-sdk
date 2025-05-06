@@ -2,8 +2,6 @@ module github.com/scopedb/scopedb-sdk/go
 
 go 1.23.0
 
-toolchain go1.24.2
-
 require (
 	github.com/apache/arrow/go/v17 v17.0.0
 	github.com/brianvoe/gofakeit/v7 v7.2.1
