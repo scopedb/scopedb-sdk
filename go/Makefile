@@ -28,7 +28,7 @@ ci-test:
 
 dev/bin/golangci-lint:
 	# Build from source is not recommend. See https://golangci-lint.run/welcome/install/
-	GOBIN=$(shell pwd)/dev/bin $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+	GOBIN=$(shell pwd)/dev/bin $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6
 
 .PHONY: check-static
 check-static: dev/bin/golangci-lint

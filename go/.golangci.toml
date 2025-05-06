@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+version = "2"
+
 [linters]
-disable-all = true
+default = "none"
 enable = [
   # TODO(tisonkun): enable once https://github.com/timakin/bodyclose/issues/60 resolved
   #  "bodyclose",
@@ -21,12 +23,8 @@ enable = [
   "errcheck",
   "errorlint",
   "exhaustive",
-  "gofmt",
-  "gofumpt",
-  "goimports",
   "gomoddirectives",
   "gosec",
-  "gosimple",
   "gosmopolitan",
   "govet",
   "ineffassign",
@@ -34,4 +32,11 @@ enable = [
   "nilerr",
   "staticcheck",
   "unused",
+]
+
+[formatters]
+enable = [
+  "gofmt",
+  "gofumpt",
+  "goimports",
 ]
