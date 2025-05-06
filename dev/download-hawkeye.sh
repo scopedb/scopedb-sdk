@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-HAWKEYE_VERSION="5.8.1"
+HAWKEYE_VERSION="6.0.3"
 
 if [[ $(which hawkeye) ]]; then
   echo "Hawkeye is already installed."

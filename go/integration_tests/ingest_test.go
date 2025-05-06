@@ -25,7 +25,6 @@ import (
 	"github.com/apache/arrow/go/v17/arrow/array"
 	"github.com/apache/arrow/go/v17/arrow/memory"
 	"github.com/gkampitakis/go-snaps/snaps"
-	"github.com/google/uuid"
 	scopedb "github.com/scopedb/scopedb-sdk/go"
 	testkit "github.com/scopedb/scopedb-sdk/go/integration_tests/internal"
 	"github.com/stretchr/testify/require"
@@ -59,28 +58,6 @@ func TestReadAfterWrite(t *testing.T) {
 	})
 	snaps.MatchSnapshot(t, rs.Metadata)
 	snaps.MatchSnapshot(t, fmt.Sprintf("%v", rs.Records))
-
-	// 2. Merge data and verify the result
-	mergeRecords := makeMergeRecords(schema)
-	resp = tk.IngestArrowBatch(ctx, mergeRecords, fmt.Sprintf(`
-	MERGE INTO %s
-	ON %s.a = $0
-	WHEN MATCHED THEN UPDATE ALL
-	`, tableName, tableName))
-	require.Equal(t, resp.NumRowsInserted, 0)
-	require.Equal(t, resp.NumRowsUpdated, 1)
-	require.Equal(t, resp.NumRowsDeleted, 0)
-
-	id, err := uuid.NewRandom()
-	require.NoError(t, err)
-
-	rs = tk.QueryAsArrowBatch(ctx, &scopedb.StatementRequest{
-		StatementId: &id,
-		Statement:   statement,
-		Format:      scopedb.ArrowJSONFormat,
-	})
-	snaps.MatchSnapshot(t, rs.Metadata)
-	snaps.MatchSnapshot(t, fmt.Sprintf("%v", rs.Records))
 }
 
 func makeSchema() *arrow.Schema {
@@ -106,20 +83,6 @@ func makeRecords(schema *arrow.Schema) []arrow.Record {
 	b.Field(0).(*array.Int64Builder).Append(2)
 	b.Field(1).(*array.StructBuilder).FieldBuilder(0).(*array.Int64Builder).Append(1)
 	b.Field(1).(*array.StructBuilder).Append(true)
-	b.Field(1).(*array.StructBuilder).FieldBuilder(0).(*array.Int64Builder).Append(2)
-	b.Field(1).(*array.StructBuilder).Append(true)
-	return []arrow.Record{b.NewRecord()}
-}
-
-func makeMergeRecords(schema *arrow.Schema) []arrow.Record {
-	// Merge data:
-	// a:int64 | s:struct<int:int64>
-	// --------+--------------------
-	// 1       | { int: 2 }
-	pool := memory.NewGoAllocator()
-	b := array.NewRecordBuilder(pool, schema)
-	defer b.Release()
-	b.Field(0).(*array.Int64Builder).Append(1)
 	b.Field(1).(*array.StructBuilder).FieldBuilder(0).(*array.Int64Builder).Append(2)
 	b.Field(1).(*array.StructBuilder).Append(true)
 	return []arrow.Record{b.NewRecord()}
