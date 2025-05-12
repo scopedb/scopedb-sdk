@@ -39,37 +39,37 @@ func TestVariantBatchCable(t *testing.T) {
 
 	ctx := context.Background()
 	tbl := c.Table(RandomName(t))
-	_, err := c.Statement(fmt.Sprintf(`CREATE TABLE %s (i TIMESTAMP, v VARIANT)`, tbl.Identifier())).Execute(ctx)
+	_, err := c.Statement(fmt.Sprintf(`CREATE TABLE %s (ts TIMESTAMP, v VARIANT)`, tbl.Identifier())).Execute(ctx)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, tbl.Drop(ctx))
 	}()
 
 	cable := c.VariantBatchCable(fmt.Sprintf(`
-		SELECT $0["i"], $0["v"]
-		INSERT INTO %s (i, v)
+		SELECT $0["ts"], $0["v"]
+		INSERT INTO %s (ts, v)
 	`, tbl.Identifier()))
 	cable.BatchSize = 0 // immediately flush
 	cable.Start(ctx)
 	defer cable.Close()
 
 	require.NoError(t, <-cable.Send(struct {
-		I int64 `json:"i"`
-		V any   `json:"v"`
+		TS int64 `json:"ts"`
+		V  any   `json:"v"`
 	}{
-		I: -101,
-		V: "scopedb",
+		TS: -1024,
+		V:  "scopedb",
 	}))
 
 	require.NoError(t, <-cable.Send(struct {
-		I int64 `json:"i"`
-		V any   `json:"v"`
+		TS int64 `json:"ts"`
+		V  any   `json:"v"`
 	}{
-		I: 102,
-		V: 42.1,
+		TS: 1024,
+		V:  42.1,
 	}))
 
-	s := c.Statement(fmt.Sprintf(`FROM %s`, tbl.Identifier()))
+	s := c.Statement(fmt.Sprintf(`FROM %s ORDER BY ts`, tbl.Identifier()))
 	result, err := s.Execute(ctx)
 	require.NoError(t, err)
 

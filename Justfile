@@ -12,17 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: check
+set dotenv-load
+
+default:
+    just --list
+
 check: check-license
 
-.PHONY: download-hawkeye
 download-hawkeye:
 	dev/download-hawkeye.sh
 
-.PHONY: check-license
 check-license: download-hawkeye
 	hawkeye check
 
-.PHONY: fmt-license
 fmt-license: download-hawkeye
 	hawkeye format
