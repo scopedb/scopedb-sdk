@@ -34,7 +34,7 @@ func TestVariantBatchCable(t *testing.T) {
 
 	_, err := client.Statement("DROP TABLE IF EXISTS variants").Execute(ctx)
 	require.NoError(t, err)
-	_, err = client.Statement("CREATE TABLE variants (i INT, v VARIANT)").Execute(ctx)
+	_, err = client.Statement("CREATE TABLE variants (i TIMESTAMP, v VARIANT)").Execute(ctx)
 	require.NoError(t, err)
 
 	cable := client.VariantBatchCable(`
@@ -49,7 +49,7 @@ func TestVariantBatchCable(t *testing.T) {
 		I int64 `json:"i"`
 		V any   `json:"v"`
 	}{
-		I: 101,
+		I: -101,
 		V: "scopedb",
 	}))
 
@@ -57,16 +57,15 @@ func TestVariantBatchCable(t *testing.T) {
 		I int64 `json:"i"`
 		V any   `json:"v"`
 	}{
-		I: 102,
+		I: -102,
 		V: 42.1,
 	}))
 
 	s := client.Statement("FROM variants")
-	s.ResultFormat = scopedb.ResultFormatArrow
 	result, err := s.Execute(ctx)
 	require.NoError(t, err)
 
-	records, err := result.ToArrowBatch()
+	records, err := result.ToValues()
 	require.NoError(t, err)
 
 	fmt.Printf("%v\n", records)
