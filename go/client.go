@@ -21,11 +21,12 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/google/uuid"
 )
 
 type Client struct {
