@@ -18,22 +18,22 @@ func TestResultFormatArrow(t *testing.T) {
 	})
 	defer client.Close()
 
-	_, err := client.Statement("DROP TABLE IF EXISTS tab").Execute(ctx)
+	_, err := client.Statement("DROP TABLE IF EXISTS arrows").Execute(ctx)
 	require.NoError(t, err)
-	_, err = client.Statement("CREATE TABLE tab (a INT, v VARIANT)").Execute(ctx)
+	_, err = client.Statement("CREATE TABLE arrows (a INT, v VARIANT)").Execute(ctx)
 	require.NoError(t, err)
 
 	schema := makeArrowSchema()
 	record := makeArrowRecord(schema)
 
-	cable := client.ArrowBatchCable(schema, "INSERT INTO tab")
+	cable := client.ArrowBatchCable(schema, "INSERT INTO arrows")
 	cable.BatchSize = 0 // immediately flush
 	cable.Start(ctx)
 	defer cable.Close()
 
 	require.NoError(t, <-cable.Send(record))
 
-	s := client.Statement("FROM tab")
+	s := client.Statement("FROM arrows")
 	s.ResultFormat = scopedb.ResultFormatArrow
 	result, err := s.Execute(ctx)
 	require.NoError(t, err)

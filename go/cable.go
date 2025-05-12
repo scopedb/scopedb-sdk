@@ -1,7 +1,9 @@
 package scopedb
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/apache/arrow/go/v17/arrow"
 	"math"
@@ -104,12 +106,6 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 					continue
 				}
 
-				if sendBatch.record == nil {
-					sendBatch.err <- errors.New("nil batch")
-					close(sendBatch.err)
-					continue
-				}
-
 				if !sendBatch.record.Schema().Equal(c.schema) {
 					sendBatch.err <- errors.New("schema mismatch")
 					close(sendBatch.err)
@@ -131,15 +127,148 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 	}()
 }
 
-func (c *ArrowBatchCable) Send(batch arrow.Record) <-chan error {
+func (c *ArrowBatchCable) Send(record arrow.Record) <-chan error {
 	sendBatch := &arrowSendRecord{
-		record: batch,
+		record: record,
 		err:    make(chan error, 1),
+	}
+	if sendBatch.record == nil {
+		sendBatch.err <- errors.New("nil batch")
+		close(sendBatch.err)
+		return sendBatch.err
 	}
 	c.sendBatchCh <- sendBatch
 	return sendBatch.err
 }
 
 func (c *ArrowBatchCable) Close() {
+	close(c.sendBatchCh)
+}
+
+type VariantBatchCable struct {
+	c *Client
+
+	transforms  string
+	currentSize uint64
+	sendBatches []*variantSendRecord
+	sendBatchCh chan *variantSendRecord
+
+	BatchSize     uint64
+	BatchInterval time.Duration
+}
+
+type variantSendRecord struct {
+	payload string
+	err     chan error
+}
+
+func (c *Client) VariantBatchCable(transforms string) *VariantBatchCable {
+	cable := &VariantBatchCable{
+		c:             c,
+		transforms:    transforms,
+		currentSize:   0,
+		sendBatches:   make([]*variantSendRecord, 0),
+		sendBatchCh:   make(chan *variantSendRecord),
+		BatchSize:     1024 * 1024, // default to 1MiB
+		BatchInterval: time.Second, // default to 1 second
+	}
+
+	return cable
+}
+
+func (c *VariantBatchCable) Start(ctx context.Context) {
+	go func() {
+		ticker := time.Tick(c.BatchInterval)
+
+		stop, tick := false, false
+		for {
+			if tick || c.currentSize > c.BatchSize {
+				sendBatches := c.sendBatches
+				go func() {
+					rows := ""
+					for _, sendBatch := range sendBatches {
+						if rows != "" {
+							rows += "\n"
+						}
+						rows += sendBatch.payload
+					}
+					_, err := c.c.ingest(ctx, &ingestRequest{
+						Data: &ingestData{
+							Format: writeFormatJSON,
+							Rows:   rows,
+						},
+						Statement: c.transforms,
+					})
+					if err != nil {
+						for _, sendBatch := range sendBatches {
+							sendBatch.err <- err
+							close(sendBatch.err)
+						}
+						return
+					}
+
+					for _, sendBatch := range sendBatches {
+						close(sendBatch.err)
+					}
+				}()
+
+				tick = false
+				c.currentSize = 0
+				c.sendBatches = c.sendBatches[:0]
+			}
+
+			if stop {
+				break
+			}
+
+			select {
+			case <-ticker:
+				if len(c.sendBatches) > 0 {
+					tick = true
+				}
+			case sendBatch, more := <-c.sendBatchCh:
+				if !more {
+					stop = true
+					continue
+				}
+
+				size := uint64(len(sendBatch.payload))
+				if size > math.MaxUint64-c.currentSize {
+					c.currentSize = math.MaxUint64
+				} else {
+					c.currentSize += size
+				}
+				c.sendBatches = append(c.sendBatches, sendBatch)
+			}
+		}
+	}()
+}
+
+func (c *VariantBatchCable) Send(record any) <-chan error {
+	errCh := make(chan error, 1)
+
+	bs, err := json.Marshal(record)
+	if err != nil {
+		errCh <- err
+		close(errCh)
+		return errCh
+	}
+
+	var buf bytes.Buffer
+	if err := json.Compact(&buf, bs); err != nil {
+		errCh <- err
+		close(errCh)
+		return errCh
+	}
+
+	sendBatch := &variantSendRecord{
+		payload: buf.String(),
+		err:     errCh,
+	}
+	c.sendBatchCh <- sendBatch
+	return sendBatch.err
+}
+
+func (c *VariantBatchCable) Close() {
 	close(c.sendBatchCh)
 }
