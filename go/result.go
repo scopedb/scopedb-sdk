@@ -69,7 +69,7 @@ func (rs *ResultSet) ToValues() ([][]Value, error) {
 			return strconv.ParseUint(v, 10, 64)
 		case FloatDataType:
 			return strconv.ParseFloat(v, 64)
-		case BoolDataType:
+		case BooleanDataType:
 			return strconv.ParseBool(v)
 		case TimestampDataType:
 			return time.Parse(time.RFC3339Nano, v)
@@ -125,8 +125,8 @@ const (
 	UIntDataType DataType = "uint"
 	// FloatDataType is a float data type.
 	FloatDataType DataType = "float"
-	// BoolDataType is a bool data type.
-	BoolDataType DataType = "bool"
+	// BooleanDataType is a bool data type.
+	BooleanDataType DataType = "boolean"
 	// TimestampDataType is a timestamp data type.
 	TimestampDataType DataType = "timestamp"
 	// IntervalDataType is an interval data type.
