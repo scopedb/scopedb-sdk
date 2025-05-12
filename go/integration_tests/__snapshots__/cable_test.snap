@@ -1,0 +1,39 @@
+
+[TestVariantBatchCable - 1]
+scopedb.Schema{
+    &scopedb.FieldSchema{Name:"i", Type:"timestamp"},
+    &scopedb.FieldSchema{Name:"v", Type:"variant"},
+}
+---
+
+[TestVariantBatchCable - 2]
+[][]scopedb.Value{
+    {
+        time.Date(1970, time.January, 1, 0, 0, 0, 102, time.UTC),
+        "42.1",
+    },
+    {
+        time.Date(1969, time.December, 31, 23, 59, 59, 999999899, time.UTC),
+        "\"scopedb\"",
+    },
+}
+---
+
+[TestArrowBatchCable - 1]
+scopedb.Schema{
+    &scopedb.FieldSchema{Name:"a", Type:"int"},
+    &scopedb.FieldSchema{Name:"v", Type:"variant"},
+}
+---
+
+[TestArrowBatchCable - 2]
+[record:
+  schema:
+  fields: 2
+    - a: type=int64, nullable
+    - v: type=large_utf8, nullable
+  rows: 2
+  col[0][a]: [1 2]
+  col[1][v]: ["{\"int\":1}" "{\"int\":2}"]
+]
+---

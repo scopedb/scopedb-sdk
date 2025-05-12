@@ -1,0 +1,12 @@
+
+[TestTableSchema - 1]
+scopedb.Schema{
+    &scopedb.FieldSchema{Name:"i", Type:"int"},
+    &scopedb.FieldSchema{Name:"u", Type:"uint"},
+    &scopedb.FieldSchema{Name:"f", Type:"float"},
+    &scopedb.FieldSchema{Name:"s", Type:"string"},
+    &scopedb.FieldSchema{Name:"b", Type:"boolean"},
+    &scopedb.FieldSchema{Name:"ts", Type:"timestamp"},
+    &scopedb.FieldSchema{Name:"var", Type:"variant"},
+}
+---
