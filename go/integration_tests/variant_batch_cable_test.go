@@ -41,7 +41,7 @@ func TestVariantBatchCable(t *testing.T) {
 	SELECT $0["i"], $0["v"]
 	INSERT INTO variants (i, v)
 	`)
-	// cable.BatchSize = 0 // immediately flush
+	cable.BatchSize = 0 // immediately flush
 	cable.Start(ctx)
 	defer cable.Close()
 

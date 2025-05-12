@@ -27,6 +27,11 @@ import (
 	"github.com/apache/arrow/go/v17/arrow"
 )
 
+const (
+	defaultBatchSize     = 16 * 1024 * 1024 // default to 16 MiB
+	defaultBatchInterval = time.Second      // default to 1 second
+)
+
 type ArrowBatchCable struct {
 	c *Client
 
@@ -53,8 +58,8 @@ func (c *Client) ArrowBatchCable(schema *arrow.Schema, transforms string) *Arrow
 		currentSize:   0,
 		sendBatches:   make([]*arrowSendRecord, 0),
 		sendBatchCh:   make(chan *arrowSendRecord),
-		BatchSize:     1024 * 1024, // default to 1MiB
-		BatchInterval: time.Second, // default to 1 second
+		BatchSize:     defaultBatchSize,
+		BatchInterval: defaultBatchInterval,
 	}
 
 	return cable
@@ -186,8 +191,8 @@ func (c *Client) VariantBatchCable(transforms string) *VariantBatchCable {
 		currentSize:   0,
 		sendBatches:   make([]*variantSendRecord, 0),
 		sendBatchCh:   make(chan *variantSendRecord),
-		BatchSize:     1024 * 1024, // default to 1MiB
-		BatchInterval: time.Second, // default to 1 second
+		BatchSize:     defaultBatchSize,
+		BatchInterval: defaultBatchInterval,
 	}
 
 	return cable
