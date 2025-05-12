@@ -19,38 +19,93 @@ package integration_tests
 import (
 	"context"
 	"fmt"
-	"testing"
-
 	"github.com/apache/arrow/go/v17/arrow"
 	"github.com/apache/arrow/go/v17/arrow/array"
 	"github.com/apache/arrow/go/v17/arrow/memory"
+	"github.com/gkampitakis/go-snaps/snaps"
+	"testing"
+
 	scopedb "github.com/scopedb/scopedb-sdk/go"
 	"github.com/stretchr/testify/require"
 )
 
-func TestResultFormatArrow(t *testing.T) {
-	ctx := context.Background()
-	client := scopedb.NewClient(&scopedb.Config{
-		Endpoint: "http://localhost:6543",
-	})
-	defer client.Close()
+func TestVariantBatchCable(t *testing.T) {
+	c := NewClient()
+	if c == nil {
+		t.Skip("nil test client")
+	}
+	defer c.Close()
 
-	_, err := client.Statement("DROP TABLE IF EXISTS arrows").Execute(ctx)
+	ctx := context.Background()
+	tbl := c.Table(RandomName(t))
+	_, err := c.Statement(fmt.Sprintf(`CREATE TABLE %s (i TIMESTAMP, v VARIANT)`, tbl.Identifier())).Execute(ctx)
 	require.NoError(t, err)
-	_, err = client.Statement("CREATE TABLE arrows (a INT, v VARIANT)").Execute(ctx)
+	defer func() {
+		require.NoError(t, tbl.Drop(ctx))
+	}()
+
+	cable := c.VariantBatchCable(fmt.Sprintf(`
+		SELECT $0["i"], $0["v"]
+		INSERT INTO %s (i, v)
+	`, tbl.Identifier()))
+	cable.BatchSize = 0 // immediately flush
+	cable.Start(ctx)
+	defer cable.Close()
+
+	require.NoError(t, <-cable.Send(struct {
+		I int64 `json:"i"`
+		V any   `json:"v"`
+	}{
+		I: -101,
+		V: "scopedb",
+	}))
+
+	require.NoError(t, <-cable.Send(struct {
+		I int64 `json:"i"`
+		V any   `json:"v"`
+	}{
+		I: 102,
+		V: 42.1,
+	}))
+
+	s := c.Statement(fmt.Sprintf(`FROM %s`, tbl.Identifier()))
+	result, err := s.Execute(ctx)
 	require.NoError(t, err)
+
+	records, err := result.ToValues()
+	require.NoError(t, err)
+
+	snaps.MatchSnapshot(t, result.Schema)
+	snaps.MatchSnapshot(t, records)
+}
+
+func TestArrowBatchCable(t *testing.T) {
+	c := NewClient()
+	if c == nil {
+		t.Skip("nil test client")
+	}
+	defer c.Close()
+
+	ctx := context.Background()
+
+	tbl := c.Table(RandomName(t))
+	_, err := c.Statement(fmt.Sprintf(`CREATE TABLE %s (a INT, v VARIANT)`, tbl.Identifier())).Execute(ctx)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, tbl.Drop(ctx))
+	}()
 
 	schema := makeArrowSchema()
 	record := makeArrowRecord(schema)
 
-	cable := client.ArrowBatchCable(schema, "INSERT INTO arrows")
+	cable := c.ArrowBatchCable(schema, fmt.Sprintf(`INSERT INTO %s`, tbl.Identifier()))
 	cable.BatchSize = 0 // immediately flush
 	cable.Start(ctx)
 	defer cable.Close()
 
 	require.NoError(t, <-cable.Send(record))
 
-	s := client.Statement("FROM arrows")
+	s := c.Statement(fmt.Sprintf(`FROM %s`, tbl.Identifier()))
 	s.ResultFormat = scopedb.ResultFormatArrow
 	result, err := s.Execute(ctx)
 	require.NoError(t, err)
@@ -58,7 +113,8 @@ func TestResultFormatArrow(t *testing.T) {
 	records, err := result.ToArrowBatch()
 	require.NoError(t, err)
 
-	fmt.Printf("%v\n", records)
+	snaps.MatchSnapshot(t, result.Schema)
+	snaps.MatchSnapshot(t, fmt.Sprintf("%v", records))
 }
 
 func makeArrowSchema() *arrow.Schema {

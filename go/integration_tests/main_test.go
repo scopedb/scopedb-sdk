@@ -17,6 +17,11 @@
 package integration_tests
 
 import (
+	"github.com/lucasepe/codename"
+	scopedb "github.com/scopedb/scopedb-sdk/go"
+	"github.com/stretchr/testify/require"
+	"os"
+	"strings"
 	"testing"
 
 	"go.uber.org/goleak"
@@ -24,4 +29,22 @@ import (
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
+}
+
+func NewClient() *scopedb.Client {
+	endpoint := os.Getenv("SCOPEDB_ENDPOINT")
+
+	if endpoint == "" {
+		return nil
+	}
+
+	return scopedb.NewClient(&scopedb.Config{
+		Endpoint: endpoint,
+	})
+}
+
+func RandomName(t testing.TB) string {
+	rng, err := codename.DefaultRNG()
+	require.NoError(t, err)
+	return strings.ReplaceAll(codename.Generate(rng, 10), "-", "_")
 }
