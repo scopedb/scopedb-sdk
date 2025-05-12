@@ -16,8 +16,8 @@
 
 package scopedb
 
-// Config defines the configuration for the connection.
+// Config defines the configuration for the client.
 type Config struct {
-	// Endpoint is the URL of the ScopeDB server.
+	// Endpoint is the URL of the ScopeDB service.
 	Endpoint string `json:"endpoint"`
 }
