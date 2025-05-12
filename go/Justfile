@@ -12,43 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-GO := GO111MODULE=on go
+set dotenv-load
 
-.PHONY: build
+GO := "GO111MODULE=on go"
+
+default:
+    just --list
+
 build:
-	$(GO) build ./...
+	{{GO}} build ./...
 
-.PHONY: test
 test:
-	$(GO) test -v ./...
+	{{GO}} test -v -bench=. ./...
 
-.PHONY: ci-test
-ci-test:
-	SCOPEDB_ENDPOINT=http://localhost:6543 $(GO) test -v -bench=. ./...
-
-dev/bin/golangci-lint:
+golangci-lint:
 	# Build from source is not recommend. See https://golangci-lint.run/welcome/install/
-	GOBIN=$(shell pwd)/dev/bin $(GO) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6
+	GOBIN=$(pwd)/dev/bin {{GO}} install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6
 
-.PHONY: check-static
-check-static: dev/bin/golangci-lint
+check-static: golangci-lint
 	GO111MODULE=on CGO_ENABLED=0 dev/bin/golangci-lint run -v
 
-.PHONY: fix-static
-fix-static: dev/bin/golangci-lint
+fix-static: golangci-lint
 	GO111MODULE=on CGO_ENABLED=0 dev/bin/golangci-lint run --fix -v
 
-.PHONY: check-mod-tidy
 check-mod-tidy:
-	$(GO) mod tidy
+	{{GO}} mod tidy
 	git diff --exit-code go.sum
 
-.PHONY: fix-mod-tidy
 fix-mod-tidy:
-	$(GO) mod tidy
+	{{GO}} mod tidy
 
-.PHONY: check
 check: check-mod-tidy check-static
 
-.PHONY: fix
 fix: fix-mod-tidy fix-static

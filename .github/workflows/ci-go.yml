@@ -32,11 +32,12 @@ jobs:
     if: ${{ github.event_name != 'schedule' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@just
       - uses: actions/setup-go@v5
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
-      - run: make check
+      - run: just check
         working-directory: go
 
   test:
@@ -44,30 +45,26 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@just
       - uses: actions/setup-go@v5
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
-      - run: make build
+      - run: just build
         working-directory: go
       - name: Prepare Composed Environment
-        if: ${{ github.repository == 'scopedb/scopedb-sdk' }}
         run: docker compose -f ./dev/docker-compose.yml up -d
       - name: Run full tests
-        if: ${{ github.repository == 'scopedb/scopedb-sdk' }}
         timeout-minutes: 10
-        run: make ci-test
+        run: just test
         working-directory: go
-      - name: Run tests
-        if: ${{ github.repository != 'scopedb/scopedb-sdk' }}
-        timeout-minutes: 10
-        run: make test
-        working-directory: go
-      - name: Upload server logs
+        env:
+          SCOPEDB_ENDPOINT: http://localhost:6543
+      - name: Upload error logs
         if: ${{ !success() }}
         uses: actions/upload-artifact@v4
         with:
-          name: server-logs
+          name: error-logs
           path: dev/logs
 
   required:

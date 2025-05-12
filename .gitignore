@@ -1,3 +1,5 @@
-# data files
+# local files
 logs
 tmp
+
+.env
