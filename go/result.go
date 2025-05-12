@@ -19,9 +19,14 @@ package scopedb
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/apache/arrow/go/v17/arrow"
 )
+
+type Value any
 
 type ResultSet struct {
 	TotalRows uint64
@@ -34,15 +39,71 @@ type ResultSet struct {
 
 func (rs *ResultSet) ToArrowBatch() ([]arrow.Record, error) {
 	if rs.Format != ResultFormatArrow {
-		return nil, errors.New("result set format is not Arrow")
+		return nil, fmt.Errorf("unexpected result set format: %s", rs.Format)
 	}
 
 	var rows string
-	err := json.Unmarshal(rs.rows, &rows)
-	if err != nil {
+	if err := json.Unmarshal(rs.rows, &rows); err != nil {
 		return nil, err
 	}
 	return decodeArrowBatches([]byte(rows))
+}
+
+func (rs *ResultSet) ToValues() ([][]Value, error) {
+	if rs.Format != ResultFormatJSON {
+		return nil, fmt.Errorf("unexpected result set format: %s", rs.Format)
+	}
+
+	var rows [][]*string
+	if err := json.Unmarshal(rs.rows, &rows); err != nil {
+		return nil, err
+	}
+
+	convertValue := func(v string, typ DataType) (Value, error) {
+		switch typ {
+		case StringDataType:
+			return v, nil
+		case IntDataType:
+			return strconv.ParseInt(v, 10, 64)
+		case UIntDataType:
+			return strconv.ParseUint(v, 10, 64)
+		case FloatDataType:
+			return strconv.ParseFloat(v, 64)
+		case BoolDataType:
+			return strconv.ParseBool(v)
+		case TimestampDataType:
+			return time.Parse(time.RFC3339Nano, v)
+		case IntervalDataType:
+			return time.ParseDuration(v)
+		case VariantDataType:
+			return v, nil
+		default:
+			return nil, fmt.Errorf("unrecognized type: %s", typ)
+		}
+	}
+
+	var valueLists [][]Value
+	for _, r := range rows {
+		if len(r) != len(rs.Schema) {
+			return nil, errors.New("schema length does not match record length")
+		}
+
+		var values []Value
+		for i, v := range r {
+			fs := rs.Schema[i]
+			if v == nil {
+				values = append(values, nil)
+			} else {
+				val, err := convertValue(*v, fs.Type)
+				if err != nil {
+					return nil, err
+				}
+				values = append(values, val)
+			}
+		}
+		valueLists = append(valueLists, values)
+	}
+	return valueLists, nil
 }
 
 type Schema []*FieldSchema

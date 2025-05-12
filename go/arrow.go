@@ -28,7 +28,7 @@ import (
 // encodeArrowBatches encodes the given record batches into a base64 encoded byte slice.
 func encodeArrowBatches(schema *arrow.Schema, batches []arrow.Record) (payload []byte, err error) {
 	if len(batches) == 0 {
-		return nil, errors.New("cannot encode empty batches")
+		return nil, errors.New("empty batches")
 	}
 
 	var buf bytes.Buffer
