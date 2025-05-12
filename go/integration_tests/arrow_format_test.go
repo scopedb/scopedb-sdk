@@ -31,8 +31,7 @@ func TestResultFormatArrow(t *testing.T) {
 	cable.Start(ctx)
 	defer cable.Close()
 
-	done, _ := cable.Send(record)
-	<-done
+	require.NoError(t, <-cable.Send(record))
 
 	s := client.Statement("FROM tab")
 	s.ResultFormat = scopedb.ResultFormatArrow

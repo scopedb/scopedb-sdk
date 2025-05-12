@@ -14,18 +14,16 @@ type ArrowBatchCable struct {
 	schema      *arrow.Schema
 	transforms  string
 	currentSize uint64
-	sendBatches []*arrowSendBatch
-	sendBatchCh chan *arrowSendBatch
+	sendBatches []*arrowSendRecord
+	sendBatchCh chan *arrowSendRecord
 
 	BatchSize     uint64
 	BatchInterval time.Duration
 }
 
-type arrowSendBatch struct {
-	batch arrow.Record
-
-	err  chan error
-	done chan struct{}
+type arrowSendRecord struct {
+	record arrow.Record
+	err    chan error
 }
 
 func (c *Client) ArrowBatchCable(schema *arrow.Schema, transforms string) *ArrowBatchCable {
@@ -34,8 +32,8 @@ func (c *Client) ArrowBatchCable(schema *arrow.Schema, transforms string) *Arrow
 		schema:        schema,
 		transforms:    transforms,
 		currentSize:   0,
-		sendBatches:   make([]*arrowSendBatch, 0),
-		sendBatchCh:   make(chan *arrowSendBatch),
+		sendBatches:   make([]*arrowSendRecord, 0),
+		sendBatchCh:   make(chan *arrowSendRecord),
 		BatchSize:     1024 * 1024, // default to 1MiB
 		BatchInterval: time.Second, // default to 1 second
 	}
@@ -54,14 +52,14 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 				go func() {
 					batches := make([]arrow.Record, 0, len(sendBatches))
 					for _, sendBatch := range sendBatches {
-						batches = append(batches, sendBatch.batch)
+						batches = append(batches, sendBatch.record)
 					}
 
 					rows, err := encodeArrowBatches(c.schema, batches)
 					if err != nil {
 						for _, sendBatch := range sendBatches {
 							sendBatch.err <- err
-							close(sendBatch.done)
+							close(sendBatch.err)
 						}
 						return
 					}
@@ -76,14 +74,13 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 					if err != nil {
 						for _, sendBatch := range sendBatches {
 							sendBatch.err <- err
-							close(sendBatch.done)
+							close(sendBatch.err)
 						}
 						return
 					}
 
 					for _, sendBatch := range sendBatches {
 						close(sendBatch.err)
-						close(sendBatch.done)
 					}
 				}()
 
@@ -107,16 +104,19 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 					continue
 				}
 
-				if sendBatch.batch == nil {
+				if sendBatch.record == nil {
+					sendBatch.err <- errors.New("nil batch")
+					close(sendBatch.err)
 					continue
 				}
 
-				if !sendBatch.batch.Schema().Equal(c.schema) {
+				if !sendBatch.record.Schema().Equal(c.schema) {
 					sendBatch.err <- errors.New("schema mismatch")
+					close(sendBatch.err)
 					continue
 				}
 
-				for _, col := range sendBatch.batch.Columns() {
+				for _, col := range sendBatch.record.Columns() {
 					size := col.Data().SizeInBytes()
 					if size > math.MaxUint64-c.currentSize {
 						c.currentSize = math.MaxUint64
@@ -131,14 +131,13 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 	}()
 }
 
-func (c *ArrowBatchCable) Send(batch arrow.Record) (<-chan struct{}, <-chan error) {
-	sendBatch := &arrowSendBatch{
-		batch: batch,
-		err:   make(chan error, 1),
-		done:  make(chan struct{}, 1),
+func (c *ArrowBatchCable) Send(batch arrow.Record) <-chan error {
+	sendBatch := &arrowSendRecord{
+		record: batch,
+		err:    make(chan error, 1),
 	}
 	c.sendBatchCh <- sendBatch
-	return sendBatch.done, sendBatch.err
+	return sendBatch.err
 }
 
 func (c *ArrowBatchCable) Close() {
