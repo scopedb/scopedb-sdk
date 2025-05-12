@@ -17,12 +17,13 @@
 package integration_tests
 
 import (
-	"github.com/lucasepe/codename"
-	scopedb "github.com/scopedb/scopedb-sdk/go"
-	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/lucasepe/codename"
+	scopedb "github.com/scopedb/scopedb-sdk/go"
+	"github.com/stretchr/testify/require"
 
 	"go.uber.org/goleak"
 )

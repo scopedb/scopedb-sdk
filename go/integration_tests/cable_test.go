@@ -19,11 +19,12 @@ package integration_tests
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/apache/arrow/go/v17/arrow"
 	"github.com/apache/arrow/go/v17/arrow/array"
 	"github.com/apache/arrow/go/v17/arrow/memory"
 	"github.com/gkampitakis/go-snaps/snaps"
-	"testing"
 
 	scopedb "github.com/scopedb/scopedb-sdk/go"
 	"github.com/stretchr/testify/require"
