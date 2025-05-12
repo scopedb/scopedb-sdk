@@ -20,39 +20,45 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/google/uuid"
 )
 
-// HTTPClient is the interface for HTTP client.
-type HTTPClient interface {
-	// Get sends a GET request to the ScopeDB server.
-	Get(context.Context, *url.URL) (*http.Response, error)
-	// Post sends a POST request to the ScopeDB server.
-	Post(context.Context, *url.URL, []byte) (*http.Response, error)
-	// Close closes the HTTP client.
-	//
-	// You don't typically need to call this as the garbage collector will release
-	// the resources when the client is no longer referenced. However, it can be
-	// useful to call this if you want to release the resources immediately.
-	Close()
+type Client struct {
+	config *Config
+	http   *httpClient
+}
+
+// NewClient creates a new ScopeDB client with the given configuration.
+func NewClient(config *Config) *Client {
+	return &Client{
+		config: config,
+		http: &httpClient{
+			client: http.DefaultClient,
+		},
+	}
+}
+
+// Close closes the ScopeDB client and release all associated resources.
+//
+// You don't typically need to call this as the garbage collector will release
+// the resources when the connection is no longer referenced. However, it can be
+// useful to call this if you want to release the resources immediately.
+func (c *Client) Close() {
+	c.http.Close()
 }
 
 type httpClient struct {
 	client *http.Client
 }
 
-var _ HTTPClient = (*httpClient)(nil)
-
-// NewHTTPClient creates a new internal HTTP client.
-func NewHTTPClient() HTTPClient {
-	return &httpClient{
-		client: http.DefaultClient,
-	}
-}
-
-func (c *httpClient) Get(ctx context.Context, u *url.URL) (*http.Response, error) {
+// doGet sends a GET request to the ScopeDB server.
+func (c *httpClient) doGet(ctx context.Context, u *url.URL) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
@@ -61,7 +67,8 @@ func (c *httpClient) Get(ctx context.Context, u *url.URL) (*http.Response, error
 	return resp, err
 }
 
-func (c *httpClient) Post(ctx context.Context, u *url.URL, body []byte) (*http.Response, error) {
+// doPost sends a POST request to the ScopeDB server.
+func (c *httpClient) doPost(ctx context.Context, u *url.URL, body []byte) (*http.Response, error) {
 	uncompressedContentLength := len(body)
 
 	var b bytes.Buffer
@@ -84,6 +91,197 @@ func (c *httpClient) Post(ctx context.Context, u *url.URL, body []byte) (*http.R
 	return resp, err
 }
 
+// Close closes the HTTP client.
+//
+// You don't typically need to call this as the garbage collector will release
+// the resources when the client is no longer referenced. However, it can be
+// useful to call this if you want to release the resources immediately.
 func (c *httpClient) Close() {
 	c.client.CloseIdleConnections()
+}
+
+type statementRequest struct {
+	StatementId *uuid.UUID   `json:"statement_id,omitempty"`
+	Statement   string       `json:"statement"`
+	ExecTimeout string       `json:"exec_timeout,omitempty"`
+	Format      ResultFormat `json:"format"`
+}
+
+type statementResponse struct {
+	ID        uuid.UUID         `json:"statement_id"`
+	Progress  StatementProgress `json:"progress"`
+	Status    StatementStatus   `json:"status"`
+	ResultSet *resultSet        `json:"result_set"`
+}
+
+type resultSet struct {
+	Metadata *resultSetMetadata `json:"metadata"`
+	Format   ResultFormat       `json:"format"`
+	Rows     json.RawMessage    `json:"rows"`
+}
+
+type resultSetMetadata struct {
+	Fields  []*resultSetField `json:"fields"`
+	NumRows uint64            `json:"num_rows"`
+}
+
+type resultSetField struct {
+	Name     string `json:"name"`
+	DataType string `json:"data_Type"`
+}
+
+func (rs *resultSet) toResultSet() *ResultSet {
+	schema := make(Schema, len(rs.Metadata.Fields))
+	for i, field := range rs.Metadata.Fields {
+		schema[i] = &FieldSchema{
+			Name: field.Name,
+			Type: DataType(field.DataType),
+		}
+	}
+
+	return &ResultSet{
+		TotalRows: rs.Metadata.NumRows,
+		Schema:    schema,
+		Format:    rs.Format,
+		rows:      rs.Rows,
+	}
+}
+
+func (c *Client) submitStatement(ctx context.Context, request *statementRequest) (*statementResponse, error) {
+	req, err := url.Parse(c.config.Endpoint + "/v1/statements")
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.http.doPost(ctx, req, body)
+	if err != nil {
+		return nil, err
+	}
+	defer sneakyBodyClose(resp.Body)
+	if err := checkStatusCodeOK(resp); err != nil {
+		return nil, err
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var respData statementResponse
+	err = json.Unmarshal(data, &respData)
+	return &respData, err
+}
+
+func (c *Client) fetchStatementResult(ctx context.Context, id uuid.UUID, format ResultFormat) (*statementResponse, error) {
+	req, err := url.Parse(c.config.Endpoint + "/v1/statements/" + id.String())
+	if err != nil {
+		return nil, err
+	}
+
+	q := req.Query()
+	q.Add("format", string(format))
+	req.RawQuery = q.Encode()
+
+	resp, err := c.http.doGet(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	defer sneakyBodyClose(resp.Body)
+	if err := checkStatusCodeOK(resp); err != nil {
+		return nil, err
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var respData statementResponse
+	err = json.Unmarshal(data, &respData)
+	return &respData, err
+}
+
+type statementCancelResponse struct {
+	Status StatementStatus `json:"status"`
+}
+
+func (c *Client) cancelStatement(ctx context.Context, statementId uuid.UUID) (*StatementStatus, error) {
+	req, err := url.Parse(c.config.Endpoint + "/v1/statements/" + statementId.String() + "/cancel")
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.http.doPost(ctx, req, []byte{})
+	if err != nil {
+		return nil, err
+	}
+	defer sneakyBodyClose(resp.Body)
+	if err := checkStatusCodeOK(resp); err != nil {
+		return nil, err
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var respData statementCancelResponse
+	err = json.Unmarshal(data, &respData)
+	return &respData.Status, err
+}
+
+type writeFormat string
+
+const (
+	// writeFormatArrow is to ingest rows as base64 encoded arrow batches.
+	writeFormatArrow writeFormat = "arrow"
+	// writeFormatJSON is to ingest rows as JSON lines.
+	writeFormatJSON writeFormat = "json"
+)
+
+type ingestRequest struct {
+	Data      *ingestData `json:"data"`
+	Statement string      `json:"statement"`
+}
+
+type ingestData struct {
+	// Format is the format of the data to ingest.
+	Format writeFormat `json:"format"`
+	// Rows is the payload of the data to ingest.
+	Rows string `json:"rows"`
+}
+
+type ingestResponse struct {
+	NumRowsInserted int `json:"num_rows_inserted"`
+}
+
+func (c *Client) ingest(ctx context.Context, request *ingestRequest) (*ingestResponse, error) {
+	req, err := url.Parse(c.config.Endpoint + "/v1/ingest")
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.http.doPost(ctx, req, body)
+	if err != nil {
+		return nil, err
+	}
+	defer sneakyBodyClose(resp.Body)
+	if err := checkStatusCodeOK(resp); err != nil {
+		return nil, err
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var respData ingestResponse
+	err = json.Unmarshal(data, &respData)
+	return &respData, err
 }

@@ -25,13 +25,11 @@ import (
 	"github.com/apache/arrow/go/v17/arrow/ipc"
 )
 
-// encodeRecordBatches encodes the given record batches into a base64 encoded byte slice.
-func encodeRecordBatches(batches []arrow.Record) (payload []byte, err error) {
+// encodeArrowBatches encodes the given record batches into a base64 encoded byte slice.
+func encodeArrowBatches(schema *arrow.Schema, batches []arrow.Record) (payload []byte, err error) {
 	if len(batches) == 0 {
-		return nil, errors.New("cannot ingest empty batches")
+		return nil, errors.New("cannot encode empty batches")
 	}
-
-	schema := batches[0].Schema()
 
 	var buf bytes.Buffer
 	defer func() {
@@ -58,8 +56,8 @@ func encodeRecordBatches(batches []arrow.Record) (payload []byte, err error) {
 	return
 }
 
-// decodeRecordBatches decodes the given base64 encoded byte slice into record batches.
-func decodeRecordBatches(data []byte) ([]arrow.Record, error) {
+// decodeArrowBatches decodes the given base64 encoded byte slice into record batches.
+func decodeArrowBatches(data []byte) ([]arrow.Record, error) {
 	decoder := base64.NewDecoder(base64.StdEncoding, bytes.NewReader(data))
 	reader, err := ipc.NewReader(decoder, ipc.WithDelayReadSchema(true))
 	if err != nil {

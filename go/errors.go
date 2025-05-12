@@ -54,13 +54,6 @@ func checkStatusCode(resp *http.Response, expected int) error {
 	return &errResp
 }
 
-func checkResultFormat(actual ResultFormat, expected ResultFormat) error {
-	if actual != expected {
-		return fmt.Errorf("unexpected result format: %s", actual)
-	}
-	return nil
-}
-
 // sneakyBodyClose closes the body and ignores the error.
 // This is useful to close the HTTP response body when we don't care about the error.
 func sneakyBodyClose(body io.ReadCloser) {

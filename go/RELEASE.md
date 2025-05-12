@@ -1,12 +1,11 @@
-# How to release ScopeDB SDKs
-
-## Release the Go SDK
+# How to release ScopeDB Go SDK
 
 It should be as simple as tagging the release and pushing the Git tag to the repository:
 
 ```shell
-git tag -a go/v0.1.0 -m "Release v0.1.0 for Go SDK"
-git push origin go/v0.1.0
+export version=v0.1.0
+git tag -a go/$version -m "Release $version for Go SDK"
+git push origin go/$version
 ```
 
 References:
