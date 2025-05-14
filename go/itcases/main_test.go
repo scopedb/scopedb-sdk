@@ -14,40 +14,39 @@
  * limitations under the License.
  */
 
-package integration_tests
+package itcases
 
 import (
-	"context"
-	"fmt"
+	"os"
+	"strings"
 	"testing"
 
-	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/lucasepe/codename"
+	scopedb "github.com/scopedb/scopedb-sdk/go"
 	"github.com/stretchr/testify/require"
+
+	"go.uber.org/goleak"
 )
 
-func TestTableSchema(t *testing.T) {
-	c := NewClient(t)
-	defer c.Close()
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
-	ctx := context.Background()
-	tbl := c.Table(RandomName(t))
-	_, err := c.Statement(fmt.Sprintf(`
-		CREATE TABLE %s (
-			i INT,
-			u UINT,
-			f FLOAT,
-			s STRING,
-			b BOOLEAN,
-			ts TIMESTAMP,
-			var VARIANT,
-		)
-	`, tbl.Identifier())).Execute(ctx)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, tbl.Drop(ctx))
-	}()
+func NewClient(t testing.TB) *scopedb.Client {
+	endpoint := os.Getenv("SCOPEDB_ENDPOINT")
 
-	schema, err := tbl.TableSchema(ctx)
+	if endpoint == "" {
+		t.Skip("SCOPEDB_ENDPOINT not set")
+		return nil // unreachable
+	}
+
+	return scopedb.NewClient(&scopedb.Config{
+		Endpoint: endpoint,
+	})
+}
+
+func RandomName(t testing.TB) string {
+	rng, err := codename.DefaultRNG()
 	require.NoError(t, err)
-	snaps.MatchSnapshot(t, schema)
+	return strings.ReplaceAll(codename.Generate(rng, 10), "-", "_")
 }

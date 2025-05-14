@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package integration_tests
+package itcases
 
 import (
 	"context"

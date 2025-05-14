@@ -63,7 +63,7 @@ func (c *Client) Statement(stmt string) *Statement {
 
 func (s *Statement) Submit(ctx context.Context) (*StatementHandle, error) {
 	resp, err := s.c.submitStatement(ctx, &statementRequest{
-		StatementId: s.ID,
+		StatementID: s.ID,
 		Statement:   s.stmt,
 		ExecTimeout: s.ExecTimeout,
 		Format:      s.ResultFormat,
