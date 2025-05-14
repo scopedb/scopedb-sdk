@@ -26,10 +26,7 @@ import (
 )
 
 func TestTableSchema(t *testing.T) {
-	c := NewClient()
-	if c == nil {
-		t.Skip("nil test client")
-	}
+	c := NewClient(t)
 	defer c.Close()
 
 	ctx := context.Background()
