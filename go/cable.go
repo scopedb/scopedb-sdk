@@ -32,6 +32,13 @@ const (
 	defaultBatchInterval = time.Second      // default to 1 second
 )
 
+// ArrowBatchCable is a cable for sending Arrow batches to ScopeDB.
+//
+// You can create an ArrowBatchCable using the Client's ArrowBatchCable method,
+// and start it using the Start method.
+//
+// Then, you can send Arrow batches using the Send method. Once the staged batches
+// reach the specified BatchSize or BatchInterval, they will be sent to ScopeDB.
 type ArrowBatchCable struct {
 	c *Client
 
@@ -41,7 +48,9 @@ type ArrowBatchCable struct {
 	sendBatches []*arrowSendRecord
 	sendBatchCh chan *arrowSendRecord
 
-	BatchSize     uint64
+	// BatchSize is the maximum size in bytes of the batches to be sent.
+	BatchSize uint64
+	// BatchInterval is the maximum time to wait before sending the batches.
 	BatchInterval time.Duration
 }
 
@@ -50,6 +59,16 @@ type arrowSendRecord struct {
 	err    chan error
 }
 
+// ArrowBatchCable creates a new ArrowBatchCable with the specified schema and transforms.
+//
+// The cable must be started before sending batches, and all the batches sent must have the same schema
+// as the one provided here.
+//
+// The transforms are ScopeQL statements that assume the data sent as the source table. The schema
+// of the source table is the one provided here. The transforms must end with an INSERT statement.
+// For example:
+//
+//	INSERT INTO my_table (col1, col2)
 func (c *Client) ArrowBatchCable(schema *arrow.Schema, transforms string) *ArrowBatchCable {
 	cable := &ArrowBatchCable{
 		c:             c,
@@ -65,6 +84,10 @@ func (c *Client) ArrowBatchCable(schema *arrow.Schema, transforms string) *Arrow
 	return cable
 }
 
+// Start starts the ArrowBatchCable background task.
+//
+// It will receive batches that users Send, package them based on the BatchSize and BatchInterval,
+// and send them to ScopeDB.
 func (c *ArrowBatchCable) Start(ctx context.Context) {
 	go func() {
 		ticker := time.Tick(c.BatchInterval)
@@ -149,6 +172,10 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 	}()
 }
 
+// Send sends an Arrow RecordBatch to the cable. The record must have the same schema
+// as the one provided when creating the cable.
+//
+// Returns a channel that will be closed when the batch is sent to ScopeDB, or an error occurs.
 func (c *ArrowBatchCable) Send(record arrow.Record) <-chan error {
 	sendBatch := &arrowSendRecord{
 		record: record,
@@ -163,10 +190,20 @@ func (c *ArrowBatchCable) Send(record arrow.Record) <-chan error {
 	return sendBatch.err
 }
 
+// Close closes the ArrowBatchCable and stops sending batches.
 func (c *ArrowBatchCable) Close() {
 	close(c.sendBatchCh)
 }
 
+// VariantBatchCable is a cable for sending any records as variant data to ScopeDB.
+//
+// You can create an VariantBatchCable using the Client's VariantBatchCable method,
+// and start it using the Start method.
+//
+// Then, you can send any records using the Send method. Once the staged batches
+// reach the specified BatchSize or BatchInterval, they will be sent to ScopeDB.
+//
+// The records sent must be JSON-serializable.
 type VariantBatchCable struct {
 	c *Client
 
@@ -184,6 +221,16 @@ type variantSendRecord struct {
 	err     chan error
 }
 
+// VariantBatchCable creates a new VariantBatchCable with the specified transforms.
+//
+// The cable must be started before sending batches. All the records sent must be JSON-serializable.
+//
+// The transforms are ScopeQL statements that assume the data sent as the source table. The schema
+// of the source table is a one-column variant table. The transforms must end with an INSERT statement.
+// For example:
+//
+//	SELECT $0["col1"], $0["col2"]
+//	INSERT INTO my_table (col1, col2)
 func (c *Client) VariantBatchCable(transforms string) *VariantBatchCable {
 	cable := &VariantBatchCable{
 		c:             c,
@@ -198,6 +245,10 @@ func (c *Client) VariantBatchCable(transforms string) *VariantBatchCable {
 	return cable
 }
 
+// Start starts the VariantBatchCable background task.
+//
+// It will receive batches that users Send, package them based on the BatchSize and BatchInterval,
+// and send them to ScopeDB.
 func (c *VariantBatchCable) Start(ctx context.Context) {
 	go func() {
 		ticker := time.Tick(c.BatchInterval)
@@ -266,6 +317,9 @@ func (c *VariantBatchCable) Start(ctx context.Context) {
 	}()
 }
 
+// Send sends a JSON-serializable record to the cable.
+//
+// Returns a channel that will be closed when the record is sent to ScopeDB, or an error occurs.
 func (c *VariantBatchCable) Send(record any) <-chan error {
 	errCh := make(chan error, 1)
 
@@ -291,6 +345,7 @@ func (c *VariantBatchCable) Send(record any) <-chan error {
 	return sendBatch.err
 }
 
+// Close closes the VariantBatchCable and stops sending batches.
 func (c *VariantBatchCable) Close() {
 	close(c.sendBatchCh)
 }

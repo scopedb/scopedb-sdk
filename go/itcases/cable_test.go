@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package integration_tests
+package itcases
 
 import (
 	"context"
@@ -31,10 +31,7 @@ import (
 )
 
 func TestVariantBatchCable(t *testing.T) {
-	c := NewClient()
-	if c == nil {
-		t.Skip("nil test client")
-	}
+	c := NewClient(t)
 	defer c.Close()
 
 	ctx := context.Background()
@@ -81,10 +78,7 @@ func TestVariantBatchCable(t *testing.T) {
 }
 
 func TestArrowBatchCable(t *testing.T) {
-	c := NewClient()
-	if c == nil {
-		t.Skip("nil test client")
-	}
+	c := NewClient(t)
 	defer c.Close()
 
 	ctx := context.Background()

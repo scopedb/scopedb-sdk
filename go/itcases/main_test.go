@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package integration_tests
+package itcases
 
 import (
 	"os"
@@ -32,11 +32,12 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-func NewClient() *scopedb.Client {
+func NewClient(t testing.TB) *scopedb.Client {
 	endpoint := os.Getenv("SCOPEDB_ENDPOINT")
 
 	if endpoint == "" {
-		return nil
+		t.Skip("SCOPEDB_ENDPOINT not set")
+		return nil // unreachable
 	}
 
 	return scopedb.NewClient(&scopedb.Config{

@@ -30,9 +30,13 @@ enable = [
   "ineffassign",
   "misspell",
   "nilerr",
+  "revive",
   "staticcheck",
   "unused",
 ]
+
+[linters.settings.staticcheck]
+checks = ["all"]
 
 [formatters]
 enable = [

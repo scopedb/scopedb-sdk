@@ -23,6 +23,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// ResultFormat defines the format of the ResultSet.
 type ResultFormat string
 
 const (
@@ -32,6 +33,7 @@ const (
 	ResultFormatJSON ResultFormat = "json"
 )
 
+// Statement is a struct that represents a statement to be executed on ScopeDB.
 type Statement struct {
 	c *Client
 
@@ -53,6 +55,7 @@ type Statement struct {
 	ResultFormat ResultFormat
 }
 
+// Statement creates a new statement with the given ScopeQL statement.
 func (c *Client) Statement(stmt string) *Statement {
 	return &Statement{
 		c:            c,
@@ -61,9 +64,10 @@ func (c *Client) Statement(stmt string) *Statement {
 	}
 }
 
+// Submit submits the statement to ScopeDB for execution.
 func (s *Statement) Submit(ctx context.Context) (*StatementHandle, error) {
 	resp, err := s.c.submitStatement(ctx, &statementRequest{
-		StatementId: s.ID,
+		StatementID: s.ID,
 		Statement:   s.stmt,
 		ExecTimeout: s.ExecTimeout,
 		Format:      s.ResultFormat,
@@ -80,6 +84,7 @@ func (s *Statement) Submit(ctx context.Context) (*StatementHandle, error) {
 	}, nil
 }
 
+// Execute submits the statement to ScopeDB for execution and waits for its completion.
 func (s *Statement) Execute(ctx context.Context) (*ResultSet, error) {
 	handle, err := s.Submit(ctx)
 	if err != nil {
@@ -88,15 +93,18 @@ func (s *Statement) Execute(ctx context.Context) (*ResultSet, error) {
 	return handle.Fetch(ctx)
 }
 
+// StatementHandle is a handle to a statement that has been submitted to ScopeDB.
 type StatementHandle struct {
 	c    *Client
 	resp *statementResponse
 
 	id uuid.UUID
 
+	// Format is the expected format of the ResultSet.
 	Format ResultFormat
 }
 
+// StatementHandle creates a new StatementHandle with the given ID.
 func (c *Client) StatementHandle(id uuid.UUID) *StatementHandle {
 	return &StatementHandle{
 		c:      c,
@@ -106,6 +114,7 @@ func (c *Client) StatementHandle(id uuid.UUID) *StatementHandle {
 	}
 }
 
+// Status returns the last seen status of the statement.
 func (h *StatementHandle) Status() *StatementStatus {
 	if h.resp == nil {
 		return nil
@@ -113,6 +122,7 @@ func (h *StatementHandle) Status() *StatementStatus {
 	return &h.resp.Status
 }
 
+// Progress returns the last seen progress of the statement.
 func (h *StatementHandle) Progress() *StatementProgress {
 	if h.resp == nil {
 		return nil
@@ -120,6 +130,7 @@ func (h *StatementHandle) Progress() *StatementProgress {
 	return &h.resp.Progress
 }
 
+// ResultSet returns the result set of the statement if available.
 func (h *StatementHandle) ResultSet() *ResultSet {
 	if h.resp == nil {
 		return nil
@@ -130,17 +141,24 @@ func (h *StatementHandle) ResultSet() *ResultSet {
 	return h.resp.ResultSet.toResultSet()
 }
 
+// FetchOnce fetches the result set of the statement once.
+//
+// If the last seen status is terminated, no fetch is performed.
 func (h *StatementHandle) FetchOnce(ctx context.Context) error {
+	if h.resp != nil && h.resp.Status.Terminated() {
+		return nil
+	}
+
 	resp, err := h.c.fetchStatementResult(ctx, h.id, h.Format)
 	if resp != nil {
 		h.resp = resp
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
+// Fetch fetches the result set of the statement until it is finished, failed or cancelled.
+//
+// When the statement is finished, the result set is returned. Otherwise, an error is returned.
 func (h *StatementHandle) Fetch(ctx context.Context) (*ResultSet, error) {
 	tick := 5 * time.Millisecond
 	maxTick := 1 * time.Second
@@ -170,6 +188,7 @@ func (h *StatementHandle) Fetch(ctx context.Context) (*ResultSet, error) {
 	}
 }
 
+// Cancel cancels the statement if it is running or pending.
 func (h *StatementHandle) Cancel(ctx context.Context) (*StatementStatus, error) {
 	if h.resp != nil {
 		switch h.resp.Status {
@@ -187,6 +206,7 @@ func (h *StatementHandle) Cancel(ctx context.Context) (*StatementStatus, error) 
 	return resp, err
 }
 
+// StatementStatus is a string that represents the status of a statement.
 type StatementStatus string
 
 const (
@@ -202,6 +222,7 @@ const (
 	StatementStatusCancelled StatementStatus = "cancelled"
 )
 
+// Finished returns true if the statement is finished.
 func (s StatementStatus) Finished() bool {
 	switch s {
 	case StatementStatusFinished:
@@ -213,6 +234,19 @@ func (s StatementStatus) Finished() bool {
 	}
 }
 
+// Terminated returns true if the statement is finished, failed, or cancelled.
+func (s StatementStatus) Terminated() bool {
+	switch s {
+	case StatementStatusFinished, StatementStatusFailed, StatementStatusCancelled:
+		return true
+	case StatementStatusRunning, StatementStatusPending:
+		return false
+	default:
+		return false
+	}
+}
+
+// StatementProgress is a struct that represents the progress of a statement.
 type StatementProgress struct {
 	// TotalPercentage denotes the total progress in percentage: [0.0, 100.0].
 	TotalPercentage float64 `json:"total_percentage"`
