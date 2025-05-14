@@ -22,6 +22,7 @@ import (
 	"fmt"
 )
 
+// Table represents a table like object (table, view, etc.) in ScopeDB.
 type Table struct {
 	c *Client
 
@@ -38,6 +39,7 @@ type Table struct {
 	Table string
 }
 
+// Table creates a new Table object with the given name.
 func (c *Client) Table(tableName string) *Table {
 	return &Table{
 		c:     c,
@@ -45,12 +47,18 @@ func (c *Client) Table(tableName string) *Table {
 	}
 }
 
+// Drop drops the table from ScopeDB.
+//
+// This method issues a DROP TABLE statement to ScopeDB and blocks until done.
 func (t *Table) Drop(ctx context.Context) error {
 	s := t.c.Statement(fmt.Sprintf(`DROP TABLE %s`, t.Identifier()))
 	_, err := s.Execute(ctx)
 	return err
 }
 
+// TableSchema returns the schema of the table.
+//
+// This method issues a meta query to ScopeDB and blocks until the result is fetched.
 func (t *Table) TableSchema(ctx context.Context) (Schema, error) {
 	var dbName, schemaName, tableName string
 	if t.Database != "" {
@@ -101,6 +109,7 @@ func (t *Table) TableSchema(ctx context.Context) (Schema, error) {
 	return schema, nil
 }
 
+// Identifier returns the quoted table identifier.
 func (t *Table) Identifier() string {
 	var b bytes.Buffer
 	if t.Database != "" {

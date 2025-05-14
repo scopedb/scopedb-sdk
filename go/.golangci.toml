@@ -30,6 +30,7 @@ enable = [
   "ineffassign",
   "misspell",
   "nilerr",
+  "revive",
   "staticcheck",
   "unused",
 ]

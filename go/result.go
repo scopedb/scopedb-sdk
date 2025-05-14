@@ -26,17 +26,24 @@ import (
 	"github.com/apache/arrow/go/v17/arrow"
 )
 
+// Value stores the contents of a single cell from a ScopeDB statement result.
 type Value any
 
+// ResultSet stores the result of a statement execution.
 type ResultSet struct {
+	// TotalRows is the total number of rows in the result set.
 	TotalRows uint64
-
+	// Schema is the schema of the result set.
 	Schema Schema
+	// Format is the result format of the result set.
 	Format ResultFormat
 
 	rows json.RawMessage
 }
 
+// ToArrowBatch reads the result set and returns the rows as Arrow batches.
+//
+// This method is only valid if the result set is of the Arrow format.
 func (rs *ResultSet) ToArrowBatch() ([]arrow.Record, error) {
 	if rs.Format != ResultFormatArrow {
 		return nil, fmt.Errorf("unexpected result set format: %s", rs.Format)
@@ -49,6 +56,10 @@ func (rs *ResultSet) ToArrowBatch() ([]arrow.Record, error) {
 	return decodeArrowBatches([]byte(rows))
 }
 
+// ToValues reads the result set and returns the rows as a 2D array of values,
+// i.e., rows of value lists.
+//
+// This method is only valid if the result set is of the JSON format.
 func (rs *ResultSet) ToValues() ([][]Value, error) {
 	if rs.Format != ResultFormatJSON {
 		return nil, fmt.Errorf("unexpected result set format: %s", rs.Format)
@@ -106,10 +117,14 @@ func (rs *ResultSet) ToValues() ([][]Value, error) {
 	return valueLists, nil
 }
 
+// Schema describes the fields in a table or query result.
 type Schema []*FieldSchema
 
+// FieldSchema describes a single field.
 type FieldSchema struct {
+	// Name is the field name.
 	Name string
+	// Type is the field data type.
 	Type DataType
 }
 

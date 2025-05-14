@@ -29,6 +29,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// Client is the major entrance to construct structs for interacting with ScopeDB.
 type Client struct {
 	config *Config
 	http   *httpClient
@@ -53,6 +54,7 @@ func (c *Client) Close() {
 	c.http.Close()
 }
 
+// httpClient is a wrapper around the standard http.Client to decorate GET/POST requests.
 type httpClient struct {
 	client *http.Client
 }
@@ -200,8 +202,10 @@ func (c *Client) fetchStatementResult(ctx context.Context, id uuid.UUID, format 
 		return nil, err
 	}
 	var respData statementResponse
-	err = json.Unmarshal(data, &respData)
-	return &respData, err
+	if err := json.Unmarshal(data, &respData); err != nil {
+		return nil, err
+	}
+	return &respData, nil
 }
 
 type statementCancelResponse struct {
