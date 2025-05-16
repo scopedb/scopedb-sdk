@@ -139,7 +139,7 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 
 				tick = false
 				c.currentSize = 0
-				c.sendBatches = c.sendBatches[:0]
+				c.sendBatches = make([]*arrowSendRecord, 0)
 			}
 
 			if stop {
@@ -297,7 +297,7 @@ func (c *VariantBatchCable) Start(ctx context.Context) {
 
 				tick = false
 				c.currentSize = 0
-				c.sendBatches = c.sendBatches[:0]
+				c.sendBatches = make([]*variantSendRecord, 0)
 			}
 
 			if stop {
