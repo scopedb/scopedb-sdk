@@ -89,18 +89,25 @@ func (c *Client) ArrowBatchCable(schema *arrow.Schema, transforms string) *Arrow
 // It will receive batches that users Send, package them based on the BatchSize and BatchInterval,
 // and send them to ScopeDB.
 func (c *ArrowBatchCable) Start(ctx context.Context) {
-	go func() {
-		ticker := time.Tick(c.BatchInterval)
+	ticker := time.Tick(c.BatchInterval)
+	batchSize := c.BatchSize
 
+	go func() {
 		stop, tick := false, false
 		for {
-			if tick || c.currentSize > c.BatchSize {
+			if tick || c.currentSize > batchSize {
 				sendBatches := c.sendBatches
 				go func() {
 					batches := make([]arrow.Record, 0, len(sendBatches))
 					for _, sendBatch := range sendBatches {
 						batches = append(batches, sendBatch.record)
 					}
+
+					defer func() {
+						for _, sendBatch := range sendBatches {
+							sendBatch.record.Release()
+						}
+					}()
 
 					rows, err := encodeArrowBatches(c.schema, batches)
 					if err != nil {
@@ -111,14 +118,13 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 						return
 					}
 
-					_, err = c.c.ingest(ctx, &ingestRequest{
+					if _, err = c.c.ingest(ctx, &ingestRequest{
 						Data: &ingestData{
 							Format: writeFormatArrow,
 							Rows:   string(rows),
 						},
 						Statement: c.transforms,
-					})
-					if err != nil {
+					}); err != nil {
 						for _, sendBatch := range sendBatches {
 							sendBatch.err <- err
 							close(sendBatch.err)
@@ -174,6 +180,9 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 
 // Send sends an Arrow RecordBatch to the cable. The record must have the same schema
 // as the one provided when creating the cable.
+//
+// The ownership of the record is transferred to the cable, and the record will be released
+// after it is sent. The caller must not use/release the record after sending it.
 //
 // Returns a channel that will be closed when the batch is sent to ScopeDB, or an error occurs.
 func (c *ArrowBatchCable) Send(record arrow.Record) <-chan error {
@@ -250,12 +259,13 @@ func (c *Client) VariantBatchCable(transforms string) *VariantBatchCable {
 // It will receive batches that users Send, package them based on the BatchSize and BatchInterval,
 // and send them to ScopeDB.
 func (c *VariantBatchCable) Start(ctx context.Context) {
-	go func() {
-		ticker := time.Tick(c.BatchInterval)
+	ticker := time.Tick(c.BatchInterval)
+	batchSize := c.BatchSize
 
+	go func() {
 		stop, tick := false, false
 		for {
-			if tick || c.currentSize > c.BatchSize {
+			if tick || c.currentSize > batchSize {
 				sendBatches := c.sendBatches
 				go func() {
 					rows := ""
@@ -265,14 +275,14 @@ func (c *VariantBatchCable) Start(ctx context.Context) {
 						}
 						rows += sendBatch.payload
 					}
-					_, err := c.c.ingest(ctx, &ingestRequest{
+
+					if _, err := c.c.ingest(ctx, &ingestRequest{
 						Data: &ingestData{
 							Format: writeFormatJSON,
 							Rows:   rows,
 						},
 						Statement: c.transforms,
-					})
-					if err != nil {
+					}); err != nil {
 						for _, sendBatch := range sendBatches {
 							sendBatch.err <- err
 							close(sendBatch.err)
