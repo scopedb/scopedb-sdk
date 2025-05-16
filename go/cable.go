@@ -75,7 +75,7 @@ func (c *Client) ArrowBatchCable(schema *arrow.Schema, transforms string) *Arrow
 		schema:        schema,
 		transforms:    transforms,
 		currentSize:   0,
-		sendBatches:   make([]*arrowSendRecord, 0),
+		sendBatches:   nil,
 		sendBatchCh:   make(chan *arrowSendRecord),
 		BatchSize:     defaultBatchSize,
 		BatchInterval: defaultBatchInterval,
@@ -139,7 +139,7 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 
 				tick = false
 				c.currentSize = 0
-				c.sendBatches = make([]*arrowSendRecord, 0)
+				c.sendBatches = nil
 			}
 
 			if stop {
@@ -245,7 +245,7 @@ func (c *Client) VariantBatchCable(transforms string) *VariantBatchCable {
 		c:             c,
 		transforms:    transforms,
 		currentSize:   0,
-		sendBatches:   make([]*variantSendRecord, 0),
+		sendBatches:   nil,
 		sendBatchCh:   make(chan *variantSendRecord),
 		BatchSize:     defaultBatchSize,
 		BatchInterval: defaultBatchInterval,
@@ -297,7 +297,7 @@ func (c *VariantBatchCable) Start(ctx context.Context) {
 
 				tick = false
 				c.currentSize = 0
-				c.sendBatches = make([]*variantSendRecord, 0)
+				c.sendBatches = nil
 			}
 
 			if stop {
