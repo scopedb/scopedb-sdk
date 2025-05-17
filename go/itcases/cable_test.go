@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestVariantBatchCable(t *testing.T) {
+func TestRawDataBatchCable(t *testing.T) {
 	c := NewClient(t)
 	defer c.Close()
 
@@ -42,7 +42,7 @@ func TestVariantBatchCable(t *testing.T) {
 		require.NoError(t, tbl.Drop(ctx))
 	}()
 
-	cable := c.VariantBatchCable(fmt.Sprintf(`
+	cable := c.RawDataBatchCable(fmt.Sprintf(`
 		SELECT $0["ts"], $0["v"]
 		INSERT INTO %s (ts, v)
 	`, tbl.Identifier()))

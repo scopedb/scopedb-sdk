@@ -47,8 +47,7 @@ func checkStatusCode(resp *http.Response, expected int) error {
 		return fmt.Errorf("%d: %s", resp.StatusCode, msg)
 	}
 	var errResp Error
-	err = json.Unmarshal(data, &errResp)
-	if err != nil {
+	if err := json.Unmarshal(data, &errResp); err != nil {
 		return fmt.Errorf("%d: %s", resp.StatusCode, msg)
 	}
 	return &errResp

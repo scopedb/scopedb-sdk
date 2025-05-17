@@ -1,12 +1,12 @@
 
-[TestVariantBatchCable - 1]
+[TestRawDataBatchCable - 1]
 scopedb.Schema{
     &scopedb.FieldSchema{Name:"ts", Type:"timestamp"},
     &scopedb.FieldSchema{Name:"v", Type:"any"},
 }
 ---
 
-[TestVariantBatchCable - 2]
+[TestRawDataBatchCable - 2]
 [][]scopedb.Value{
     {
         time.Date(1969, time.December, 31, 23, 59, 59, 999998976, time.UTC),
