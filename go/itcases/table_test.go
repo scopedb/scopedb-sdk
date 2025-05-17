@@ -39,7 +39,7 @@ func TestTableSchema(t *testing.T) {
 			s STRING,
 			b BOOLEAN,
 			ts TIMESTAMP,
-			var VARIANT,
+			var any,
 		)
 	`, tbl.Identifier())).Execute(ctx)
 	require.NoError(t, err)

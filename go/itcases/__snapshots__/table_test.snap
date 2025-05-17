@@ -7,6 +7,6 @@ scopedb.Schema{
     &scopedb.FieldSchema{Name:"s", Type:"string"},
     &scopedb.FieldSchema{Name:"b", Type:"boolean"},
     &scopedb.FieldSchema{Name:"ts", Type:"timestamp"},
-    &scopedb.FieldSchema{Name:"var", Type:"variant"},
+    &scopedb.FieldSchema{Name:"var", Type:"any"},
 }
 ---

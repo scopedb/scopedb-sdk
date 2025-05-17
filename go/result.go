@@ -86,7 +86,7 @@ func (rs *ResultSet) ToValues() ([][]Value, error) {
 			return time.Parse(time.RFC3339Nano, v)
 		case IntervalDataType:
 			return time.ParseDuration(v)
-		case VariantDataType:
+		case AnyDataType:
 			return v, nil
 		default:
 			return nil, fmt.Errorf("unrecognized type: %s", typ)
@@ -132,20 +132,20 @@ type FieldSchema struct {
 type DataType string
 
 const (
-	// StringDataType is a string data type.
+	// StringDataType indicates the data is of string data type.
 	StringDataType DataType = "string"
-	// IntDataType is an int data type.
+	// IntDataType indicates the data is of int data type.
 	IntDataType DataType = "int"
-	// UIntDataType is an uint data type.
+	// UIntDataType indicates the data is of uint data type.
 	UIntDataType DataType = "uint"
-	// FloatDataType is a float data type.
+	// FloatDataType indicates the data is of float data type.
 	FloatDataType DataType = "float"
-	// BooleanDataType is a bool data type.
+	// BooleanDataType indicates the data is of bool data type.
 	BooleanDataType DataType = "boolean"
-	// TimestampDataType is a timestamp data type.
+	// TimestampDataType indicates the data is of timestamp data type.
 	TimestampDataType DataType = "timestamp"
-	// IntervalDataType is an interval data type.
+	// IntervalDataType indicates the data is of interval data type.
 	IntervalDataType DataType = "interval"
-	// VariantDataType is a variant data type.
-	VariantDataType DataType = "variant"
+	// AnyDataType indicates the data is of any data type.
+	AnyDataType DataType = "any"
 )

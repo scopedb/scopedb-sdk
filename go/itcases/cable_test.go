@@ -36,7 +36,7 @@ func TestVariantBatchCable(t *testing.T) {
 
 	ctx := context.Background()
 	tbl := c.Table(RandomName(t))
-	_, err := c.Statement(fmt.Sprintf(`CREATE TABLE %s (ts TIMESTAMP, v VARIANT)`, tbl.Identifier())).Execute(ctx)
+	_, err := c.Statement(fmt.Sprintf(`CREATE TABLE %s (ts TIMESTAMP, v any)`, tbl.Identifier())).Execute(ctx)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, tbl.Drop(ctx))
@@ -84,7 +84,7 @@ func TestArrowBatchCable(t *testing.T) {
 	ctx := context.Background()
 
 	tbl := c.Table(RandomName(t))
-	_, err := c.Statement(fmt.Sprintf(`CREATE TABLE %s (a INT, v VARIANT)`, tbl.Identifier())).Execute(ctx)
+	_, err := c.Statement(fmt.Sprintf(`CREATE TABLE %s (a INT, v any)`, tbl.Identifier())).Execute(ctx)
 	require.NoError(t, err)
 	defer func() {
 		require.NoError(t, tbl.Drop(ctx))
