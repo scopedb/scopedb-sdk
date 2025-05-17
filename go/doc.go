@@ -27,9 +27,9 @@ Use NewClient to create a client struct. This is the major entrance to construct
 
 # Write Data via Cables
 
-Use VariantBatchCable or ArrowBatchCable to write data to ScopeDB:
+Use RawDataBatchCable or ArrowBatchCable to write data to ScopeDB:
 
-	cable := c.VariantBatchCable(fmt.Sprintf(`
+	cable := c.RawDataBatchCable(fmt.Sprintf(`
 		SELECT $0["ts"], $0["v"]
 		INSERT INTO %s (ts, v)
 	`, tbl.Identifier()))

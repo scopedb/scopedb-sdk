@@ -180,8 +180,7 @@ func (h *StatementHandle) Fetch(ctx context.Context) (*ResultSet, error) {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-ticker.C:
-			err := h.FetchOnce(ctx)
-			if err != nil {
+			if err := h.FetchOnce(ctx); err != nil {
 				return nil, err
 			}
 		}

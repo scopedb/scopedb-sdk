@@ -182,7 +182,7 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 // as the one provided when creating the cable.
 //
 // The ownership of the record is transferred to the cable, and the record will be released
-// after it is sent. The caller must not use/release the record after sending it.
+// after it is sent to ScopeDB. The caller must not use/release the record after sending it.
 //
 // Returns a channel that will be closed when the batch is sent to ScopeDB, or an error occurs.
 func (c *ArrowBatchCable) Send(record arrow.Record) <-chan error {
@@ -204,49 +204,51 @@ func (c *ArrowBatchCable) Close() {
 	close(c.sendBatchCh)
 }
 
-// VariantBatchCable is a cable for sending any records as variant data to ScopeDB.
+// RawDataBatchCable is a cable for sending any records as raw data to ScopeDB.
 //
-// You can create an VariantBatchCable using the Client's VariantBatchCable method,
+// You can create an RawDataBatchCable using the Client's RawDataBatchCable method,
 // and start it using the Start method.
 //
 // Then, you can send any records using the Send method. Once the staged batches
 // reach the specified BatchSize or BatchInterval, they will be sent to ScopeDB.
 //
-// The records sent must be JSON-serializable.
-type VariantBatchCable struct {
+// The records sent should be JSON-serializable.
+type RawDataBatchCable struct {
 	c *Client
 
 	transforms  string
 	currentSize uint64
-	sendBatches []*variantSendRecord
-	sendBatchCh chan *variantSendRecord
+	sendBatches []*rawDataSendRecord
+	sendBatchCh chan *rawDataSendRecord
 
-	BatchSize     uint64
+	// BatchSize is the maximum size in bytes of the batches to be sent.
+	BatchSize uint64
+	// BatchInterval is the maximum time to wait before sending the batches.
 	BatchInterval time.Duration
 }
 
-type variantSendRecord struct {
+type rawDataSendRecord struct {
 	payload string
 	err     chan error
 }
 
-// VariantBatchCable creates a new VariantBatchCable with the specified transforms.
+// RawDataBatchCable creates a new RawDataBatchCable with the specified transforms.
 //
-// The cable must be started before sending batches. All the records sent must be JSON-serializable.
+// The cable must be started before sending batches. All the records sent should be JSON-serializable.
 //
 // The transforms are ScopeQL statements that assume the data sent as the source table. The schema
-// of the source table is a one-column (of "any" type) table. The transforms must end with an
+// of the source table is a one-column (of the "any" type) table. The transforms must end with an
 // INSERT statement. For example:
 //
 //	SELECT $0["col1"]::int, $0["col2"]::string, $0
 //	INSERT INTO my_table (col1, col2, v)
-func (c *Client) VariantBatchCable(transforms string) *VariantBatchCable {
-	cable := &VariantBatchCable{
+func (c *Client) RawDataBatchCable(transforms string) *RawDataBatchCable {
+	cable := &RawDataBatchCable{
 		c:             c,
 		transforms:    transforms,
 		currentSize:   0,
 		sendBatches:   nil,
-		sendBatchCh:   make(chan *variantSendRecord),
+		sendBatchCh:   make(chan *rawDataSendRecord),
 		BatchSize:     defaultBatchSize,
 		BatchInterval: defaultBatchInterval,
 	}
@@ -254,11 +256,11 @@ func (c *Client) VariantBatchCable(transforms string) *VariantBatchCable {
 	return cable
 }
 
-// Start starts the VariantBatchCable background task.
+// Start starts the RawDataBatchCable background task.
 //
 // It will receive batches that users Send, package them based on the BatchSize and BatchInterval,
 // and send them to ScopeDB.
-func (c *VariantBatchCable) Start(ctx context.Context) {
+func (c *RawDataBatchCable) Start(ctx context.Context) {
 	ticker := time.Tick(c.BatchInterval)
 	batchSize := c.BatchSize
 
@@ -327,10 +329,10 @@ func (c *VariantBatchCable) Start(ctx context.Context) {
 	}()
 }
 
-// Send sends a JSON-serializable record to the cable.
+// Send sends a record to the cable. The record should be JSON-serializable.
 //
 // Returns a channel that will be closed when the record is sent to ScopeDB, or an error occurs.
-func (c *VariantBatchCable) Send(record any) <-chan error {
+func (c *RawDataBatchCable) Send(record any) <-chan error {
 	errCh := make(chan error, 1)
 
 	bs, err := json.Marshal(record)
@@ -347,7 +349,7 @@ func (c *VariantBatchCable) Send(record any) <-chan error {
 		return errCh
 	}
 
-	sendBatch := &variantSendRecord{
+	sendBatch := &rawDataSendRecord{
 		payload: buf.String(),
 		err:     errCh,
 	}
@@ -355,7 +357,7 @@ func (c *VariantBatchCable) Send(record any) <-chan error {
 	return sendBatch.err
 }
 
-// Close closes the VariantBatchCable and stops sending batches.
-func (c *VariantBatchCable) Close() {
+// Close closes the RawDataBatchCable and stops sending batches.
+func (c *RawDataBatchCable) Close() {
 	close(c.sendBatchCh)
 }
