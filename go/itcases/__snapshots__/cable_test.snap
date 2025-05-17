@@ -2,7 +2,7 @@
 [TestVariantBatchCable - 1]
 scopedb.Schema{
     &scopedb.FieldSchema{Name:"ts", Type:"timestamp"},
-    &scopedb.FieldSchema{Name:"v", Type:"variant"},
+    &scopedb.FieldSchema{Name:"v", Type:"any"},
 }
 ---
 
@@ -22,7 +22,7 @@ scopedb.Schema{
 [TestArrowBatchCable - 1]
 scopedb.Schema{
     &scopedb.FieldSchema{Name:"a", Type:"int"},
-    &scopedb.FieldSchema{Name:"v", Type:"variant"},
+    &scopedb.FieldSchema{Name:"v", Type:"any"},
 }
 ---
 

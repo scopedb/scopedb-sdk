@@ -235,11 +235,11 @@ type variantSendRecord struct {
 // The cable must be started before sending batches. All the records sent must be JSON-serializable.
 //
 // The transforms are ScopeQL statements that assume the data sent as the source table. The schema
-// of the source table is a one-column variant table. The transforms must end with an INSERT statement.
-// For example:
+// of the source table is a one-column (of "any" type) table. The transforms must end with an
+// INSERT statement. For example:
 //
-//	SELECT $0["col1"], $0["col2"]
-//	INSERT INTO my_table (col1, col2)
+//	SELECT $0["col1"]::int, $0["col2"]::string, $0
+//	INSERT INTO my_table (col1, col2, v)
 func (c *Client) VariantBatchCable(transforms string) *VariantBatchCable {
 	cable := &VariantBatchCable{
 		c:             c,
