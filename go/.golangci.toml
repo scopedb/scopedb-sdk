@@ -17,8 +17,7 @@ version = "2"
 [linters]
 default = "none"
 enable = [
-  # TODO(tisonkun): enable once https://github.com/timakin/bodyclose/issues/60 resolved
-  #  "bodyclose",
+  "bodyclose",
   "durationcheck",
   "errcheck",
   "errorlint",

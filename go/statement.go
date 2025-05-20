@@ -150,10 +150,15 @@ func (h *StatementHandle) FetchOnce(ctx context.Context) error {
 	}
 
 	resp, err := h.c.fetchStatementResult(ctx, h.id, h.Format)
-	if resp != nil {
-		h.resp = resp
+	if err != nil {
+		return err
 	}
-	return err
+
+	h.resp = resp
+	if resp.Message != nil {
+		return &Error{Message: *resp.Message}
+	}
+	return nil
 }
 
 // Fetch fetches the result set of the statement until it is finished, failed or cancelled.
@@ -167,8 +172,13 @@ func (h *StatementHandle) Fetch(ctx context.Context) (*ResultSet, error) {
 	defer ticker.Stop()
 
 	for {
-		if h.resp != nil && h.resp.Status.Finished() {
-			return h.resp.ResultSet.toResultSet(), nil
+		if h.resp != nil {
+			if h.resp.ResultSet != nil {
+				return h.resp.ResultSet.toResultSet(), nil
+			}
+			if h.resp.Message != nil {
+				return nil, &Error{Message: *h.resp.Message}
+			}
 		}
 
 		if tick < maxTick {

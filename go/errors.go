@@ -32,31 +32,74 @@ func (e *Error) Error() string {
 	return e.Message
 }
 
-func checkStatusCodeOK(resp *http.Response) error {
-	return checkStatusCode(resp, 200)
-}
-
-func checkStatusCode(resp *http.Response, expected int) error {
-	if resp.StatusCode == expected {
-		return nil
-	}
-
+func checkStatementResponse(resp *http.Response) (*statementResponse, error) {
 	data, err := io.ReadAll(resp.Body)
-	msg := string(data)
+	defer func() {
+		if resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
 	if err != nil {
-		return fmt.Errorf("%d: %s", resp.StatusCode, msg)
+		return nil, err
 	}
+
+	var stmtResp statementResponse
+	if err := json.Unmarshal(data, &stmtResp); err == nil {
+		return &stmtResp, nil
+	}
+
 	var errResp Error
 	if err := json.Unmarshal(data, &errResp); err != nil {
-		return fmt.Errorf("%d: %s", resp.StatusCode, msg)
+		msg := string(data)
+		return nil, fmt.Errorf("%d: %s", resp.StatusCode, msg)
 	}
-	return &errResp
+	return nil, &errResp
 }
 
-// sneakyBodyClose closes the body and ignores the error.
-// This is useful to close the HTTP response body when we don't care about the error.
-func sneakyBodyClose(body io.ReadCloser) {
-	if body != nil {
-		_ = body.Close()
+func checkStatementCancelResponse(resp *http.Response) (*statementCancelResponse, error) {
+	data, err := io.ReadAll(resp.Body)
+	defer func() {
+		if resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
+	if err != nil {
+		return nil, err
 	}
+
+	var stmtResp statementCancelResponse
+	if err := json.Unmarshal(data, &stmtResp); err == nil {
+		return &stmtResp, nil
+	}
+
+	var errResp Error
+	if err := json.Unmarshal(data, &errResp); err != nil {
+		msg := string(data)
+		return nil, fmt.Errorf("%d: %s", resp.StatusCode, msg)
+	}
+	return nil, &errResp
+}
+
+func checkIngestResponse(resp *http.Response) (*ingestResponse, error) {
+	data, err := io.ReadAll(resp.Body)
+	defer func() {
+		if resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	var stmtResp ingestResponse
+	if err := json.Unmarshal(data, &stmtResp); err == nil {
+		return &stmtResp, nil
+	}
+
+	var errResp Error
+	if err := json.Unmarshal(data, &errResp); err != nil {
+		msg := string(data)
+		return nil, fmt.Errorf("%d: %s", resp.StatusCode, msg)
+	}
+	return nil, &errResp
 }
