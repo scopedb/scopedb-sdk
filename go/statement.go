@@ -261,8 +261,6 @@ type StatementProgress struct {
 	NanosFromSubmitted int64 `json:"nanos_from_submitted"`
 	// NanosFromStarted denotes the duration in nanoseconds since the statement is started.
 	NanosFromStarted int64 `json:"nanos_from_started"`
-	// NanosToFinish denotes the estimated duration in nanoseconds to finish the statement.
-	NanosToFinish int64 `json:"nanos_to_finish"`
 	// TotalStages denotes the total number of stages to execute.
 	TotalStages int64 `json:"total_stages"`
 	// TotalPartitions denotes the estimated total number of partitions to scan.
