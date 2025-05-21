@@ -170,6 +170,7 @@ func (c *Client) submitStatement(ctx context.Context, request *statementRequest)
 	if err != nil {
 		return nil, err
 	}
+	defer sneakyBodyClose(resp.Body)
 	return checkStatementResponse(resp)
 }
 
@@ -187,14 +188,16 @@ func (c *Client) fetchStatementResult(ctx context.Context, id uuid.UUID, format 
 	if err != nil {
 		return nil, err
 	}
+	defer sneakyBodyClose(resp.Body)
 	return checkStatementResponse(resp)
 }
 
 type statementCancelResponse struct {
-	Status StatementStatus `json:"status"`
+	Status  StatementStatus `json:"status"`
+	Message string          `json:"message"`
 }
 
-func (c *Client) cancelStatement(ctx context.Context, statementID uuid.UUID) (*StatementStatus, error) {
+func (c *Client) cancelStatement(ctx context.Context, statementID uuid.UUID) (*statementCancelResponse, error) {
 	req, err := url.Parse(c.config.Endpoint + "/v1/statements/" + statementID.String() + "/cancel")
 	if err != nil {
 		return nil, err
@@ -204,12 +207,8 @@ func (c *Client) cancelStatement(ctx context.Context, statementID uuid.UUID) (*S
 	if err != nil {
 		return nil, err
 	}
-
-	data, err := checkStatementCancelResponse(resp)
-	if data != nil {
-		return &data.Status, nil
-	}
-	return nil, err
+	defer sneakyBodyClose(resp.Body)
+	return checkStatementCancelResponse(resp)
 }
 
 type writeFormat string
@@ -252,6 +251,6 @@ func (c *Client) ingest(ctx context.Context, request *ingestRequest) (*ingestRes
 	if err != nil {
 		return nil, err
 	}
-
+	defer sneakyBodyClose(resp.Body)
 	return checkIngestResponse(resp)
 }

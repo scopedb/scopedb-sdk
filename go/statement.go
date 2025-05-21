@@ -199,20 +199,18 @@ func (h *StatementHandle) Fetch(ctx context.Context) (*ResultSet, error) {
 
 // Cancel cancels the statement if it is running or pending.
 func (h *StatementHandle) Cancel(ctx context.Context) (*StatementStatus, error) {
-	if h.resp != nil {
-		switch h.resp.Status {
-		case StatementStatusRunning, StatementStatusPending:
-			// possible to cancel the statement
-		case StatementStatusFinished, StatementStatusFailed, StatementStatusCancelled:
-			return &h.resp.Status, nil
-		}
+	if h.resp != nil && h.resp.Status.Terminated() {
+		return &h.resp.Status, nil
 	}
 
 	resp, err := h.c.cancelStatement(ctx, h.id)
-	if resp != nil {
-		h.resp.Status = *resp
+	if err != nil {
+		return nil, err
 	}
-	return resp, err
+
+	h.resp.Status = resp.Status
+	h.resp.Message = &resp.Message
+	return &resp.Status, nil
 }
 
 // StatementStatus is a string that represents the status of a statement.

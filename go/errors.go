@@ -34,11 +34,6 @@ func (e *Error) Error() string {
 
 func checkStatementResponse(resp *http.Response) (*statementResponse, error) {
 	data, err := io.ReadAll(resp.Body)
-	defer func() {
-		if resp.Body != nil {
-			_ = resp.Body.Close()
-		}
-	}()
 	if err != nil {
 		return nil, err
 	}
@@ -58,11 +53,6 @@ func checkStatementResponse(resp *http.Response) (*statementResponse, error) {
 
 func checkStatementCancelResponse(resp *http.Response) (*statementCancelResponse, error) {
 	data, err := io.ReadAll(resp.Body)
-	defer func() {
-		if resp.Body != nil {
-			_ = resp.Body.Close()
-		}
-	}()
 	if err != nil {
 		return nil, err
 	}
@@ -82,11 +72,6 @@ func checkStatementCancelResponse(resp *http.Response) (*statementCancelResponse
 
 func checkIngestResponse(resp *http.Response) (*ingestResponse, error) {
 	data, err := io.ReadAll(resp.Body)
-	defer func() {
-		if resp.Body != nil {
-			_ = resp.Body.Close()
-		}
-	}()
 	if err != nil {
 		return nil, err
 	}
@@ -102,4 +87,12 @@ func checkIngestResponse(resp *http.Response) (*ingestResponse, error) {
 		return nil, fmt.Errorf("%d: %s", resp.StatusCode, msg)
 	}
 	return nil, &errResp
+}
+
+// sneakyBodyClose closes the body and ignores the error.
+// This is useful to close the HTTP response body when we don't care about the error.
+func sneakyBodyClose(body io.ReadCloser) {
+	if body != nil {
+		_ = body.Close()
+	}
 }
