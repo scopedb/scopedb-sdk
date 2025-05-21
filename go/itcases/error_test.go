@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,7 +30,14 @@ func TestStatementFailure(t *testing.T) {
 	defer c.Close()
 
 	ctx := context.Background()
-	_, err := c.Statement("SELECT REGEXP_MATCH('some text', 'malformed regex: \\d')").Execute(ctx)
+
+	id, err := uuid.Parse("c8fe71d6-3695-11f0-85b3-063c3400fda9")
+	require.NoError(t, err)
+	err = c.StatementHandle(id).FetchOnce(ctx)
+	require.Error(t, err)
+	snaps.MatchSnapshot(t, err.Error())
+
+	_, err = c.Statement("SELECT REGEXP_MATCH('some text', 'malformed regex: \\d')").Execute(ctx)
 	require.Error(t, err)
 	snaps.MatchSnapshot(t, err.Error())
 }

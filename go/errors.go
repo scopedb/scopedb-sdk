@@ -39,7 +39,8 @@ func checkStatementResponse(resp *http.Response) (*statementResponse, error) {
 	}
 
 	var stmtResp statementResponse
-	if err := json.Unmarshal(data, &stmtResp); err == nil {
+	_ = json.Unmarshal(data, &stmtResp)
+	if stmtResp.Status != "" {
 		return &stmtResp, nil
 	}
 

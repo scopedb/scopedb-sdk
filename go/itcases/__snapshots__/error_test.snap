@@ -1,5 +1,9 @@
 
 [TestStatementFailure - 1]
+result set not found: c8fe71d6-3695-11f0-85b3-063c3400fda9
+---
+
+[TestStatementFailure - 2]
 0: failed to prepare statement: "SELECT REGEXP_MATCH('some text', 'malformed regex: \\d')"
 1: failed to parse input
 
