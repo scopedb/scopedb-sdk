@@ -150,10 +150,15 @@ func (h *StatementHandle) FetchOnce(ctx context.Context) error {
 	}
 
 	resp, err := h.c.fetchStatementResult(ctx, h.id, h.Format)
-	if resp != nil {
-		h.resp = resp
+	if err != nil {
+		return err
 	}
-	return err
+
+	h.resp = resp
+	if resp.Message != nil {
+		return &Error{Message: *resp.Message}
+	}
+	return nil
 }
 
 // Fetch fetches the result set of the statement until it is finished, failed or cancelled.
@@ -167,8 +172,13 @@ func (h *StatementHandle) Fetch(ctx context.Context) (*ResultSet, error) {
 	defer ticker.Stop()
 
 	for {
-		if h.resp != nil && h.resp.Status.Finished() {
-			return h.resp.ResultSet.toResultSet(), nil
+		if h.resp != nil {
+			if h.resp.ResultSet != nil {
+				return h.resp.ResultSet.toResultSet(), nil
+			}
+			if h.resp.Message != nil {
+				return nil, &Error{Message: *h.resp.Message}
+			}
 		}
 
 		if tick < maxTick {
@@ -189,20 +199,18 @@ func (h *StatementHandle) Fetch(ctx context.Context) (*ResultSet, error) {
 
 // Cancel cancels the statement if it is running or pending.
 func (h *StatementHandle) Cancel(ctx context.Context) (*StatementStatus, error) {
-	if h.resp != nil {
-		switch h.resp.Status {
-		case StatementStatusRunning, StatementStatusPending:
-			// possible to cancel the statement
-		case StatementStatusFinished, StatementStatusFailed, StatementStatusCancelled:
-			return &h.resp.Status, nil
-		}
+	if h.resp != nil && h.resp.Status.Terminated() {
+		return &h.resp.Status, nil
 	}
 
 	resp, err := h.c.cancelStatement(ctx, h.id)
-	if resp != nil {
-		h.resp.Status = *resp
+	if err != nil {
+		return nil, err
 	}
-	return resp, err
+
+	h.resp.Status = resp.Status
+	h.resp.Message = &resp.Message
+	return &resp.Status, nil
 }
 
 // StatementStatus is a string that represents the status of a statement.

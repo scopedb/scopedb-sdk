@@ -21,10 +21,10 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -110,10 +110,16 @@ type statementRequest struct {
 }
 
 type statementResponse struct {
-	ID        uuid.UUID         `json:"statement_id"`
-	Progress  StatementProgress `json:"progress"`
-	Status    StatementStatus   `json:"status"`
-	ResultSet *resultSet        `json:"result_set"`
+	ID       uuid.UUID         `json:"statement_id"`
+	Progress StatementProgress `json:"progress"`
+	Status   StatementStatus   `json:"status"`
+	Created  time.Time         `json:"created_at"`
+
+	// Message is set when the statement was failed or canceled.
+	Message *string `json:"message"`
+
+	// ResultSet is set when the statement was successfully finished.
+	ResultSet *resultSet `json:"result_set"`
 }
 
 type resultSet struct {
@@ -165,17 +171,7 @@ func (c *Client) submitStatement(ctx context.Context, request *statementRequest)
 		return nil, err
 	}
 	defer sneakyBodyClose(resp.Body)
-	if err := checkStatusCodeOK(resp); err != nil {
-		return nil, err
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var respData statementResponse
-	err = json.Unmarshal(data, &respData)
-	return &respData, err
+	return checkStatementResponse(resp)
 }
 
 func (c *Client) fetchStatementResult(ctx context.Context, id uuid.UUID, format ResultFormat) (*statementResponse, error) {
@@ -193,26 +189,15 @@ func (c *Client) fetchStatementResult(ctx context.Context, id uuid.UUID, format 
 		return nil, err
 	}
 	defer sneakyBodyClose(resp.Body)
-	if err := checkStatusCodeOK(resp); err != nil {
-		return nil, err
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var respData statementResponse
-	if err := json.Unmarshal(data, &respData); err != nil {
-		return nil, err
-	}
-	return &respData, nil
+	return checkStatementResponse(resp)
 }
 
 type statementCancelResponse struct {
-	Status StatementStatus `json:"status"`
+	Status  StatementStatus `json:"status"`
+	Message string          `json:"message"`
 }
 
-func (c *Client) cancelStatement(ctx context.Context, statementID uuid.UUID) (*StatementStatus, error) {
+func (c *Client) cancelStatement(ctx context.Context, statementID uuid.UUID) (*statementCancelResponse, error) {
 	req, err := url.Parse(c.config.Endpoint + "/v1/statements/" + statementID.String() + "/cancel")
 	if err != nil {
 		return nil, err
@@ -223,17 +208,7 @@ func (c *Client) cancelStatement(ctx context.Context, statementID uuid.UUID) (*S
 		return nil, err
 	}
 	defer sneakyBodyClose(resp.Body)
-	if err := checkStatusCodeOK(resp); err != nil {
-		return nil, err
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var respData statementCancelResponse
-	err = json.Unmarshal(data, &respData)
-	return &respData.Status, err
+	return checkStatementCancelResponse(resp)
 }
 
 type writeFormat string
@@ -277,15 +252,5 @@ func (c *Client) ingest(ctx context.Context, request *ingestRequest) (*ingestRes
 		return nil, err
 	}
 	defer sneakyBodyClose(resp.Body)
-	if err := checkStatusCodeOK(resp); err != nil {
-		return nil, err
-	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var respData ingestResponse
-	err = json.Unmarshal(data, &respData)
-	return &respData, err
+	return checkIngestResponse(resp)
 }
