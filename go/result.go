@@ -86,7 +86,8 @@ func (rs *ResultSet) ToValues() ([][]Value, error) {
 			return time.Parse(time.RFC3339Nano, v)
 		case IntervalDataType:
 			return time.ParseDuration(v)
-		case AnyDataType:
+		case ArrayDataType, ObjectDataType, AnyDataType:
+			// represent as JSON string
 			return v, nil
 		default:
 			return nil, fmt.Errorf("unrecognized type: %s", typ)
@@ -146,6 +147,10 @@ const (
 	TimestampDataType DataType = "timestamp"
 	// IntervalDataType indicates the data is of interval data type.
 	IntervalDataType DataType = "interval"
+	// ArrayDataType indicates the data is of array data type.
+	ArrayDataType DataType = "array"
+	// ObjectDataType indicates the data is of object data type.
+	ObjectDataType DataType = "object"
 	// AnyDataType indicates the data is of any data type.
 	AnyDataType DataType = "any"
 )
