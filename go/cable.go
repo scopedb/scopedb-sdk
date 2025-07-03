@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/apache/arrow/go/v17/arrow"
@@ -118,18 +119,29 @@ func (c *ArrowBatchCable) Start(ctx context.Context) {
 						return
 					}
 
-					if _, err = c.c.ingest(ctx, &ingestRequest{
-						Data: &ingestData{
-							Format: writeFormatArrow,
-							Rows:   string(rows),
-						},
-						Statement: c.transforms,
-					}); err != nil {
-						for _, sendBatch := range sendBatches {
-							sendBatch.err <- err
-							close(sendBatch.err)
+					for {
+						_, err := c.c.ingest(ctx, &ingestRequest{
+							Data: &ingestData{
+								Format: writeFormatArrow,
+								Rows:   string(rows),
+							},
+							Statement: c.transforms,
+						})
+
+						if err == nil {
+							break
 						}
-						return
+
+						if !strings.Contains(err.Error(), "429: Too many requests.") {
+							for _, sendBatch := range sendBatches {
+								sendBatch.err <- err
+								close(sendBatch.err)
+							}
+							return
+						}
+
+						// 429 - retry after a short delay
+						time.Sleep(10 * time.Second)
 					}
 
 					for _, sendBatch := range sendBatches {
@@ -278,18 +290,29 @@ func (c *RawDataBatchCable) Start(ctx context.Context) {
 						rows += sendBatch.payload
 					}
 
-					if _, err := c.c.ingest(ctx, &ingestRequest{
-						Data: &ingestData{
-							Format: writeFormatJSON,
-							Rows:   rows,
-						},
-						Statement: c.transforms,
-					}); err != nil {
-						for _, sendBatch := range sendBatches {
-							sendBatch.err <- err
-							close(sendBatch.err)
+					for {
+						_, err := c.c.ingest(ctx, &ingestRequest{
+							Data: &ingestData{
+								Format: writeFormatJSON,
+								Rows:   rows,
+							},
+							Statement: c.transforms,
+						})
+
+						if err == nil {
+							break
 						}
-						return
+
+						if !strings.Contains(err.Error(), "429: Too many requests.") {
+							for _, sendBatch := range sendBatches {
+								sendBatch.err <- err
+								close(sendBatch.err)
+							}
+							return
+						}
+
+						// 429 - retry after a short delay
+						time.Sleep(10 * time.Second)
 					}
 
 					for _, sendBatch := range sendBatches {
