@@ -33,12 +33,12 @@ func TestTableSchema(t *testing.T) {
 	tbl := c.Table(RandomName(t))
 	_, err := c.Statement(fmt.Sprintf(`
 		CREATE TABLE %s (
-			i INT,
-			u UINT,
-			f FLOAT,
-			s STRING,
-			b BOOLEAN,
-			ts TIMESTAMP,
+			i int,
+			u uint,
+			f float,
+			s string,
+			b boolean,
+			ts timestamp,
 			var any,
 		)
 	`, tbl.Identifier())).Execute(ctx)

@@ -22,8 +22,6 @@ import (
 	"fmt"
 	"strconv"
 	"time"
-
-	"github.com/apache/arrow/go/v17/arrow"
 )
 
 // Value stores the contents of a single cell from a ScopeDB statement result.
@@ -39,21 +37,6 @@ type ResultSet struct {
 	Format ResultFormat
 
 	rows json.RawMessage
-}
-
-// ToArrowBatch reads the result set and returns the rows as Arrow batches.
-//
-// This method is only valid if the result set is of the Arrow format.
-func (rs *ResultSet) ToArrowBatch() ([]arrow.Record, error) {
-	if rs.Format != ResultFormatArrow {
-		return nil, fmt.Errorf("unexpected result set format: %s", rs.Format)
-	}
-
-	var rows string
-	if err := json.Unmarshal(rs.rows, &rows); err != nil {
-		return nil, err
-	}
-	return decodeArrowBatches([]byte(rows))
 }
 
 // ToValues reads the result set and returns the rows as a 2D array of values,

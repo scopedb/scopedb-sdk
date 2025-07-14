@@ -1,21 +1,21 @@
 
-[TestStatementFailure - 1]
+[TestFetchStatementFail - 1]
 result set not found: c8fe71d6-3695-11f0-85b3-063c3400fda9
 ---
 
-[TestStatementFailure - 2]
-0: failed to prepare statement: "SELECT REGEXP_MATCH('some text', 'malformed regex: \\d')"
-1: failed to parse input
+[TestSubmitStatementFail - 1]
+0: failed to prepare statement: "SELECT UNKNOWN_FUNCTION()"
+1: failed to type check expression: unknown_function()
+2: failed to type check function: unknown_function()
+3: function not found: unknown_function()
 
 ========================================
 
 error: failed to execute statement
- --> ScopeQL:1:34
+ --> ScopeQL:1:8
   |
-1 | SELECT REGEXP_MATCH('some text', 'malformed regex: \d')
-  |        ^^^^^^^^^^^^              ^^^^^^^^^^^^^^^^^^^^^ invalid escape or unicode
-  |        |
-  |        while parsing expression
+1 | SELECT UNKNOWN_FUNCTION()
+  |        ^^^^^^^^^^^^^^^^^^ function not found: unknown_function()
   |
 
 ---

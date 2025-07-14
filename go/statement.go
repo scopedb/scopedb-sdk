@@ -27,8 +27,6 @@ import (
 type ResultFormat string
 
 const (
-	// ResultFormatArrow parses the result set as BASE64 encoded Arrow IPC format.
-	ResultFormatArrow ResultFormat = "arrow"
 	// ResultFormatJSON parses the result set as JSON lines.
 	ResultFormatJSON ResultFormat = "json"
 )

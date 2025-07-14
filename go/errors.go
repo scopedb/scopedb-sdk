@@ -77,9 +77,11 @@ func checkIngestResponse(resp *http.Response) (*ingestResponse, error) {
 		return nil, err
 	}
 
-	var stmtResp ingestResponse
-	if err := json.Unmarshal(data, &stmtResp); err == nil {
-		return &stmtResp, nil
+	if resp.StatusCode == http.StatusOK {
+		var stmtResp ingestResponse
+		if err := json.Unmarshal(data, &stmtResp); err == nil {
+			return &stmtResp, nil
+		}
 	}
 
 	var errResp Error
