@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStatementFailure(t *testing.T) {
+func TestFetchStatementFail(t *testing.T) {
 	c := NewClient(t)
 	defer c.Close()
 
@@ -36,8 +36,15 @@ func TestStatementFailure(t *testing.T) {
 	err = c.StatementHandle(id).FetchOnce(ctx)
 	require.Error(t, err)
 	snaps.MatchSnapshot(t, err.Error())
+}
 
-	_, err = c.Statement("SELECT REGEXP_MATCH('some text', 'malformed regex: \\d')").Execute(ctx)
+func TestSubmitStatementFail(t *testing.T) {
+	c := NewClient(t)
+	defer c.Close()
+
+	ctx := context.Background()
+
+	_, err := c.Statement("SELECT UNKNOWN_FUNCTION()").Execute(ctx)
 	require.Error(t, err)
 	snaps.MatchSnapshot(t, err.Error())
 }

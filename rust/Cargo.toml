@@ -14,20 +14,18 @@
 
 [package]
 name = "scopedb-client"
-version = "0.1.1"
+version = "0.2.0"
+
 edition = "2024"
-license = "Apache-2.0"
-description = "ScopeDB client for Rust"
-homepage = "https://scopedb.io"
-repository = "https://github.com/scopedb/scopedb-sdk/tree/main/rust"
+rust-version = "1.85.0"
+
 categories = ["database"]
+description = "A Rust client for ScopeDB"
+homepage = "https://www.scopedb.io"
 keywords = ["scopedb"]
+license = "Apache-2.0"
+repository = "https://github.com/scopedb/scopedb-sdk"
 
 [dependencies]
-arrow = { version = "54.2.0", default-features = false, features = ["ipc"] }
-base64 = "0.22.1"
-reqwest = { version = "0.12.12", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
 
 [dev-dependencies]
-insta = { version = "1.42.1", features = ["json"] }

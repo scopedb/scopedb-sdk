@@ -13,5 +13,5 @@ The Go SDK uses [go-snaps](https://github.com/gkampitakis/go-snaps) for snapshot
 When the snapshot assertions are expected to be updated, run the tests with `UPDATE_SNAPS=true`:
 
 ```shell
-UPDATE_SNAPS=true go test ./...
+UPDATE_SNAPS=true just test
 ```

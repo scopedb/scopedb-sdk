@@ -1,39 +1,22 @@
-
-[TestRawDataBatchCable - 1]
+[TestDataCable - 1]
 scopedb.Schema{
     &scopedb.FieldSchema{Name:"ts", Type:"timestamp"},
-    &scopedb.FieldSchema{Name:"v", Type:"any"},
+    &scopedb.FieldSchema{Name:"name", Type:"string"},
+    &scopedb.FieldSchema{Name:"var", Type:"object"},
 }
 ---
 
-[TestRawDataBatchCable - 2]
+[TestDataCable - 2]
 [][]scopedb.Value{
     {
-        time.Date(1969, time.December, 31, 23, 59, 59, 999998976, time.UTC),
-        "\"scopedb\"",
+        time.Date(1970, time.January, 4, 15, 36, 0, 0, time.UTC),
+        "scopedb",
+        "{\"arbitrary\":\"Schema On The Fly\",\"name\":\"scopedb\",\"ts\":315360000000000}",
     },
     {
-        time.Date(1970, time.January, 1, 0, 0, 0, 1024, time.UTC),
-        "42.1",
+        time.Date(1970, time.January, 4, 21, 11, 43, 360000000, time.UTC),
+        "tison",
+        "{\"arbitrary\":27,\"name\":\"tison\",\"ts\":335503360000000}",
     },
 }
----
-
-[TestArrowBatchCable - 1]
-scopedb.Schema{
-    &scopedb.FieldSchema{Name:"a", Type:"int"},
-    &scopedb.FieldSchema{Name:"v", Type:"any"},
-}
----
-
-[TestArrowBatchCable - 2]
-[record:
-  schema:
-  fields: 2
-    - a: type=int64, nullable
-    - v: type=large_utf8, nullable
-  rows: 2
-  col[0][a]: [1 2]
-  col[1][v]: ["{\"int\":1}" "{\"int\":2}"]
-]
 ---

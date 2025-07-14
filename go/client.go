@@ -213,16 +213,20 @@ func (c *Client) cancelStatement(ctx context.Context, statementID uuid.UUID) (*s
 
 type writeFormat string
 
+// writeFormatJSON is to ingest rows as JSON lines.
+const writeFormatJSON writeFormat = "json"
+
+type writeType string
+
 const (
-	// writeFormatArrow is to ingest rows as base64 encoded arrow batches.
-	writeFormatArrow writeFormat = "arrow"
-	// writeFormatJSON is to ingest rows as JSON lines.
-	writeFormatJSON writeFormat = "json"
+	writeTypeCommitted writeType = "committed"
+	writeTypeBuffered  writeType = "buffered"
 )
 
 type ingestRequest struct {
-	Data      *ingestData `json:"data"`
-	Statement string      `json:"statement"`
+	Data      ingestData `json:"data"`
+	Type      writeType  `json:"type"`
+	Statement string     `json:"statement"`
 }
 
 type ingestData struct {
