@@ -12,24 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod client;
-mod protocol;
-mod result;
-mod statement;
+use crate::command::Config;
 
-pub use client::Client;
-pub use protocol::DataType;
-pub use protocol::ResultFormat;
-pub use protocol::StatementCancelResponse;
-pub use protocol::StatementEstimatedProgress;
-pub use protocol::StatementProgress;
-pub use result::FieldSchema;
-pub use result::ResultSet;
-pub use result::Schema;
-pub use result::Value;
-pub use statement::Statement;
-pub use statement::StatementHandle;
-
-#[derive(Debug, thiserror::Error)]
-#[error("{0}")]
-pub struct Error(String);
+pub fn entrypoint(_config: Config) {}

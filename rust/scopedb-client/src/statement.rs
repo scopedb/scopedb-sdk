@@ -20,6 +20,7 @@ use jiff::SignedDuration;
 use uuid::Uuid;
 
 use crate::Error;
+use crate::StatementCancelResponse;
 use crate::client::Client;
 use crate::protocol::Response;
 use crate::protocol::ResultFormat;
@@ -172,15 +173,51 @@ impl StatementHandle {
         }
     }
 
-    pub async fn cancel(&mut self) -> Result<String, Error> {
+    pub async fn cancel(&mut self) -> Result<StatementCancelResponse, Error> {
         if let Some(response) = self.response.as_ref() {
-            if response.is_terminated() {
-                return Ok(response.status().to_string());
+            match response {
+                StatementResponse::Pending { .. } | StatementResponse::Running { .. } => {}
+                StatementResponse::Finished {
+                    statement_id,
+                    created_at,
+                    ..
+                } => {
+                    return Ok(StatementCancelResponse {
+                        statement_id: *statement_id,
+                        created_at: *created_at,
+                        status: "finished".to_string(),
+                        message: "statement is finished".to_string(),
+                    });
+                }
+                StatementResponse::Failed {
+                    statement_id,
+                    created_at,
+                    ..
+                } => {
+                    return Ok(StatementCancelResponse {
+                        statement_id: *statement_id,
+                        created_at: *created_at,
+                        status: "failed".to_string(),
+                        message: "statement is failed".to_string(),
+                    });
+                }
+                StatementResponse::Cancelled {
+                    statement_id,
+                    created_at,
+                    ..
+                } => {
+                    return Ok(StatementCancelResponse {
+                        statement_id: *statement_id,
+                        created_at: *created_at,
+                        status: "cancelled".to_string(),
+                        message: "statement is cancelled".to_string(),
+                    });
+                }
             }
         }
 
         match self.client.cancel_statement(self.statement_id).await? {
-            Response::Success(response) => Ok(response.status),
+            Response::Success(response) => Ok(response),
             Response::Failed(err) => {
                 Err(Error(format!("failed to cancel statement: {err}")).into_exn())
             }
