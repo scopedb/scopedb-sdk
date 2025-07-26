@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: CI (Go SDK)
+name: CI (Rust SDK)
 on:
   pull_request:
     branches: [ main ]
-    paths: [ 'go/**' ]
+    paths: [ 'rust/**' ]
   schedule:
     - cron: '2 4 * * *'
 
@@ -31,13 +31,14 @@ jobs:
     if: ${{ github.event_name != 'schedule' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: taiki-e/install-action@just
-      - uses: actions/setup-go@v5
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
+          components: rustfmt,clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@just
       - run: just check
-        working-directory: go
+        working-directory: rust
 
   test:
     name: Build and test
@@ -45,26 +46,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: taiki-e/install-action@just
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go/go.mod
-          cache-dependency-path: go/go.sum
-      - run: just build
-        working-directory: go
-      - name: Prepare Composed Environment
-        run: docker compose -f ./dev/docker-compose.yml up -d
       - name: Run full tests
         timeout-minutes: 10
         run: just test
-        working-directory: go
-        env:
-          SCOPEDB_ENDPOINT: http://localhost:6543
-      - name: Upload error logs
-        if: ${{ !success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: error-logs
-          path: dev/logs
+        working-directory: rust
 
   required:
     name: Required
