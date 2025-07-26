@@ -12,6 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![feature(random)]
+
+use clap::Parser;
+
+use crate::command::Command;
+use crate::command::Subcommand;
+use repl::entrypoint;
+
+mod command;
+mod client;
+mod error;
+mod global;
+mod repl;
+
 fn main() {
-    println!("Hello, world!");
+    let cmd = Command::parse();
+
+    let config = cmd.config();
+    global::set_printer(config.quiet);
+
+    match cmd.subcommand() {
+        Subcommand::Repl => entrypoint(config),
+    }
 }

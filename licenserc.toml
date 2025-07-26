@@ -14,15 +14,7 @@
 
 headerPath = "Apache-2.0.txt"
 
-includes = [
-  '*.rs',
-  '*.go',
-  '*.java',
-  '*.toml',
-  '*.yml',
-  '*.yaml',
-  'pom.xml',
-]
+includes = ['*.rs', '*.go', '*.java', '*.toml', '*.yml', '*.yaml', 'pom.xml']
 
 [properties]
 copyrightOwner = "ScopeDB, Inc."

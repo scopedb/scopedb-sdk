@@ -23,7 +23,7 @@ use crate::ResultFormat;
 use crate::protocol::ResultSetData;
 use crate::protocol::StatementResultSet;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Schema {
     fields: Vec<FieldSchema>,
 }
@@ -34,7 +34,7 @@ impl Schema {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FieldSchema {
     name: String,
     data_type: DataType,
@@ -50,7 +50,7 @@ impl FieldSchema {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ResultSet {
     schema: Schema,
     num_rows: usize,

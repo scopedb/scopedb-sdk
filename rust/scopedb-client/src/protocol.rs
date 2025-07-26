@@ -229,7 +229,7 @@ impl StatementResponse {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct StatementEstimatedProgress {
     /// Total progress in percentage: `[0.0, 100.0]`.
     pub total_percentage: f64,
@@ -241,7 +241,7 @@ pub struct StatementEstimatedProgress {
     pub details: StatementProgress,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StatementProgress {
     pub total_stages: i64,
     pub total_partitions: i64,

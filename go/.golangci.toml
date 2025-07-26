@@ -39,8 +39,4 @@ enable = [
 checks = ["all"]
 
 [formatters]
-enable = [
-  "gofmt",
-  "gofumpt",
-  "goimports",
-]
+enable = ["gofmt", "gofumpt", "goimports"]
