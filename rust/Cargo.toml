@@ -12,20 +12,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[package]
-name = "scopedb-client"
-version = "0.2.0"
+[workspace]
+members = [
+  "scopedb-client",
+  "scopeql",
+]
+resolver = "2"
 
+[workspace.package]
 edition = "2024"
-rust-version = "1.85.0"
-
-categories = ["database"]
-description = "A Rust client for ScopeDB"
 homepage = "https://www.scopedb.io"
-keywords = ["scopedb"]
 license = "Apache-2.0"
+rust-version = "1.85.0"
 repository = "https://github.com/scopedb/scopedb-sdk"
 
-[dependencies]
+[workspace.dependencies]
+exn = { version = "0.1.0-alpha.3" }
+fastrace = { version = "0.7" }
+fastrace-reqwest = { version = "0.2" }
+jiff = { version = "0.2", features = ["serde"] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "rustls-tls",
+  "charset",
+  "http2",
+  "macos-system-configuration",
+] }
+serde = { version = "1.0", features = ["derive"]}
+serde_json = { version = "1.0", features = ["unbounded_depth"] }
+thiserror = { version = "2.0"}
+tokio = { version = "1.44", features = [ "time" ] }
+uuid = { version = "1.17", features = ["v4", "serde"] }
 
-[dev-dependencies]
+[workspace.lints.rust]
+unknown_lints = "deny"
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+field_reassign_with_default = "allow"
+identity_op = "allow"
+manual_range_contains = "allow"
+new_without_default = "allow"
