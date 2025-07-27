@@ -29,11 +29,12 @@ repository.workspace = true
 [dependencies]
 anstyle = { workspace = true }
 clap = { workspace = true }
-clap-stdin = { workspace = true }
 dirs = { workspace = true }
 exn = { workspace = true }
-fastrace = { workspace = true }
+indicatif = { workspace = true }
 jiff = { workspace = true }
+logos = { workspace = true }
+mea = { workspace = true }
 nu-ansi-term = { workspace = true }
 reedline = { workspace = true }
 reqwest = { workspace = true }

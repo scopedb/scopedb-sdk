@@ -30,12 +30,14 @@ scopedb-client = { path = "scopedb-client" }
 # Crates.io dependencies
 anstyle = { version = "1.0" }
 clap = { version = "4.5", features = ["derive"] }
-clap-stdin = { version = "0.6" }
 dirs = { version = "6.0" }
 exn = { version = "0.1.0-alpha.4" }
 fastrace = { version = "0.7" }
 fastrace-reqwest = { version = "0.2" }
+indicatif = { version = "0.18" }
 jiff = { version = "0.2", features = ["serde"] }
+logos = { version = "0.15.0" }
+mea = { version = "0.3.11" }
 nu-ansi-term = { version = "0.50" }
 reedline = { version = "0.41.0" }
 reqwest = { version = "0.12", default-features = false, features = [
