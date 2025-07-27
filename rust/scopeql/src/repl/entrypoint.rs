@@ -12,6 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use nu_ansi_term::Color;
+use nu_ansi_term::Style;
+use reedline::DefaultHinter;
+use reedline::Emacs;
+use reedline::FileBackedHistory;
+use reedline::KeyCode;
+use reedline::KeyModifiers;
+use reedline::Reedline;
+use reedline::ReedlineEvent;
+use reedline::default_emacs_keybindings;
+
 use crate::command::Config;
 
-pub fn entrypoint(_config: Config) {}
+fn make_file_history() -> Option<FileBackedHistory> {
+    let Some(home_dir) = dirs::home_dir() else {
+        eprintln!("cannot get home directory; history disabled");
+        return None;
+    };
+
+    let history_file = home_dir.join(".scopeql_history");
+    let history = FileBackedHistory::with_file(1000, history_file).unwrap();
+    Some(history)
+}
+
+pub fn entrypoint(_config: Config) {
+    let mut keybindings = default_emacs_keybindings();
+    keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Tab,
+        ReedlineEvent::HistoryHintComplete,
+    );
+
+    let hinter = DefaultHinter::default().with_style(Style::new().fg(Color::DarkGray));
+
+    let mut state = Reedline::create()
+        .with_hinter(Box::new(hinter))
+        .with_edit_mode(Box::new(Emacs::new(keybindings)));
+
+    if let Some(history) = make_file_history() {
+        state = state.with_history(Box::new(history));
+    }
+
+    loop {}
+}

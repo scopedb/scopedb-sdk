@@ -22,13 +22,13 @@ use uuid::Uuid;
 use crate::Error;
 use crate::Statement;
 use crate::protocol::IngestRequest;
-use crate::protocol::IngestResponse;
+use crate::protocol::IngestResult;
 use crate::protocol::Response;
 use crate::protocol::ResultFormat;
-use crate::protocol::StatementCancelResponse;
+use crate::protocol::StatementCancelResult;
 use crate::protocol::StatementRequest;
 use crate::protocol::StatementRequestParams;
-use crate::protocol::StatementResponse;
+use crate::protocol::StatementStatus;
 use crate::statement::StatementHandle;
 
 #[derive(Debug, Clone)]
@@ -62,7 +62,7 @@ impl Client {
     }
 
     #[fastrace::trace]
-    pub async fn ingest(&self, request: IngestRequest) -> Result<Response<IngestResponse>, Error> {
+    pub async fn ingest(&self, request: IngestRequest) -> Result<Response<IngestResult>, Error> {
         let format = request.data.format();
         let make_error = || Error(format!("failed to ingest data in {format}"));
         let url = self.endpoint.join("v1/ingest").or_raise(make_error)?;
@@ -83,7 +83,7 @@ impl Client {
     pub(crate) async fn submit_statement(
         &self,
         request: StatementRequest,
-    ) -> Result<Response<StatementResponse>, Error> {
+    ) -> Result<Response<StatementStatus>, Error> {
         let make_error = || Error(format!("failed to submit statement: {request:?}"));
         let url = self.endpoint.join("v1/statements").or_raise(make_error)?;
         let response = self
@@ -102,7 +102,7 @@ impl Client {
         &self,
         statement_id: Uuid,
         params: StatementRequestParams,
-    ) -> Result<Response<StatementResponse>, Error> {
+    ) -> Result<Response<StatementStatus>, Error> {
         let make_error = || Error(format!("failed to fetch statement: {statement_id:?}"));
         let path = format!("v1/statements/{statement_id}");
         let url = self.endpoint.join(&path).or_raise(make_error)?;
@@ -121,7 +121,7 @@ impl Client {
     pub(crate) async fn cancel_statement(
         &self,
         statement_id: Uuid,
-    ) -> Result<Response<StatementCancelResponse>, Error> {
+    ) -> Result<Response<StatementCancelResult>, Error> {
         let make_error = || Error(format!("failed to cancel statement: {statement_id:?}"));
         let path = format!("v1/statements/{statement_id}/cancel");
         let url = self.endpoint.join(&path).or_raise(make_error)?;

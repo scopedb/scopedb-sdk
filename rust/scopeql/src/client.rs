@@ -1,12 +1,14 @@
+use std::time::Duration;
+
 use exn::Result;
 use exn::ResultExt;
 use exn::bail;
-use fastrace::prelude::*;
 use jiff::SignedDuration;
 use nu_ansi_term::Color;
 use scopedb_client::ResultSet;
-use scopedb_client::StatementCancelResponse;
+use scopedb_client::StatementCancelResult;
 use scopedb_client::StatementEstimatedProgress;
+use scopedb_client::StatementStatus;
 use uuid::Uuid;
 
 use crate::error::Error;
@@ -66,22 +68,6 @@ impl ScopeQLClient {
         statement: String,
         display_progress: impl Fn(&'static str, StatementEstimatedProgress),
     ) -> Result<String, Error> {
-        let trace_id = statement_id.to_u128_le();
-        let root = Span::root(
-            func_path!(),
-            SpanContext::new(TraceId(trace_id), SpanId::default()),
-        );
-        self.do_execute_statement(statement_id, statement, display_progress)
-            .in_span(root)
-            .await
-    }
-
-    async fn do_execute_statement(
-        &self,
-        statement_id: Uuid,
-        statement: String,
-        display_progress: impl Fn(&'static str, StatementEstimatedProgress),
-    ) -> Result<String, Error> {
         let make_error = || {
             Error(format!(
                 "failed to execute statement ({statement_id}): {statement}"
@@ -91,9 +77,10 @@ impl ScopeQLClient {
         let start_time = jiff::Timestamp::now();
         display_progress("Submitting", StatementEstimatedProgress::default());
 
+        let statement = statement.clone();
         let mut handle = self
             .client
-            .statement(statement.clone())
+            .statement(statement)
             .with_statement_id(statement_id)
             .submit()
             .await
@@ -101,24 +88,39 @@ impl ScopeQLClient {
 
         loop {
             handle.fetch_once().await.or_raise(make_error)?;
+
+            const DEFAULT_FETCH_INTERVAL: Duration = Duration::from_millis(42);
+
+            // SAFETY: after successfully fetch once, the status field is guaranteed to be set
+            match handle.status().unwrap() {
+                StatementStatus::Pending(s) => {
+                    display_progress("Pending", s.progress.clone());
+                }
+                StatementStatus::Running(s) => {
+                    display_progress("Running", s.progress.clone());
+                }
+                StatementStatus::Finished(s) => {
+                    let elapsed = start_time.duration_until(jiff::Timestamp::now());
+                    return format_result_set(s.result_set(), elapsed, s.progress.clone());
+                }
+                StatementStatus::Failed(s) => {
+                    bail!(Error(format!("statement failed: {}", s.message)));
+                }
+                StatementStatus::Cancelled(s) => {
+                    bail!(Error(format!("statement cancelled: {}", s.message)));
+                }
+            }
+
+            tokio::time::sleep(DEFAULT_FETCH_INTERVAL).await;
         }
     }
 
     pub async fn cancel_statement(
         &self,
         statement_id: Uuid,
-    ) -> Result<StatementCancelResponse, Error> {
-        let trace_id = statement_id.to_u128_le();
-        let root = Span::root(
-            func_path!(),
-            SpanContext::new(TraceId(trace_id), SpanId(std::random::random(..))),
-        );
-
+    ) -> Result<StatementCancelResult, Error> {
+        let make_error = || Error(format!("failed to cancel statement: {statement_id}"));
         let mut handle = self.client.statement_handle(statement_id);
-        handle
-            .cancel()
-            .in_span(root)
-            .await
-            .or_raise(|| Error("failed to cancel statement".to_string()))
+        handle.cancel().await.or_raise(make_error)
     }
 }
