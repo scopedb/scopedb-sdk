@@ -1,3 +1,17 @@
+// Copyright 2024 ScopeDB, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::fmt;
 use std::ops::Range;
 
@@ -21,12 +35,8 @@ impl<'a> Token<'a> {
         Token {
             source,
             kind: EOI,
-            span: (source.len()..source.len()).into(),
+            span: source.len()..source.len(),
         }
-    }
-
-    pub fn text(&self) -> &'a str {
-        &self.source[self.span.clone()]
     }
 }
 
@@ -75,11 +85,12 @@ impl<'a> Iterator for Tokenizer<'a> {
     }
 }
 
-pub fn run_tokenizer(source: &str) -> Result<Vec<Token>, Error> {
+pub fn run_tokenizer(source: &'_ str) -> Result<Vec<Token<'_>>, Error> {
     Tokenizer::new(source).collect::<Result<_, _>>()
 }
 
 #[allow(non_camel_case_types)]
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Logos, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TokenKind {
     EOI,
@@ -410,43 +421,5 @@ impl TokenKind {
 
     pub fn is_keyword(&self) -> bool {
         !self.is_literal() && !self.is_symbol() && !matches!(self, Ident | EOI)
-    }
-
-    pub fn is_reserved_keyword(&self) -> bool {
-        matches!(
-            self,
-            FROM | JOIN
-                | VALUES
-                | WHERE
-                | ORDER
-                | DISTINCT
-                | LIMIT
-                | SELECT
-                | AGGREGATE
-                | WINDOW
-                | WITHIN
-                | GROUP
-                | INSERT
-                | UNION
-                | SAMPLE
-                | NULL
-                | TRUE
-                | FALSE
-                | AS
-                | BY
-                | ON
-                | CASE
-                | WHEN
-                | THEN
-                | ELSE
-                | END
-                | CAST
-                | NOT
-                | IS
-                | IN
-                | BETWEEN
-                | AND
-                | OR
-        )
     }
 }

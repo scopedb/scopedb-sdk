@@ -15,14 +15,15 @@
 #![feature(random)]
 
 use clap::Parser;
+use repl::entrypoint;
 
 use crate::command::Command;
 use crate::command::Subcommand;
-use repl::entrypoint;
 
-mod command;
 mod client;
+mod command;
 mod error;
+#[allow(dead_code)]
 mod global;
 mod repl;
 
