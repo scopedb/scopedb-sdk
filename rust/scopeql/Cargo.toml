@@ -27,6 +27,33 @@ rust-version.workspace = true
 repository.workspace = true
 
 [dependencies]
+anstyle = { workspace = true }
+clap = { workspace = true }
+dirs = { workspace = true }
+exn = { workspace = true }
+indicatif = { workspace = true }
+jiff = { workspace = true }
+logos = { workspace = true }
+mea = { workspace = true }
+nu-ansi-term = { workspace = true }
+reedline = { workspace = true }
+reqwest = { workspace = true }
+scopedb-client = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = [
+  "io-util",
+  "io-std",
+  "macros",
+  "net",
+  "parking_lot",
+  "rt",
+  "rt-multi-thread",
+  "signal",
+  "time",
+] }
+uuid = { workspace = true }
 
 [lints]
 workspace = true

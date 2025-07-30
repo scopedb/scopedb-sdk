@@ -12,28 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![feature(random)]
+pub use entrypoint::entrypoint;
 
-use clap::Parser;
-use repl::entrypoint;
-
-use crate::command::Command;
-use crate::command::Subcommand;
-
-mod client;
 mod command;
-mod error;
-#[allow(dead_code)]
-mod global;
-mod repl;
-
-fn main() {
-    let cmd = Command::parse();
-
-    let config = cmd.config();
-    global::set_printer(config.quiet);
-
-    match cmd.subcommand() {
-        Subcommand::Repl => entrypoint(config),
-    }
-}
+mod entrypoint;
+mod highlight;
+mod prompt;
+mod tokenizer;
+mod validate;

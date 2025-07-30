@@ -12,28 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![feature(random)]
+use std::borrow::Borrow;
 
-use clap::Parser;
-use repl::entrypoint;
+use exn::Exn;
+use exn::Result;
+use serde::Serialize;
+use thiserror::Error;
 
-use crate::command::Command;
-use crate::command::Subcommand;
+#[derive(Debug, Error)]
+#[error("{0}")]
+pub struct Error(pub String);
 
-mod client;
-mod command;
-mod error;
-#[allow(dead_code)]
-mod global;
-mod repl;
-
-fn main() {
-    let cmd = Command::parse();
-
-    let config = cmd.config();
-    global::set_printer(config.quiet);
-
-    match cmd.subcommand() {
-        Subcommand::Repl => entrypoint(config),
+pub fn format_result<T: Serialize>(result: &Result<T, Error>) -> String {
+    match result {
+        Ok(result) => serde_json::to_string_pretty(result).unwrap(),
+        Err(err) => format_error(err),
     }
+}
+
+pub fn format_error<E: Borrow<Exn<Error>>>(err: E) -> String {
+    format!("{:?}", err.borrow())
 }

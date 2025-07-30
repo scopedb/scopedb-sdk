@@ -23,6 +23,7 @@ use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
 use crate::Error;
+use crate::ResultSet;
 
 #[derive(Debug, Clone)]
 pub enum Response<T> {
@@ -107,7 +108,7 @@ pub struct IngestRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IngestResponse {
+pub struct IngestResult {
     pub num_rows_inserted: i64,
 }
 
@@ -135,7 +136,7 @@ pub struct StatementRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StatementCancelResponse {
+pub struct StatementCancelResult {
     pub statement_id: Uuid,
     pub status: String,
     pub message: String,
@@ -144,92 +145,102 @@ pub struct StatementCancelResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "status")]
-pub enum StatementResponse {
+pub enum StatementStatus {
     #[serde(rename = "pending")]
-    Pending {
-        statement_id: Uuid,
-        created_at: jiff::Timestamp,
-        progress: StatementEstimatedProgress,
-    },
+    Pending(StatementStatusPending),
     #[serde(rename = "running")]
-    Running {
-        statement_id: Uuid,
-        created_at: jiff::Timestamp,
-        progress: StatementEstimatedProgress,
-    },
+    Running(StatementStatusRunning),
     #[serde(rename = "finished")]
-    Finished {
-        statement_id: Uuid,
-        created_at: jiff::Timestamp,
-        progress: StatementEstimatedProgress,
-        result_set: StatementResultSet,
-    },
+    Finished(StatementStatusFinished),
     #[serde(rename = "failed")]
-    Failed {
-        statement_id: Uuid,
-        created_at: jiff::Timestamp,
-        progress: StatementEstimatedProgress,
-        message: String,
-    },
+    Failed(StatementStatusFailed),
     #[serde(rename = "cancelled")]
-    Cancelled {
-        statement_id: Uuid,
-        created_at: jiff::Timestamp,
-        progress: StatementEstimatedProgress,
-        message: String,
-    },
+    Cancelled(StatementStatusCancelled),
 }
 
-impl StatementResponse {
+#[non_exhaustive]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatementStatusPending {
+    pub statement_id: Uuid,
+    pub created_at: jiff::Timestamp,
+    pub progress: StatementEstimatedProgress,
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatementStatusRunning {
+    pub statement_id: Uuid,
+    pub created_at: jiff::Timestamp,
+    pub progress: StatementEstimatedProgress,
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatementStatusFinished {
+    pub statement_id: Uuid,
+    pub created_at: jiff::Timestamp,
+    pub progress: StatementEstimatedProgress,
+
+    result_set: StatementResultSet,
+}
+
+impl StatementStatusFinished {
+    pub fn result_set(&self) -> ResultSet {
+        ResultSet::from_statement_result_set(self.result_set.clone())
+    }
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatementStatusFailed {
+    pub statement_id: Uuid,
+    pub created_at: jiff::Timestamp,
+    pub progress: StatementEstimatedProgress,
+    pub message: String,
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatementStatusCancelled {
+    pub statement_id: Uuid,
+    pub created_at: jiff::Timestamp,
+    pub progress: StatementEstimatedProgress,
+    pub message: String,
+}
+
+impl StatementStatus {
     pub fn statement_id(&self) -> Uuid {
         match self {
-            Self::Pending { statement_id, .. }
-            | Self::Running { statement_id, .. }
-            | Self::Finished { statement_id, .. }
-            | Self::Failed { statement_id, .. }
-            | Self::Cancelled { statement_id, .. } => *statement_id,
+            StatementStatus::Pending(s) => s.statement_id,
+            StatementStatus::Running(s) => s.statement_id,
+            StatementStatus::Finished(s) => s.statement_id,
+            StatementStatus::Failed(s) => s.statement_id,
+            StatementStatus::Cancelled(s) => s.statement_id,
         }
     }
 
-    pub fn status(&self) -> &str {
+    pub fn created_at(&self) -> jiff::Timestamp {
         match self {
-            Self::Pending { .. } => "pending",
-            Self::Running { .. } => "running",
-            Self::Finished { .. } => "finished",
-            Self::Failed { .. } => "failed",
-            Self::Cancelled { .. } => "cancelled",
+            StatementStatus::Pending(s) => s.created_at,
+            StatementStatus::Running(s) => s.created_at,
+            StatementStatus::Finished(s) => s.created_at,
+            StatementStatus::Failed(s) => s.created_at,
+            StatementStatus::Cancelled(s) => s.created_at,
         }
-    }
-
-    pub fn is_terminated(&self) -> bool {
-        matches!(
-            self,
-            Self::Finished { .. } | Self::Failed { .. } | Self::Cancelled { .. }
-        )
     }
 
     pub fn progress(&self) -> &StatementEstimatedProgress {
         match self {
-            Self::Pending { progress, .. }
-            | Self::Running { progress, .. }
-            | Self::Finished { progress, .. }
-            | Self::Failed { progress, .. }
-            | Self::Cancelled { progress, .. } => progress,
-        }
-    }
-
-    pub fn result_set(&self) -> Option<&StatementResultSet> {
-        match self {
-            StatementResponse::Finished { result_set, .. } => Some(result_set),
-            StatementResponse::Pending { .. }
-            | StatementResponse::Running { .. }
-            | StatementResponse::Failed { .. }
-            | StatementResponse::Cancelled { .. } => None,
+            StatementStatus::Pending(s) => &s.progress,
+            StatementStatus::Running(s) => &s.progress,
+            StatementStatus::Finished(s) => &s.progress,
+            StatementStatus::Failed(s) => &s.progress,
+            StatementStatus::Cancelled(s) => &s.progress,
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct StatementEstimatedProgress {
     /// Total progress in percentage: `[0.0, 100.0]`.
     pub total_percentage: f64,
@@ -241,7 +252,7 @@ pub struct StatementEstimatedProgress {
     pub details: StatementProgress,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StatementProgress {
     pub total_stages: i64,
     pub total_partitions: i64,
