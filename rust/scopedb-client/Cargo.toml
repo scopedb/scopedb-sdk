@@ -30,6 +30,7 @@ repository.workspace = true
 exn = { workspace = true }
 fastrace = { workspace = true }
 fastrace-reqwest = { workspace = true }
+hex = { workspace = true }
 jiff = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
