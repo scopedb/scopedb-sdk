@@ -42,9 +42,25 @@ fn format_result_set(
         n => format!("({n} rows)"),
     };
 
-    let result = result_set
+    let header = result_set
+        .schema()
+        .fields()
+        .iter()
+        .map(|f| f.name().to_string())
+        .collect::<Vec<_>>();
+
+    let rows = result_set
         .into_values()
-        .or_raise(|| Error("failed to format result set".to_string()))?;
+        .or_raise(|| Error("failed to convert result rows".to_string()))?;
+
+    // @see https://docs.rs/comfy-table/7.1.3/comfy_table/presets/index.html
+    const TABLE_STYLE_PRESET: &str = "||--+-++|    ++++++";
+    let mut table = comfy_table::Table::new();
+    table.load_preset(TABLE_STYLE_PRESET);
+    table.set_header(header);
+    for row in &rows {
+        table.add_row(row);
+    }
 
     let queue_secs =
         SignedDuration::from_nanos(progress.nanos_from_submitted - progress.nanos_from_started);
@@ -60,7 +76,7 @@ fn format_result_set(
     let total = Color::LightGreen.paint("total");
 
     Ok(format!(
-        "{result:?}\n{num_rows}\ntime: {queue_secs} {queue} {run_secs} {run} {total_secs} {total}",
+        "{table}\n{num_rows}\ntime: {queue_secs} {queue} {run_secs} {run} {total_secs} {total}",
     ))
 }
 

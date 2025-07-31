@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fmt;
 use std::str::FromStr;
 
 use exn::Result;
@@ -174,4 +175,44 @@ pub enum Value {
     Any(String),
     /// Null value.
     Null,
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Int(v) => write!(f, "{v}"),
+            Value::UInt(v) => write!(f, "{v}"),
+            Value::Float(v) => write!(f, "{v:?}"),
+            Value::Timestamp(v) => write!(f, "{v}"),
+            Value::Interval(v) => write!(f, "{v}"),
+            Value::Boolean(v) => write!(f, "{v}"),
+            Value::String(v) => quote_string(f, v, '"'),
+            Value::Binary(v) => write!(f, "{}", hex::encode_upper(v)),
+            Value::Array(v) => write!(f, "{v}"),
+            Value::Object(v) => write!(f, "{v}"),
+            Value::Any(v) => write!(f, "{v}"),
+            Value::Null => write!(f, "NULL"),
+        }
+    }
+}
+
+fn quote_string(f: &mut fmt::Formatter<'_>, s: &str, quote: char) -> fmt::Result {
+    write!(f, "{quote}")?;
+    for c in s.chars() {
+        match c {
+            '\t' => write!(f, "\\t")?,
+            '\r' => write!(f, "\\r")?,
+            '\n' => write!(f, "\\n")?,
+            '\\' => write!(f, "\\\\")?,
+            '\x00'..='\x1F' => write!(f, "\\x{:02x}", c as u8)?,
+            c => {
+                if c != quote {
+                    write!(f, "{c}")?
+                } else {
+                    write!(f, "\\{quote}")?
+                }
+            }
+        }
+    }
+    write!(f, "{quote}")
 }

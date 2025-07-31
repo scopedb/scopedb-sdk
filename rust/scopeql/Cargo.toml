@@ -29,6 +29,7 @@ repository.workspace = true
 [dependencies]
 anstyle = { workspace = true }
 clap = { workspace = true }
+comfy-table = { workspace = true }
 dirs = { workspace = true }
 exn = { workspace = true }
 indicatif = { workspace = true }
