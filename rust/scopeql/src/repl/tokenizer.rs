@@ -376,7 +376,7 @@ pub enum TokenKind {
     #[token("XOR", ignore(ascii_case))]
     XOR,
 
-    // ScopeQL specific
+    // ScopeQL
     #[token("\\")]
     Backslash,
     #[token("CANCEL", ignore(ascii_case))]
