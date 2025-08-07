@@ -56,7 +56,7 @@ impl CommandCancel {
         let statement_id = match uuid::Uuid::try_parse(statement_id) {
             Ok(statement_id) => statement_id,
             Err(err) => {
-                println!("error: invalid statement ID {statement_id:?}\n{err}");
+                println!("error: invalid statement id {statement_id:?}: {err}");
                 return;
             }
         };

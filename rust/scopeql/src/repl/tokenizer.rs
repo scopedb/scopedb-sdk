@@ -375,6 +375,12 @@ pub enum TokenKind {
     WITHIN,
     #[token("XOR", ignore(ascii_case))]
     XOR,
+
+    // ScopeQL
+    #[token("\\")]
+    Backslash,
+    #[token("CANCEL", ignore(ascii_case))]
+    CANCEL,
 }
 
 impl TokenKind {
@@ -416,6 +422,7 @@ impl TokenKind {
                 | SemiColon
                 | Dollar
                 | Arrow
+                | Backslash
         )
     }
 
