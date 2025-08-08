@@ -149,7 +149,7 @@ impl ResultSet {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Value {
     /// Signed integer value.
     Int(i64),
@@ -177,6 +177,25 @@ pub enum Value {
     Null,
 }
 
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Int(v) => write!(f, "{v}"),
+            Value::UInt(v) => write!(f, "{v}"),
+            Value::Float(v) => write!(f, "{v:?}"),
+            Value::Timestamp(v) => write!(f, "{v}"),
+            Value::Interval(v) => write!(f, "{v}"),
+            Value::Boolean(v) => write!(f, "{v}"),
+            Value::String(v) => quote_string(f, v, '\''),
+            Value::Binary(v) => write!(f, "{}", hex::encode_upper(v)),
+            Value::Array(v) => write!(f, "{v}"),
+            Value::Object(v) => write!(f, "{v}"),
+            Value::Any(v) => write!(f, "{v}"),
+            Value::Null => write!(f, "NULL"),
+        }
+    }
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -186,7 +205,7 @@ impl fmt::Display for Value {
             Value::Timestamp(v) => write!(f, "{v}"),
             Value::Interval(v) => write!(f, "{v}"),
             Value::Boolean(v) => write!(f, "{v}"),
-            Value::String(v) => quote_string(f, v, '"'),
+            Value::String(v) => write!(f, "{v}"),
             Value::Binary(v) => write!(f, "{}", hex::encode_upper(v)),
             Value::Array(v) => write!(f, "{v}"),
             Value::Object(v) => write!(f, "{v}"),
