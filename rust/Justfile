@@ -19,11 +19,11 @@ default:
 
 check:
     cargo fmt --all --check
-    cargo clippy --tests --all-targets --all-features --workspace -- -D warnings
+    cargo clippy --tests --all-targets --all-features -- -D warnings
 
 fix:
-    cargo clippy --tests --all-targets --all-features --workspace --fix --allow-staged --allow-dirty
+    cargo clippy --tests --all-targets --all-features --fix --allow-staged --allow-dirty
     cargo fmt --all
 
 test:
-    cargo test --workspace
+    cargo test

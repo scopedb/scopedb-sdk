@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-[toolchain]
-channel = "stable"
-components = ["cargo", "rustfmt", "clippy", "rust-analyzer"]
+set dotenv-load
+
+default:
+    just --list
+
+check:
+    cargo fmt --all --check
+    cargo clippy --tests --all-targets --all-features -- -D warnings
+
+fix:
+    cargo clippy --tests --all-targets --all-features --fix --allow-staged --allow-dirty
+    cargo fmt --all

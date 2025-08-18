@@ -13,11 +13,11 @@
 # limitations under the License.
 
 [package]
-name = "scopedb-client"
-version = "0.2.0"
+name = "scopeql"
+version = "0.1.0"
 
 categories = ["database"]
-description = "A Rust client for ScopeDB"
+description = "A command-line interface for ScopeDB"
 keywords = ["scopedb"]
 
 edition = "2024"
@@ -27,11 +27,17 @@ rust-version = "1.85.0"
 repository = "https://github.com/scopedb/scopedb-sdk"
 
 [dependencies]
+anstyle = { version = "1.0" }
+clap = { version = "4.5", features = ["derive"] }
+comfy-table = { version = "7.1.4", default-features = false }
+dirs = { version = "6.0" }
 exn = { version = "0.1.0-alpha.5" }
-fastrace = { version = "0.7" }
-fastrace-reqwest = { version = "0.2" }
-hex = { version = "0.4" }
+indicatif = { version = "0.18" }
 jiff = { version = "0.2", features = ["serde"] }
+logos = { version = "0.15.0" }
+mea = { version = "0.4.0" }
+nu-ansi-term = { version = "0.50" }
+reedline = { version = "0.41.0" }
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
@@ -39,9 +45,21 @@ reqwest = { version = "0.12", default-features = false, features = [
   "http2",
   "macos-system-configuration",
 ] }
+scopedb-client = { path = "../rust", version = "0.2.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["unbounded_depth"] }
 thiserror = { version = "2.0" }
+tokio = { version = "1.47.1", default-features = false, features = [
+  "io-util",
+  "io-std",
+  "macros",
+  "net",
+  "parking_lot",
+  "rt",
+  "rt-multi-thread",
+  "signal",
+  "time",
+] }
 uuid = { version = "1.17", features = ["v4", "serde"] }
 
 [lints.rust]
