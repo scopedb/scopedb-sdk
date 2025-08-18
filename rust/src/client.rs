@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exn::Result;
-use exn::ResultExt;
 use fastrace_reqwest::traceparent_headers;
 use reqwest::IntoUrl;
 use reqwest::Url;
 use uuid::Uuid;
 
 use crate::Error;
+use crate::ErrorKind;
 use crate::Statement;
 use crate::protocol::IngestRequest;
 use crate::protocol::IngestResult;
@@ -39,11 +38,14 @@ pub struct Client {
 
 impl Client {
     pub fn new<E: IntoUrl>(endpoint: E, client: reqwest::Client) -> Result<Self, Error> {
-        let endpoint = endpoint
-            .into_url()
-            .or_raise(|| Error("failed to parse endpoint".to_string()))?;
-
-        Ok(Self { endpoint, client })
+        match endpoint.into_url() {
+            Ok(endpoint) => Ok(Self { endpoint, client }),
+            Err(err) => Err(Error::new(
+                ErrorKind::ConfigInvalid,
+                "failed to parse endpoint".to_string(),
+            )
+            .set_source(err)),
+        }
     }
 
     pub fn statement(&self, statement: String) -> Statement {
@@ -55,17 +57,21 @@ impl Client {
     }
 
     pub async fn health_check(&self) -> Result<(), Error> {
-        let make_error = || Error("failed to do health check".to_string());
-        let url = self.endpoint.join("v1/health").or_raise(make_error)?;
-        self.client.get(url).send().await.or_raise(make_error)?;
+        let url = self.make_url("v1/health")?;
+        self.client.get(url).send().await.map_err(|err| {
+            Error::new(
+                ErrorKind::Unexpected,
+                "failed to send health check request".to_string(),
+            )
+            .set_source(err)
+        })?;
         Ok(())
     }
 
     #[fastrace::trace]
     pub async fn ingest(&self, request: IngestRequest) -> Result<Response<IngestResult>, Error> {
         let format = request.data.format();
-        let make_error = || Error(format!("failed to ingest data in {format}"));
-        let url = self.endpoint.join("v1/ingest").or_raise(make_error)?;
+        let url = self.make_url("v1/ingest")?;
         let response = self
             .client
             .post(url)
@@ -73,7 +79,13 @@ impl Client {
             .json(&request)
             .send()
             .await
-            .or_raise(make_error)?;
+            .map_err(|err| {
+                Error::new(
+                    ErrorKind::Unexpected,
+                    format!("failed to ingest data in {format}"),
+                )
+                .set_source(err)
+            })?;
         Response::from_http_response(response).await
     }
 }
@@ -84,8 +96,7 @@ impl Client {
         &self,
         request: StatementRequest,
     ) -> Result<Response<StatementStatus>, Error> {
-        let make_error = || Error(format!("failed to submit statement: {request:?}"));
-        let url = self.endpoint.join("v1/statements").or_raise(make_error)?;
+        let url = self.make_url("v1/statements")?;
         let response = self
             .client
             .post(url)
@@ -93,7 +104,13 @@ impl Client {
             .json(&request)
             .send()
             .await
-            .or_raise(make_error)?;
+            .map_err(|err| {
+                Error::new(
+                    ErrorKind::Unexpected,
+                    format!("failed to submit statement: {request:?}"),
+                )
+                .set_source(err)
+            })?;
         Response::from_http_response(response).await
     }
 
@@ -103,9 +120,8 @@ impl Client {
         statement_id: Uuid,
         params: StatementRequestParams,
     ) -> Result<Response<StatementStatus>, Error> {
-        let make_error = || Error(format!("failed to fetch statement: {statement_id:?}"));
         let path = format!("v1/statements/{statement_id}");
-        let url = self.endpoint.join(&path).or_raise(make_error)?;
+        let url = self.make_url(&path)?;
         let response = self
             .client
             .get(url)
@@ -113,7 +129,13 @@ impl Client {
             .query(&params)
             .send()
             .await
-            .or_raise(make_error)?;
+            .map_err(|err| {
+                Error::new(
+                    ErrorKind::Unexpected,
+                    format!("failed to fetch statement: {statement_id:?}"),
+                )
+                .set_source(err)
+            })?;
         Response::from_http_response(response).await
     }
 
@@ -122,16 +144,28 @@ impl Client {
         &self,
         statement_id: Uuid,
     ) -> Result<Response<StatementCancelResult>, Error> {
-        let make_error = || Error(format!("failed to cancel statement: {statement_id:?}"));
         let path = format!("v1/statements/{statement_id}/cancel");
-        let url = self.endpoint.join(&path).or_raise(make_error)?;
+        let url = self.make_url(&path)?;
         let response = self
             .client
             .post(url)
             .headers(traceparent_headers())
             .send()
             .await
-            .or_raise(make_error)?;
+            .map_err(|err| {
+                Error::new(
+                    ErrorKind::Unexpected,
+                    format!("failed to cancel statement: {statement_id:?}"),
+                )
+                .set_source(err)
+            })?;
         Response::from_http_response(response).await
+    }
+
+    #[track_caller]
+    fn make_url(&self, path: &str) -> Result<Url, Error> {
+        self.endpoint.join(path).map_err(|err| {
+            Error::new(ErrorKind::Unexpected, "failed to construct URL".to_string()).set_source(err)
+        })
     }
 }

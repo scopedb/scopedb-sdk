@@ -12,12 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exn::IntoExn;
-use exn::Result;
 use jiff::SignedDuration;
 use uuid::Uuid;
 
 use crate::Error;
+use crate::ErrorKind;
 use crate::StatementCancelResult;
 use crate::client::Client;
 use crate::protocol::Response;
@@ -72,9 +71,10 @@ impl Statement {
                 format,
                 status: Some(response),
             }),
-            Response::Failed(err) => {
-                Err(Error(format!("failed to submit statement: {err}")).into_exn())
-            }
+            Response::Failed(err) => Err(Error::new(
+                ErrorKind::Unexpected,
+                format!("failed to submit statement: {err}"),
+            )),
         }
     }
 
@@ -134,9 +134,10 @@ impl StatementHandle {
                 self.status = Some(status);
                 Ok(())
             }
-            Response::Failed(err) => {
-                Err(Error(format!("failed to fetch statement: {err}")).into_exn())
-            }
+            Response::Failed(err) => Err(Error::new(
+                ErrorKind::Unexpected,
+                format!("failed to fetch statement: {err}"),
+            )),
         }
     }
 
@@ -173,9 +174,10 @@ impl StatementHandle {
 
         match self.client.cancel_statement(self.statement_id).await? {
             Response::Success(response) => Ok(response),
-            Response::Failed(err) => {
-                Err(Error(format!("failed to cancel statement: {err}")).into_exn())
-            }
+            Response::Failed(err) => Err(Error::new(
+                ErrorKind::Unexpected,
+                format!("failed to cancel statement: {err}"),
+            )),
         }
     }
 

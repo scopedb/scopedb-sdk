@@ -27,7 +27,7 @@ rust-version = "1.85.0"
 repository = "https://github.com/scopedb/scopedb-sdk"
 
 [dependencies]
-exn = { version = "0.1.0-alpha.5" }
+anyhow = { version = "1.0.99" }
 fastrace = { version = "0.7" }
 fastrace-reqwest = { version = "0.2" }
 hex = { version = "0.4" }
@@ -41,7 +41,6 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["unbounded_depth"] }
-thiserror = { version = "2.0" }
 uuid = { version = "1.17", features = ["v4", "serde"] }
 
 [lints.rust]

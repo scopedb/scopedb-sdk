@@ -13,11 +13,14 @@
 // limitations under the License.
 
 mod client;
+mod error;
 mod protocol;
 mod result;
 mod statement;
 
 pub use client::Client;
+pub use error::Error;
+pub use error::ErrorKind;
 pub use protocol::DataType;
 pub use protocol::ResultFormat;
 pub use protocol::StatementCancelResult;
@@ -35,7 +38,3 @@ pub use result::Schema;
 pub use result::Value;
 pub use statement::Statement;
 pub use statement::StatementHandle;
-
-#[derive(Debug, thiserror::Error)]
-#[error("{0}")]
-pub struct Error(String);

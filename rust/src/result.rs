@@ -15,11 +15,9 @@
 use std::fmt;
 use std::str::FromStr;
 
-use exn::Result;
-use exn::ResultExt;
-
 use crate::DataType;
 use crate::Error;
+use crate::ErrorKind;
 use crate::ResultFormat;
 use crate::protocol::ResultSetData;
 use crate::protocol::StatementResultSet;
@@ -92,30 +90,46 @@ impl ResultSet {
                 };
 
                 let value = match self.schema.fields[i].data_type() {
-                    DataType::Int => Value::Int(
-                        i64::from_str(&value)
-                            .or_raise(|| Error("failed to parse int value".to_string()))?,
-                    ),
-                    DataType::UInt => Value::UInt(
-                        u64::from_str(&value)
-                            .or_raise(|| Error("failed to parse uint value".to_string()))?,
-                    ),
-                    DataType::Float => Value::Float(
-                        f64::from_str(&value)
-                            .or_raise(|| Error("failed to parse float value".to_string()))?,
-                    ),
-                    DataType::Timestamp => Value::Timestamp(
-                        jiff::Timestamp::from_str(&value)
-                            .or_raise(|| Error("failed to parse timestamp value".to_string()))?,
-                    ),
-                    DataType::Interval => Value::Interval(
-                        jiff::SignedDuration::from_str(&value)
-                            .or_raise(|| Error("failed to parse interval value".to_string()))?,
-                    ),
-                    DataType::Boolean => Value::Boolean(
-                        bool::from_str(&value)
-                            .or_raise(|| Error("failed to parse boolean value".to_string()))?,
-                    ),
+                    DataType::Int => Value::Int(i64::from_str(&value).map_err(|err| {
+                        Error::new(
+                            ErrorKind::Unexpected,
+                            format!("failed to parse int value: {err}"),
+                        )
+                    })?),
+                    DataType::UInt => Value::UInt(u64::from_str(&value).map_err(|err| {
+                        Error::new(
+                            ErrorKind::Unexpected,
+                            format!("failed to parse uint value: {err}"),
+                        )
+                    })?),
+                    DataType::Float => Value::Float(f64::from_str(&value).map_err(|err| {
+                        Error::new(
+                            ErrorKind::Unexpected,
+                            format!("failed to parse float value: {err}"),
+                        )
+                    })?),
+                    DataType::Timestamp => {
+                        Value::Timestamp(jiff::Timestamp::from_str(&value).map_err(|err| {
+                            Error::new(
+                                ErrorKind::Unexpected,
+                                format!("failed to parse timestamp value: {err}"),
+                            )
+                        })?)
+                    }
+                    DataType::Interval => {
+                        Value::Interval(jiff::SignedDuration::from_str(&value).map_err(|err| {
+                            Error::new(
+                                ErrorKind::Unexpected,
+                                format!("failed to parse interval value: {err}"),
+                            )
+                        })?)
+                    }
+                    DataType::Boolean => Value::Boolean(bool::from_str(&value).map_err(|err| {
+                        Error::new(
+                            ErrorKind::Unexpected,
+                            format!("failed to parse boolean value: {err}"),
+                        )
+                    })?),
                     DataType::String => Value::String(value),
                     DataType::Binary => Value::Binary(value),
                     DataType::Array => Value::Array(value),
