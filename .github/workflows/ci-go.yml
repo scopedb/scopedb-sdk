@@ -36,8 +36,9 @@ jobs:
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
-      - run: just check
+      - name: Check Go SDK
         working-directory: go
+        run: just check
 
   test:
     name: Build and test
@@ -49,22 +50,19 @@ jobs:
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
-      - run: just build
+      - name: Build Go SDK
         working-directory: go
-      - name: Prepare Composed Environment
-        run: docker compose -f ./dev/docker-compose.yml up -d
+        run: just build
       - name: Run full tests
         timeout-minutes: 10
-        run: just test
         working-directory: go
-        env:
-          SCOPEDB_ENDPOINT: http://localhost:6543
-      - name: Upload error logs
-        if: ${{ !success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: error-logs
-          path: dev/logs
+        run: |
+          if [ ${{ github.repository }} == 'scopedb/scopedb-go' ]; then
+            # Secrets are only available for the main repository.
+            export SCOPEDB_ENDPOINT="${{ secrets.CI_TRIAL_ENDPOINT_URL }}"
+          fi
+
+          just test
 
   required:
     name: Required
