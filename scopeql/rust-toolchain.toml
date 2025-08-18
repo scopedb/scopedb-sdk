@@ -12,18 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set dotenv-load
-
-default:
-    just --list
-
-check:
-    cargo +nightly fmt --all --check
-    cargo +nightly clippy --tests --all-targets --all-features -- -D warnings
-
-fix:
-    cargo +nightly clippy --tests --all-targets --all-features --fix --allow-staged --allow-dirty
-    cargo +nightly fmt --all
-
-test:
-    cargo test
+[toolchain]
+channel = "nightly-2025-08-01"
+components = ["cargo", "rustfmt", "clippy", "rust-analyzer"]

@@ -18,12 +18,9 @@ default:
     just --list
 
 check:
-    cargo +nightly fmt --all --check
-    cargo +nightly clippy --tests --all-targets --all-features -- -D warnings
+    cargo fmt --all --check
+    cargo clippy --tests --all-targets --all-features -- -D warnings
 
 fix:
-    cargo +nightly clippy --tests --all-targets --all-features --fix --allow-staged --allow-dirty
-    cargo +nightly fmt --all
-
-test:
-    cargo test
+    cargo clippy --tests --all-targets --all-features --fix --allow-staged --allow-dirty
+    cargo fmt --all

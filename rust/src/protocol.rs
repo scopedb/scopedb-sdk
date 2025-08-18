@@ -14,7 +14,6 @@
 
 use std::fmt;
 
-use exn::ResultExt;
 use jiff::SignedDuration;
 use reqwest::StatusCode;
 use serde::Deserialize;
@@ -23,6 +22,7 @@ use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
 use crate::Error;
+use crate::ErrorKind;
 use crate::ResultSet;
 
 #[derive(Debug, Clone)]
@@ -32,12 +32,14 @@ pub enum Response<T> {
 }
 
 impl<T: DeserializeOwned> Response<T> {
-    pub async fn from_http_response(r: reqwest::Response) -> exn::Result<Self, Error> {
-        let make_error = || Error("failed to make response".to_string());
+    pub async fn from_http_response(r: reqwest::Response) -> Result<Self, Error> {
+        let make_error = |err| {
+            Error::new(ErrorKind::Unexpected, "failed to make response".to_string()).set_source(err)
+        };
 
         let code = r.status();
         if code.is_success() {
-            let result = r.json().await.or_raise(make_error)?;
+            let result = r.json().await.map_err(make_error)?;
             return Ok(Response::Success(result));
         }
 
@@ -46,7 +48,7 @@ impl<T: DeserializeOwned> Response<T> {
             message: String,
         }
 
-        let payload = r.bytes().await.or_raise(make_error)?;
+        let payload = r.bytes().await.map_err(make_error)?;
         if let Ok(ErrorMessage { message }) = serde_json::from_slice::<ErrorMessage>(&payload) {
             Ok(Response::Failed(ErrorStatus { code, message }))
         } else {
