@@ -16,7 +16,10 @@ name: CI (Go SDK)
 on:
   pull_request:
     branches: [ main ]
-    paths: [ 'go/**' ]
+    paths: [
+      'go/**',
+      '.github/workflows/ci-go.yml',
+    ]
   schedule:
     - cron: '2 4 * * *'
 

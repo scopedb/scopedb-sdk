@@ -16,7 +16,10 @@ name: CI (Rust SDK)
 on:
   pull_request:
     branches: [ main ]
-    paths: [ 'rust/**' ]
+    paths: [
+      'rust/**',
+      '.github/workflows/ci-rust.yml',
+    ]
   schedule:
     - cron: '2 4 * * *'
 
