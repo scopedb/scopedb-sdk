@@ -60,7 +60,7 @@ tokio = { version = "1.47.1", default-features = false, features = [
   "signal",
   "time",
 ] }
-uuid = { version = "1.17", features = ["v4", "serde"] }
+uuid = { version = "1.17", features = ["v7", "serde"] }
 
 [lints.rust]
 unknown_lints = "deny"

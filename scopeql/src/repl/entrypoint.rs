@@ -166,7 +166,7 @@ pub fn entrypoint(config: Config) {
         for range in stmts_range {
             let stmt = input[range].to_string();
 
-            let statement_id = uuid::Uuid::new_v4();
+            let statement_id = uuid::Uuid::now_v7();
             println!("StatementID: {statement_id}");
 
             let pb_style = "{spinner:.green} [{elapsed_precise}] {msg:.green.bold.bright} [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})";
