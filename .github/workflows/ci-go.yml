@@ -60,7 +60,7 @@ jobs:
         timeout-minutes: 10
         working-directory: go
         run: |
-          if [ ${{ github.repository }} == 'scopedb/scopedb-go' ]; then
+          if [ ${{ github.repository }} == 'scopedb/scopedb-sdk' ]; then
             # Secrets are only available for the main repository.
             export SCOPEDB_ENDPOINT="${{ secrets.CI_TRIAL_ENDPOINT_URL }}"
           fi
