@@ -29,6 +29,7 @@ mod execute;
 mod global;
 mod repl;
 mod tokenizer;
+mod version;
 
 fn main() {
     let cmd = Command::parse();
