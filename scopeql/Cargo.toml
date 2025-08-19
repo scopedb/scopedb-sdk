@@ -31,6 +31,7 @@ anstyle = { version = "1.0" }
 clap = { version = "4.5", features = ["derive"] }
 clap-stdin = { version = "0.7.0" }
 comfy-table = { version = "7.1.4", default-features = false }
+const_format = { version = "0.2.34" }
 dirs = { version = "6.0" }
 exn = { version = "0.1.0-alpha.5" }
 indicatif = { version = "0.18" }
@@ -49,6 +50,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 scopedb-client = { path = "../rust", version = "0.2.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["unbounded_depth"] }
+shadow-rs = { version = "1.2.1", default-features = false }
 thiserror = { version = "2.0" }
 tokio = { version = "1.47.1", default-features = false, features = [
   "io-util",
@@ -63,6 +65,11 @@ tokio = { version = "1.47.1", default-features = false, features = [
 ] }
 uuid = { version = "1.17", features = ["v7", "serde"] }
 
+[build-dependencies]
+build-data = { version = "0.3.0" }
+gix-discover = { version = "0.41.0" }
+shadow-rs = { version = "1.2.1", default-features = false, features = ["build"] }
+
 [lints.rust]
 unknown_lints = "deny"
 unsafe_code = "deny"
@@ -74,3 +81,13 @@ field_reassign_with_default = "allow"
 identity_op = "allow"
 manual_range_contains = "allow"
 new_without_default = "allow"
+
+[profile.release]
+debug = true
+lto = "thin"
+
+[profile.dist]
+codegen-units = 1
+debug = true
+inherits = "release"
+lto = "fat"

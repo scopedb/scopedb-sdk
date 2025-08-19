@@ -14,8 +14,10 @@
 
 use clap_stdin::MaybeStdin;
 
+use crate::version::version;
+
 #[derive(Debug, clap::Parser)]
-#[command(name = "scopeql", version, styles=styled())]
+#[command(name = "scopeql", version, long_version = version(), styles=styled())]
 pub struct Command {
     #[clap(flatten)]
     config: Config,
