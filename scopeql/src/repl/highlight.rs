@@ -17,7 +17,7 @@ use nu_ansi_term::Style;
 use reedline::Highlighter;
 use reedline::StyledText;
 
-use crate::repl::tokenizer::run_tokenizer;
+use crate::tokenizer::run_tokenizer;
 
 pub struct ScopeQLHighlighter;
 

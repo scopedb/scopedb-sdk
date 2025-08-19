@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use clap_stdin::MaybeStdin;
+
 #[derive(Debug, clap::Parser)]
 #[command(name = "scopeql", version, styles=styled())]
 pub struct Command {
@@ -47,6 +49,11 @@ pub struct Config {
 pub enum Subcommand {
     #[clap(about = "Start an interactive REPL [default]")]
     Repl,
+    #[clap(visible_alias = "-c", about = "Execute only single statement and exit")]
+    Command {
+        /// The statements to execute ("-" to read from stdin).
+        statements: MaybeStdin<String>,
+    },
 }
 
 pub fn styled() -> clap::builder::Styles {

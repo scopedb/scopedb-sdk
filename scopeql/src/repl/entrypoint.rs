@@ -41,8 +41,8 @@ use crate::repl::command::ReplCommand;
 use crate::repl::command::ReplSubCommand;
 use crate::repl::highlight::ScopeQLHighlighter;
 use crate::repl::prompt::CommandLinePrompt;
-use crate::repl::tokenizer::TokenKind;
-use crate::repl::tokenizer::run_tokenizer;
+use crate::tokenizer::TokenKind;
+use crate::tokenizer::run_tokenizer;
 use crate::repl::validate::ScopeQLValidator;
 
 fn make_file_history() -> Option<FileBackedHistory> {

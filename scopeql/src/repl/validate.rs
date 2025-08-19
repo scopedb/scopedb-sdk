@@ -15,8 +15,8 @@
 use reedline::ValidationResult;
 use reedline::Validator;
 
-use crate::repl::tokenizer::TokenKind;
-use crate::repl::tokenizer::run_tokenizer;
+use crate::tokenizer::TokenKind;
+use crate::tokenizer::run_tokenizer;
 
 pub struct ScopeQLValidator;
 

@@ -19,13 +19,16 @@ use repl::entrypoint;
 
 use crate::command::Command;
 use crate::command::Subcommand;
+use crate::execute::execute;
 
 mod client;
 mod command;
 mod error;
+mod execute;
 #[allow(dead_code)]
 mod global;
 mod repl;
+mod tokenizer;
 
 fn main() {
     let cmd = Command::parse();
@@ -35,5 +38,6 @@ fn main() {
 
     match cmd.subcommand() {
         Subcommand::Repl => entrypoint(config),
+        Subcommand::Command { statements } => execute(config, statements.into_inner()),
     }
 }
