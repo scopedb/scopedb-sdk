@@ -15,6 +15,14 @@
 name: Docker Sanity Check
 description: Build image and run sanity checks
 
+inputs:
+  tag:
+    description: The bare tag of Docker image
+    required: true
+  file:
+    description: The path to the specified Dockerfile
+    required: true
+
 runs:
   using: composite
   steps:
@@ -22,13 +30,13 @@ runs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile
-          tags: scopeql:ci
+          file: ${{ inputs.file }}
+          tags: ${{ inputs.tag }}
           outputs: |
             type=docker
             type=image,push=false
       - name: Sanity check
         shell: bash
         run: |
-          docker image inspect scopeql:ci --format='{{.Size}}'
-          docker run --rm -v $(pwd):/github/workspace scopeql:ci --version
+          docker image inspect ${{ inputs.tag }} --format='{{.Size}}'
+          docker run --rm ${{ inputs.tag }} --version

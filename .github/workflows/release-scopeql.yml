@@ -44,6 +44,9 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - name: Run Docker sanity check
         uses: ./.github/actions/docker-sanity-check
+        with:
+          tag: scopeql:ci
+          file: scopeql.dockerfile
       - name: Build and push by digest
         if: ${{ github.event_name != 'pull_request' }}
         uses: ./.github/actions/docker-push-by-digest
@@ -67,6 +70,9 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - name: Run Docker sanity check
         uses: ./.github/actions/docker-sanity-check
+        with:
+          tag: scopeql:ci
+          file: scopeql.dockerfile
       - name: Build and push by digest
         if: ${{ github.event_name != 'pull_request' }}
         uses: ./.github/actions/docker-push-by-digest
