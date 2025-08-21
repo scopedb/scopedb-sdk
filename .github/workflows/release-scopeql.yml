@@ -116,6 +116,7 @@ jobs:
     needs:
       - build-and-push-amd64
       - build-and-push-arm64
+      - docker-meta
     steps:
       - uses: actions/checkout@v4
       - name: Release to GitHub Container Registry
@@ -137,6 +138,7 @@ jobs:
     needs:
       - build-and-push-amd64
       - build-and-push-arm64
+      - docker-meta
     steps:
       - uses: actions/checkout@v4
       # Login to ghcr.io for copy images
@@ -164,6 +166,7 @@ jobs:
     needs:
       - build-and-push-amd64
       - build-and-push-arm64
+      - docker-meta
     steps:
       - uses: actions/checkout@v4
       # Login to ghcr.io for copy images
