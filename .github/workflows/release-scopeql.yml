@@ -37,8 +37,28 @@ jobs:
       - uses: actions/checkout@v4
       - run: ./scopeql/scripts/check-version-tag-match.sh
 
-  build-and-push-amd64:
+  docker-meta:
     needs: [ precondition ]
+    if: ${{ github.repository == 'scopedb/scopedb-sdk' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: scopeql
+          sep-tags: ' '
+          tags: |
+            type=semver,pattern=v{{version}},match=^scopeql\/v([0-9]+\.[0-9]+\.[0-9]+.*)$
+            type=edge,branch=main
+            type=raw,value={{date 'YYYYMMDD-HHmmss'}}
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
+
+  build-and-push-amd64:
+    needs: [ docker-meta ]
     if: ${{ github.repository == 'scopedb/scopedb-sdk' }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
@@ -64,7 +84,7 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
 
   build-and-push-arm64:
-    needs: [ precondition ]
+    needs: [ docker-meta ]
     if: ${{ github.repository == 'scopedb/scopedb-sdk' }}
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
@@ -89,25 +109,6 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
 
-  docker-meta:
-    if: ${{ github.repository == 'scopedb/scopedb-sdk' && github.event_name != 'pull_request' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: scopeql
-          sep-tags: ' '
-          tags: |
-            type=semver,pattern=v{{version}},match=^scopeql/v([0-9]+.[0-9]+.[0-9]+*)$
-            type=edge,branch=main
-            type=raw,value={{date 'YYYYMMDD-HHmmss'}}
-    outputs:
-      tags: ${{ steps.meta.outputs.tags }}
-
   release-ghcr:
     if: ${{ github.repository == 'scopedb/scopedb-sdk' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
@@ -115,7 +116,6 @@ jobs:
     needs:
       - build-and-push-amd64
       - build-and-push-arm64
-      - docker-meta
     steps:
       - uses: actions/checkout@v4
       - name: Release to GitHub Container Registry
@@ -137,7 +137,6 @@ jobs:
     needs:
       - build-and-push-amd64
       - build-and-push-arm64
-      - docker-meta
     steps:
       - uses: actions/checkout@v4
       # Login to ghcr.io for copy images
@@ -165,7 +164,6 @@ jobs:
     needs:
       - build-and-push-amd64
       - build-and-push-arm64
-      - docker-meta
     steps:
       - uses: actions/checkout@v4
       # Login to ghcr.io for copy images
