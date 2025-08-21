@@ -93,9 +93,6 @@ jobs:
     if: ${{ github.repository == 'scopedb/scopedb-sdk' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    needs:
-      - build-and-push-amd64
-      - build-and-push-arm64
     steps:
       - uses: actions/checkout@v4
       - name: Docker meta
