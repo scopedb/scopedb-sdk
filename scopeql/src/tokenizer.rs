@@ -319,6 +319,8 @@ pub enum TokenKind {
     RENAME,
     #[token("REPLACE", ignore(ascii_case))]
     REPLACE,
+    #[token("RESUME", ignore(ascii_case))]
+    RESUME,
     #[token("RIGHT", ignore(ascii_case))]
     RIGHT,
     #[token("SAMPLE", ignore(ascii_case))]
@@ -339,6 +341,8 @@ pub enum TokenKind {
     STATEMENTS,
     #[token("STRING", ignore(ascii_case))]
     STRING,
+    #[token("SUSPEND", ignore(ascii_case))]
+    SUSPEND,
     #[token("TABLE", ignore(ascii_case))]
     TABLE,
     #[token("TABLES", ignore(ascii_case))]
