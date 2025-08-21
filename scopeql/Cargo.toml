@@ -33,7 +33,7 @@ clap-stdin = { version = "0.7.0" }
 comfy-table = { version = "7.1.4", default-features = false }
 const_format = { version = "0.2.34" }
 dirs = { version = "6.0" }
-exn = { version = "0.1.0-alpha.5" }
+exn = { version = "0.1.0" }
 indicatif = { version = "0.18" }
 jiff = { version = "0.2", features = ["serde"] }
 logos = { version = "0.15.0" }
