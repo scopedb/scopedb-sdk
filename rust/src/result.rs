@@ -197,8 +197,8 @@ impl fmt::Debug for Value {
             Value::Int(v) => write!(f, "{v}"),
             Value::UInt(v) => write!(f, "{v}"),
             Value::Float(v) => write!(f, "{v:?}"),
-            Value::Timestamp(v) => write!(f, "{v}"),
-            Value::Interval(v) => write!(f, "{v}"),
+            Value::Timestamp(v) => format_timestamp(f, v),
+            Value::Interval(v) => format_interval(f, v),
             Value::Boolean(v) => write!(f, "{v}"),
             Value::String(v) => quote_string(f, v, '\''),
             Value::Binary(v) => write!(f, "{}", hex::encode_upper(v)),
@@ -216,8 +216,8 @@ impl fmt::Display for Value {
             Value::Int(v) => write!(f, "{v}"),
             Value::UInt(v) => write!(f, "{v}"),
             Value::Float(v) => write!(f, "{v:?}"),
-            Value::Timestamp(v) => write!(f, "{v}"),
-            Value::Interval(v) => write!(f, "{v}"),
+            Value::Timestamp(v) => format_timestamp(f, v),
+            Value::Interval(v) => format_interval(f, v),
             Value::Boolean(v) => write!(f, "{v}"),
             Value::String(v) => write!(f, "{v}"),
             Value::Binary(v) => write!(f, "{}", hex::encode_upper(v)),
@@ -227,6 +227,28 @@ impl fmt::Display for Value {
             Value::Null => write!(f, "NULL"),
         }
     }
+}
+
+fn format_timestamp(f: &mut fmt::Formatter<'_>, ts: &jiff::Timestamp) -> fmt::Result {
+    use jiff::fmt::StdFmtWrite;
+    use jiff::fmt::temporal;
+
+    let precision = f.precision().map(|p| u8::try_from(p).unwrap_or(u8::MAX));
+    temporal::DateTimePrinter::new()
+        .precision(precision)
+        .print_timestamp(ts, StdFmtWrite(f))
+        .map_err(|_| fmt::Error)
+}
+
+fn format_interval(f: &mut fmt::Formatter<'_>, d: &jiff::SignedDuration) -> fmt::Result {
+    use jiff::fmt::StdFmtWrite;
+    use jiff::fmt::friendly;
+
+    friendly::SpanPrinter::new()
+        .spacing(friendly::Spacing::None)
+        .designator(friendly::Designator::Compact)
+        .print_duration(d, StdFmtWrite(f))
+        .map_err(|_| fmt::Error)
 }
 
 fn quote_string(f: &mut fmt::Formatter<'_>, s: &str, quote: char) -> fmt::Result {
