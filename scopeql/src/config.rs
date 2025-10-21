@@ -53,7 +53,16 @@ pub fn load_config(config_file: Option<PathBuf>) -> Config {
 
     // Layer 1: environment variables
     let env = std::env::vars()
-        .filter(|(k, _)| k.starts_with("SCOPEQL_CONFIG_"))
+        .filter_map(|(k, v)| {
+            let normalized_key = k.trim().to_lowercase();
+            if normalized_key.starts_with("scopeql_config_") {
+                let prefix_len = "scopeql_config_".len();
+                let normalized_key = &normalized_key[prefix_len..];
+                Some((normalized_key.to_owned(), v))
+            } else {
+                None
+            }
+        })
         .collect::<std::collections::HashMap<_, _>>();
 
     fn set_toml_path(doc: &mut DocumentMut, parts: &[&str], value: toml_edit::Item) {
@@ -70,20 +79,16 @@ pub fn load_config(config_file: Option<PathBuf>) -> Config {
     }
 
     for (k, v) in env {
-        let normalized_key = k.trim().to_lowercase();
-
-        if normalized_key == "scopeql_config_default_connection" {
+        if k == "default_connection" {
             let value = toml_edit::value(v);
             set_toml_path(&mut config, &["default_connection"], value);
             continue;
         }
 
-        if normalized_key.starts_with("scopeql_config_connections_")
-            && normalized_key.ends_with("_endpoint")
-        {
-            let prefix_len = "scopeql_config_connections_".len();
+        if k.starts_with("connections_") && k.ends_with("_endpoint") {
+            let prefix_len = "connections_".len();
             let suffix_len = "_endpoint".len();
-            let name = &normalized_key[prefix_len..normalized_key.len() - suffix_len];
+            let name = &k[prefix_len..k.len() - suffix_len];
             let value = toml_edit::value(v);
             set_toml_path(&mut config, &["connections", name, "endpoint"], value);
             continue;
