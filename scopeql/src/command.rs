@@ -60,6 +60,22 @@ pub enum Subcommand {
         /// The statements to execute ("-" to read from stdin).
         statements: MaybeStdin<String>,
     },
+    #[clap(name = "gen", about = "Generate command-line interface utilities")]
+    Generate {
+        /// Output file path (if not specified, output to stdout).
+        #[clap(short, long, value_hint = ValueHint::FilePath)]
+        output: Option<PathBuf>,
+
+        /// The target to generate.
+        #[clap(value_enum)]
+        target: GenerateTarget,
+    },
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum GenerateTarget {
+    /// Generate the default config file.
+    Config,
 }
 
 pub fn styled() -> clap::builder::Styles {

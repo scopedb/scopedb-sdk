@@ -18,7 +18,9 @@ use clap::Parser;
 use repl::entrypoint;
 
 use crate::command::Command;
+use crate::command::GenerateTarget;
 use crate::command::Subcommand;
+use crate::config::Config;
 use crate::config::load_config;
 use crate::execute::execute;
 
@@ -38,9 +40,33 @@ fn main() {
     let args = cmd.args();
     global::set_printer(args.quiet);
 
-    let config = load_config(args.config_file);
     match cmd.subcommand() {
-        Subcommand::Repl => entrypoint(config),
-        Subcommand::Command { statements } => execute(config, statements.into_inner()),
+        Subcommand::Generate { output, target } => {
+            let content = match target {
+                GenerateTarget::Config => {
+                    let config = Config::default();
+                    toml::to_string(&config).expect("default config must be always valid")
+                }
+            };
+
+            if let Some(output) = output {
+                std::fs::write(&output, content).unwrap_or_else(|err| {
+                    let target = match target {
+                        GenerateTarget::Config => "configurations",
+                    };
+                    panic!("failed to write {target} to {}: {err}", output.display())
+                });
+            } else {
+                println!("{content}");
+            }
+        }
+        Subcommand::Repl => {
+            let config = load_config(args.config_file);
+            entrypoint(config)
+        }
+        Subcommand::Command { statements } => {
+            let config = load_config(args.config_file);
+            execute(config, statements.into_inner())
+        }
     }
 }
