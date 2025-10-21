@@ -34,16 +34,16 @@ use reedline::default_emacs_keybindings;
 use scopedb_client::StatementEstimatedProgress;
 
 use crate::client::ScopeQLClient;
-use crate::command::Config;
+use crate::config::Config;
 use crate::error::format_error;
 use crate::global;
 use crate::repl::command::ReplCommand;
 use crate::repl::command::ReplSubCommand;
 use crate::repl::highlight::ScopeQLHighlighter;
 use crate::repl::prompt::CommandLinePrompt;
+use crate::repl::validate::ScopeQLValidator;
 use crate::tokenizer::TokenKind;
 use crate::tokenizer::run_tokenizer;
-use crate::repl::validate::ScopeQLValidator;
 
 fn make_file_history() -> Option<FileBackedHistory> {
     let Some(home_dir) = dirs::home_dir() else {
@@ -57,12 +57,17 @@ fn make_file_history() -> Option<FileBackedHistory> {
 }
 
 pub fn entrypoint(config: Config) {
+    let endpoint = config
+        .get_default_connection()
+        .expect("no default connection in config");
+    let endpoint = endpoint.endpoint().to_owned();
+
     let mut prompt = CommandLinePrompt::default();
-    let mut client = if config.endpoint.is_empty() {
+    let mut client = if endpoint.is_empty() {
         None
     } else {
-        prompt.set_endpoint(Some(config.endpoint.clone()));
-        Some(ScopeQLClient::new(config.endpoint))
+        prompt.set_endpoint(Some(endpoint.clone()));
+        Some(ScopeQLClient::new(endpoint))
     };
 
     let mut keybindings = default_emacs_keybindings();

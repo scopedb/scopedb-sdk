@@ -20,6 +20,7 @@ categories = ["database"]
 description = "A Rust client for ScopeDB"
 keywords = ["scopedb"]
 
+documentation = "https://docs.rs/scopedb-client"
 edition = "2024"
 homepage = "https://www.scopedb.io"
 license = "Apache-2.0"
