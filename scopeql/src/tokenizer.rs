@@ -15,7 +15,6 @@
 use std::fmt;
 use std::ops::Range;
 
-use exn::IntoExn;
 use exn::Result;
 use logos::Lexer;
 use logos::Logos;
@@ -69,7 +68,7 @@ impl<'a> Iterator for Tokenizer<'a> {
         match self.lexer.next() {
             Some(Err(..)) => {
                 let err = Error("failed to recognize the rest tokens".to_string());
-                Some(Err(err.into_exn()))
+                Some(Err(err.into()))
             }
             Some(Ok(kind)) => Some(Ok(Token {
                 source: self.source,

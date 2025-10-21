@@ -33,13 +33,13 @@ clap-stdin = { version = "0.7.0" }
 comfy-table = { version = "7.1.4", default-features = false }
 const_format = { version = "0.2.34" }
 dirs = { version = "6.0" }
-exn = { version = "0.1.0" }
+exn = { version = "0.2.0" }
 indicatif = { version = "0.18" }
 jiff = { version = "0.2", features = ["serde"] }
 logos = { version = "0.15.0" }
 mea = { version = "0.4.0" }
 nu-ansi-term = { version = "0.50" }
-reedline = { version = "0.41.0" }
+reedline = { version = "0.43.0" }
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
