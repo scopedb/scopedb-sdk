@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::path::PathBuf;
+
+use clap::ValueHint;
 use clap_stdin::MaybeStdin;
 
 use crate::version::version;
@@ -20,14 +23,14 @@ use crate::version::version;
 #[command(name = "scopeql", version, long_version = version(), styles=styled())]
 pub struct Command {
     #[clap(flatten)]
-    config: Config,
+    config: Args,
 
     #[command(subcommand)]
     subcommand: Option<Subcommand>,
 }
 
 impl Command {
-    pub fn config(&self) -> Config {
+    pub fn args(&self) -> Args {
         self.config.clone()
     }
 
@@ -37,10 +40,11 @@ impl Command {
 }
 
 #[derive(Default, Debug, Clone, clap::Args)]
-pub struct Config {
-    /// The endpoint of ScopeDB service to connect to.
-    #[clap(short, long, default_value = "http://localhost:6543")]
-    pub endpoint: String,
+pub struct Args {
+    /// Run `scopeql` with the given config file; if not specified, the default lookup logic is
+    /// applied.
+    #[clap(long, value_hint = ValueHint::FilePath)]
+    pub config_file: Option<PathBuf>,
 
     /// Suppress normal output.
     #[clap(short, long, alias = "silent", default_value = "false")]

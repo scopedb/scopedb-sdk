@@ -19,13 +19,14 @@ use repl::entrypoint;
 
 use crate::command::Command;
 use crate::command::Subcommand;
+use crate::config::load_config;
 use crate::execute::execute;
 
 mod client;
 mod command;
+mod config;
 mod error;
 mod execute;
-#[allow(dead_code)]
 mod global;
 mod repl;
 mod tokenizer;
@@ -34,9 +35,10 @@ mod version;
 fn main() {
     let cmd = Command::parse();
 
-    let config = cmd.config();
-    global::set_printer(config.quiet);
+    let args = cmd.args();
+    global::set_printer(args.quiet);
 
+    let config = load_config(args.config_file);
     match cmd.subcommand() {
         Subcommand::Repl => entrypoint(config),
         Subcommand::Command { statements } => execute(config, statements.into_inner()),

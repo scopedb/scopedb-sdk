@@ -13,14 +13,18 @@
 // limitations under the License.
 
 use crate::client::ScopeQLClient;
-use crate::command::Config;
+use crate::config::Config;
 use crate::error::Error;
 use crate::error::format_error;
 use crate::global;
 use crate::tokenizer::TokenKind;
 
 pub fn execute(config: Config, stmts: String) {
-    let client = ScopeQLClient::new(config.endpoint);
+    let endpoint = config
+        .get_default_connection()
+        .expect("no default connection in config");
+    let endpoint = endpoint.endpoint().to_owned();
+    let client = ScopeQLClient::new(endpoint);
 
     let tokens = match crate::tokenizer::run_tokenizer(&stmts) {
         Ok(tokens) => tokens,

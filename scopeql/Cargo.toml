@@ -52,17 +52,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["unbounded_depth"] }
 shadow-rs = { version = "1.2.1", default-features = false }
 thiserror = { version = "2.0" }
-tokio = { version = "1.47.1", default-features = false, features = [
-  "io-util",
-  "io-std",
-  "macros",
-  "net",
-  "parking_lot",
-  "rt",
-  "rt-multi-thread",
-  "signal",
-  "time",
-] }
+tokio = { version = "1.47.1", features = ["full"] }
+toml = { version = "0.9.3" }
+toml_edit = { version = "0.23.2", features = ["serde"] }
 uuid = { version = "1.17", features = ["v7", "serde"] }
 
 [build-dependencies]
