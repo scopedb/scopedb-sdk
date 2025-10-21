@@ -56,40 +56,25 @@ pub fn load_config(config_file: Option<PathBuf>) -> Config {
         .filter(|(k, _)| k.starts_with("SCOPEQL_CONFIG_"))
         .collect::<std::collections::HashMap<_, _>>();
 
-    fn set_toml_path(
-        doc: &mut DocumentMut,
-        key: &str,
-        path: &str,
-        value: toml_edit::Item,
-    ) -> Vec<String> {
+    fn set_toml_path(doc: &mut DocumentMut, parts: &[&str], value: toml_edit::Item) {
         let mut current = doc.as_item_mut();
-        let mut warnings = vec![];
 
-        let parts = path.split('.').collect::<Vec<_>>();
         let len = parts.len();
         assert!(len > 0, "path must not be empty");
 
         for part in parts.iter().take(len - 1) {
-            if current.get(part).is_none() {
-                warnings.push(format!(
-                    "[key={key}] config path '{path}' has missing parent '{part}'; created",
-                ));
-            }
             current = &mut current[part];
         }
 
         current[parts[len - 1]] = value;
-        warnings
     }
 
-    let mut warnings = vec![];
     for (k, v) in env {
         let normalized_key = k.trim().to_lowercase();
 
         if normalized_key == "scopeql_config_default_connection" {
-            let path = "default_connection";
             let value = toml_edit::value(v);
-            warnings.extend(set_toml_path(&mut config, &k, path, value));
+            set_toml_path(&mut config, &["default_connection"], value);
             continue;
         }
 
@@ -99,18 +84,14 @@ pub fn load_config(config_file: Option<PathBuf>) -> Config {
             let prefix_len = "scopeql_config_connections_".len();
             let suffix_len = "_endpoint".len();
             let name = &normalized_key[prefix_len..normalized_key.len() - suffix_len];
-            let path = format!("connections.{name}.endpoint");
             let value = toml_edit::value(v);
-            warnings.extend(set_toml_path(&mut config, &k, &path, value));
+            set_toml_path(&mut config, &["connections", name, "endpoint"], value);
             continue;
         }
 
-        warnings.push(format!(
+        global::display(format!(
             "ignore unknown environment variable {k} with value {v}"
         ));
-    }
-    for warning in warnings {
-        global::display(format!("warning: {warning}"));
     }
 
     Config::deserialize(config.into_deserializer()).expect("failed to deserialize config")
