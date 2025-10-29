@@ -4,6 +4,10 @@ All significant changes to this software be documented in this file.
 
 ## Unreleased
 
+### New Features
+
+* Recognize `VACUUM` token to support `VACUUM` command.
+
 ## v0.2.0 (2025-10-21)
 
 ### Breaking Changes

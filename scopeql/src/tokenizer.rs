@@ -360,6 +360,8 @@ pub enum TokenKind {
     UNION,
     #[token("UPDATE", ignore(ascii_case))]
     UPDATE,
+    #[token("VACUUM", ignore(ascii_case))]
+    VACUUM,
     #[token("VALUES", ignore(ascii_case))]
     VALUES,
     #[token("VIEW", ignore(ascii_case))]
