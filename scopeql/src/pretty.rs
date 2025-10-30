@@ -28,6 +28,13 @@ pub fn pretty_print(input: &str) -> String {
     let mut empty = false;
     let mut first = true;
 
+    fn write_indent(output: &mut Vec<u8>, depth: usize) {
+        for _ in 0..depth {
+            output.push(b' ');
+            output.push(b' ');
+        }
+    }
+
     let mut n = 0;
     while n < input.len() {
         let b = input[n];
@@ -67,10 +74,7 @@ pub fn pretty_print(input: &str) -> String {
                         output.push(input[n]);
                     } else if empty {
                         output.push(b'\n');
-                        for _ in 0..depth {
-                            output.push(b' ');
-                            output.push(b' ');
-                        }
+                        write_indent(&mut output, depth);
                         output.push(input[n]);
                     } else if depth == 0 {
                         output.push(b'\n');
@@ -88,36 +92,33 @@ pub fn pretty_print(input: &str) -> String {
                         output.push(input[n]);
                     } else {
                         output.push(b'\n');
-                        for _ in 0..depth {
-                            output.push(b' ');
-                            output.push(b' ');
-                        }
+                        write_indent(&mut output, depth);
                         output.push(input[n]);
                     }
                 }
                 b',' => {
                     output.push(input[n]);
                     output.push(b'\n');
-                    for _ in 0..depth {
-                        output.push(b' ');
-                        output.push(b' ');
-                    }
+                    write_indent(&mut output, depth);
                 }
                 b':' => {
                     output.push(input[n]);
                     output.push(b' ');
                 }
+                b'"' => {
+                    in_string = true;
+                    if empty {
+                        output.push(b'\n');
+                        write_indent(&mut output, depth);
+                        empty = false;
+                    }
+                    output.push(input[n]);
+                }
                 _ => {
                     if empty {
                         output.push(b'\n');
-                        for _ in 0..depth {
-                            output.push(b' ');
-                            output.push(b' ');
-                        }
+                        write_indent(&mut output, depth);
                         empty = false;
-                    }
-                    if b == b'"' {
-                        in_string = true;
                     }
                     output.push(input[n]);
                 }
