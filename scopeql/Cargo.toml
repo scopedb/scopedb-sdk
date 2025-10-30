@@ -14,7 +14,7 @@
 
 [package]
 name = "scopeql"
-version = "0.2.0"
+version = "0.2.1"
 
 categories = ["database"]
 description = "A command-line interface for ScopeDB"
@@ -23,7 +23,6 @@ keywords = ["scopedb"]
 edition = "2024"
 homepage = "https://www.scopedb.io"
 license = "Apache-2.0"
-rust-version = "1.85.0"
 repository = "https://github.com/scopedb/scopedb-sdk"
 
 [dependencies]
