@@ -8,6 +8,10 @@ All significant changes to this software be documented in this file.
 
 * Recognize `VACUUM` token to support `VACUUM` command.
 
+### Improvements
+
+* Repl now pretty-prints semi-structure data.
+
 ## v0.2.0 (2025-10-21)
 
 ### Breaking Changes
@@ -26,7 +30,7 @@ All significant changes to this software be documented in this file.
 
 ## v0.1.1 (2025-08-21)
 
-### Internal Changes
+### Developments
 
 * Fix the release workflow to properly build AMD64 image.
 

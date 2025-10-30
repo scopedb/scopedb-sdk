@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![feature(random)]
+#![feature(string_from_utf8_lossy_owned)]
 
 use clap::Parser;
 use repl::entrypoint;
@@ -30,6 +31,7 @@ mod config;
 mod error;
 mod execute;
 mod global;
+mod pretty;
 mod repl;
 mod tokenizer;
 mod version;
