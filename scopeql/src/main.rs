@@ -30,6 +30,7 @@ mod config;
 mod error;
 mod execute;
 mod global;
+mod pretty;
 mod repl;
 mod tokenizer;
 mod version;

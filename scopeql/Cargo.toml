@@ -29,7 +29,7 @@ repository = "https://github.com/scopedb/scopedb-sdk"
 [dependencies]
 anstyle = { version = "1.0" }
 clap = { version = "4.5", features = ["derive"] }
-clap-stdin = { version = "0.7.0" }
+clap-stdin = { version = "0.8.0" }
 comfy-table = { version = "7.1.4", default-features = false }
 const_format = { version = "0.2.34" }
 dirs = { version = "6.0" }
@@ -38,6 +38,7 @@ indicatif = { version = "0.18" }
 jiff = { version = "0.2", features = ["serde"] }
 logos = { version = "0.15.0" }
 mea = { version = "0.4.0" }
+memchr = { version = "2.7.6" }
 nu-ansi-term = { version = "0.50" }
 reedline = { version = "0.43.0" }
 reqwest = { version = "0.12", default-features = false, features = [
@@ -59,7 +60,7 @@ uuid = { version = "1.17", features = ["v7", "serde"] }
 
 [build-dependencies]
 build-data = { version = "0.3.0" }
-gix-discover = { version = "0.41.0" }
+gix-discover = { version = "0.42.0" }
 shadow-rs = { version = "1.2.1", default-features = false, features = ["build"] }
 
 [lints.rust]

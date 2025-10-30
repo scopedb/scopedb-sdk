@@ -23,9 +23,11 @@ use scopedb_client::ResultSet;
 use scopedb_client::StatementCancelResult;
 use scopedb_client::StatementEstimatedProgress;
 use scopedb_client::StatementStatus;
+use scopedb_client::Value;
 use uuid::Uuid;
 
 use crate::error::Error;
+use crate::pretty::pretty_print;
 
 #[derive(Debug)]
 pub struct ScopeQLClient {
@@ -58,7 +60,29 @@ fn format_result_set(
     let mut table = comfy_table::Table::new();
     table.load_preset(TABLE_STYLE_PRESET);
     table.set_header(header);
-    for row in &rows {
+    for row in rows {
+        let row = row
+            .into_iter()
+            .map(|v| match v {
+                Value::Null
+                | Value::Int(_)
+                | Value::UInt(_)
+                | Value::Float(_)
+                | Value::Timestamp(_)
+                | Value::Interval(_)
+                | Value::Boolean(_)
+                | Value::Binary(_) => v.to_string(),
+                Value::String(s) => s,
+                Value::Array(s) | Value::Object(s) | Value::Any(s) => {
+                    const MAX_COMPACT_LEN: usize = 64;
+                    if s.len() > MAX_COMPACT_LEN {
+                        pretty_print(&s).unwrap()
+                    } else {
+                        s
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
         table.add_row(row);
     }
 
