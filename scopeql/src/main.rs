@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![feature(random)]
+#![feature(string_from_utf8_lossy_owned)]
 
 use clap::Parser;
 use repl::entrypoint;

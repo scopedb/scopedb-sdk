@@ -76,7 +76,7 @@ fn format_result_set(
                 Value::Array(s) | Value::Object(s) | Value::Any(s) => {
                     const MAX_COMPACT_LEN: usize = 64;
                     if s.len() > MAX_COMPACT_LEN {
-                        pretty_print(&s).unwrap()
+                        pretty_print(&s)
                     } else {
                         s
                     }
