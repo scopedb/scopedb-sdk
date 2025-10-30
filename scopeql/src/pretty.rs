@@ -15,25 +15,6 @@
 // This file is derived from https://github.com/gamache/jsonxf/blob/ab914dc7/src/jsonxf.rs
 
 struct Formatter {
-    /// Used for beginning-of-line indentation in arrays and objects.
-    pub indent: String,
-
-    /// Used inside arrays and objects.
-    pub line_separator: String,
-
-    /// Used between root-level arrays and objects.
-    pub record_separator: String,
-
-    /// Used after a colon inside objects.
-    pub after_colon: String,
-
-    /// Used at very end of output.
-    pub trailing_output: String,
-
-    /// Add a record_separator as soon as a record ends, before seeing a
-    /// subsequent record. Useful when there's a long time between records.
-    pub eager_record_separators: bool,
-
     // private mutable state
     depth: usize,       // current nesting depth
     in_string: bool,    // is the next byte part of a string?
@@ -48,10 +29,7 @@ impl Formatter {
     /// Input must be valid JSON data in UTF-8 encoding.
     fn format(&mut self, json_string: &str) -> String {
         let mut output: Vec<u8> = vec![];
-
         self.format_buf(json_string.as_bytes(), &mut output);
-        output.extend_from_slice(self.trailing_output.as_bytes());
-
         String::from_utf8_lossy_owned(output)
     }
 
@@ -99,13 +77,14 @@ impl Formatter {
                             self.first = false;
                             writer.push(buf[n]);
                         } else if self.empty {
-                            writer.extend_from_slice(self.line_separator.as_bytes());
+                            writer.push(b'\n');
                             for _ in 0..self.depth {
-                                writer.extend_from_slice(self.indent.as_bytes());
+                                writer.push(b' ');
+                                writer.push(b' ');
                             }
                             writer.push(buf[n]);
-                        } else if !self.eager_record_separators && self.depth == 0 {
-                            writer.extend_from_slice(self.record_separator.as_bytes());
+                        } else if self.depth == 0 {
+                            writer.push(b'\n');
                             writer.push(buf[n]);
                         } else {
                             writer.push(buf[n]);
@@ -119,32 +98,32 @@ impl Formatter {
                             self.empty = false;
                             writer.push(buf[n]);
                         } else {
-                            writer.extend_from_slice(self.line_separator.as_bytes());
+                            writer.push(b'\n');
                             for _ in 0..self.depth {
-                                writer.extend_from_slice(self.indent.as_bytes());
+                                writer.push(b' ');
+                                writer.push(b' ');
                             }
                             writer.push(buf[n]);
-                        }
-                        if self.eager_record_separators && self.depth == 0 {
-                            writer.extend_from_slice(self.record_separator.as_bytes());
                         }
                     }
                     b',' => {
                         writer.push(buf[n]);
-                        writer.extend_from_slice(self.line_separator.as_bytes());
+                        writer.push(b'\n');
                         for _ in 0..self.depth {
-                            writer.extend_from_slice(self.indent.as_bytes());
+                            writer.push(b' ');
+                            writer.push(b' ');
                         }
                     }
                     b':' => {
                         writer.push(buf[n]);
-                        writer.extend_from_slice(self.after_colon.as_bytes());
+                        writer.push(b' ');
                     }
                     _ => {
                         if self.empty {
-                            writer.extend_from_slice(self.line_separator.as_bytes());
+                            writer.push(b'\n');
                             for _ in 0..self.depth {
-                                writer.extend_from_slice(self.indent.as_bytes());
+                                writer.push(b' ');
+                                writer.push(b' ');
                             }
                             self.empty = false;
                         }
@@ -165,12 +144,6 @@ impl Formatter {
 /// Input must be valid JSON data in UTF-8 encoding.
 pub fn pretty_print(json_string: &str) -> String {
     Formatter {
-        indent: String::from("  "),
-        line_separator: String::from("\n"),
-        record_separator: String::from("\n"),
-        after_colon: String::from(" "),
-        trailing_output: String::from(""),
-        eager_record_separators: false,
         depth: 0,
         in_string: false,
         in_backslash: false,
