@@ -80,6 +80,7 @@ pub fn entrypoint(config: Config) {
     let hinter = DefaultHinter::default().with_style(Style::new().fg(Color::DarkGray));
 
     let mut state = Reedline::create()
+        .use_bracketed_paste(true)
         .with_validator(Box::new(ScopeQLValidator))
         .with_highlighter(Box::new(ScopeQLHighlighter))
         .with_hinter(Box::new(hinter))

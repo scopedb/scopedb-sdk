@@ -14,143 +14,119 @@
 
 // This file is derived from https://github.com/gamache/jsonxf/blob/ab914dc7/src/jsonxf.rs
 
-struct Formatter {
-    // private mutable state
-    depth: usize,       // current nesting depth
-    in_string: bool,    // is the next byte part of a string?
-    in_backslash: bool, // does the next byte follow a backslash in a string?
-    empty: bool,        // is the next byte in an empty object or array?
-    first: bool,        // is this the first byte of input?
-}
-
-impl Formatter {
-    /// Formats a string of JSON-encoded data.
-    ///
-    /// Input must be valid JSON data in UTF-8 encoding.
-    fn format(&mut self, json_string: &str) -> String {
-        let mut output: Vec<u8> = vec![];
-        self.format_buf(json_string.as_bytes(), &mut output);
-        String::from_utf8_lossy_owned(output)
-    }
-
-    /// Format directly from a buffer into a writer.
-    ///
-    /// This may be called on chunks of a JSON document to format it bit by bit.
-    ///
-    /// As such, it does not add the `trailing_output` at the end.
-    fn format_buf(&mut self, buf: &[u8], writer: &mut Vec<u8>) {
-        let mut n = 0;
-        while n < buf.len() {
-            let b = buf[n];
-
-            if self.in_string {
-                if self.in_backslash {
-                    writer.push(buf[n]);
-                    self.in_backslash = false;
-                } else {
-                    match memchr::memchr2(b'"', b'\\', &buf[n..]) {
-                        None => {
-                            // The whole rest of buf is part of the string
-                            writer.extend_from_slice(&buf[n..]);
-                            break;
-                        }
-                        Some(index) => {
-                            let length = index + 1;
-                            writer.extend_from_slice(&buf[n..n + length]);
-                            if buf[n + index] == b'"' {
-                                // End of string
-                                self.in_string = false;
-                            } else {
-                                // Backslash
-                                self.in_backslash = true;
-                            }
-                            n += length;
-                            continue;
-                        }
-                    }
-                }
-            } else {
-                match b {
-                    b' ' | b'\n' | b'\r' | b'\t' => {} // skip whitespace
-                    b'[' | b'{' => {
-                        if self.first {
-                            self.first = false;
-                            writer.push(buf[n]);
-                        } else if self.empty {
-                            writer.push(b'\n');
-                            for _ in 0..self.depth {
-                                writer.push(b' ');
-                                writer.push(b' ');
-                            }
-                            writer.push(buf[n]);
-                        } else if self.depth == 0 {
-                            writer.push(b'\n');
-                            writer.push(buf[n]);
-                        } else {
-                            writer.push(buf[n]);
-                        }
-                        self.depth += 1;
-                        self.empty = true;
-                    }
-                    b']' | b'}' => {
-                        self.depth = self.depth.saturating_sub(1);
-                        if self.empty {
-                            self.empty = false;
-                            writer.push(buf[n]);
-                        } else {
-                            writer.push(b'\n');
-                            for _ in 0..self.depth {
-                                writer.push(b' ');
-                                writer.push(b' ');
-                            }
-                            writer.push(buf[n]);
-                        }
-                    }
-                    b',' => {
-                        writer.push(buf[n]);
-                        writer.push(b'\n');
-                        for _ in 0..self.depth {
-                            writer.push(b' ');
-                            writer.push(b' ');
-                        }
-                    }
-                    b':' => {
-                        writer.push(buf[n]);
-                        writer.push(b' ');
-                    }
-                    _ => {
-                        if self.empty {
-                            writer.push(b'\n');
-                            for _ in 0..self.depth {
-                                writer.push(b' ');
-                                writer.push(b' ');
-                            }
-                            self.empty = false;
-                        }
-                        if b == b'"' {
-                            self.in_string = true;
-                        }
-                        writer.push(buf[n]);
-                    }
-                };
-            };
-            n += 1;
-        }
-    }
-}
-
 /// Pretty-prints a string of JSON-encoded data.
 ///
-/// Input must be valid JSON data in UTF-8 encoding.
-pub fn pretty_print(json_string: &str) -> String {
-    Formatter {
-        depth: 0,
-        in_string: false,
-        in_backslash: false,
-        empty: false,
-        first: true,
+/// This method assumes `input` to be a valid JSON string in UTF-8 encoding.
+pub fn pretty_print(input: &str) -> String {
+    let input = input.as_bytes();
+    let mut output: Vec<u8> = vec![];
+
+    // formatting states
+    let mut depth = 0_usize;
+    let mut in_string = false;
+    let mut in_backslash = false;
+    let mut empty = false;
+    let mut first = true;
+
+    let mut n = 0;
+    while n < input.len() {
+        let b = input[n];
+
+        if in_string {
+            if in_backslash {
+                output.push(input[n]);
+                in_backslash = false;
+            } else {
+                match memchr::memchr2(b'"', b'\\', &input[n..]) {
+                    None => {
+                        // The whole rest of buf is part of the string
+                        output.extend_from_slice(&input[n..]);
+                        break;
+                    }
+                    Some(index) => {
+                        let length = index + 1;
+                        output.extend_from_slice(&input[n..n + length]);
+                        if input[n + index] == b'"' {
+                            // End of string
+                            in_string = false;
+                        } else {
+                            // Backslash
+                            in_backslash = true;
+                        }
+                        n += length;
+                        continue;
+                    }
+                }
+            }
+        } else {
+            match b {
+                b' ' | b'\n' | b'\r' | b'\t' => {} // skip whitespace
+                b'[' | b'{' => {
+                    if first {
+                        first = false;
+                        output.push(input[n]);
+                    } else if empty {
+                        output.push(b'\n');
+                        for _ in 0..depth {
+                            output.push(b' ');
+                            output.push(b' ');
+                        }
+                        output.push(input[n]);
+                    } else if depth == 0 {
+                        output.push(b'\n');
+                        output.push(input[n]);
+                    } else {
+                        output.push(input[n]);
+                    }
+                    depth += 1;
+                    empty = true;
+                }
+                b']' | b'}' => {
+                    depth = depth.saturating_sub(1);
+                    if empty {
+                        empty = false;
+                        output.push(input[n]);
+                    } else {
+                        output.push(b'\n');
+                        for _ in 0..depth {
+                            output.push(b' ');
+                            output.push(b' ');
+                        }
+                        output.push(input[n]);
+                    }
+                }
+                b',' => {
+                    output.push(input[n]);
+                    output.push(b'\n');
+                    for _ in 0..depth {
+                        output.push(b' ');
+                        output.push(b' ');
+                    }
+                }
+                b':' => {
+                    output.push(input[n]);
+                    output.push(b' ');
+                }
+                _ => {
+                    if empty {
+                        output.push(b'\n');
+                        for _ in 0..depth {
+                            output.push(b' ');
+                            output.push(b' ');
+                        }
+                        empty = false;
+                    }
+                    if b == b'"' {
+                        in_string = true;
+                    }
+                    output.push(input[n]);
+                }
+            };
+        };
+        n += 1;
     }
-    .format(json_string)
+
+    String::from_utf8_lossy_owned(output)
 }
 
 #[cfg(test)]
