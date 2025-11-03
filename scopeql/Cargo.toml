@@ -31,15 +31,16 @@ clap = { version = "4.5", features = ["derive"] }
 clap-stdin = { version = "0.8.0" }
 comfy-table = { version = "7.1.4", default-features = false }
 const_format = { version = "0.2.34" }
+csv = { version = "1.4" }
 dirs = { version = "6.0" }
-exn = { version = "0.2.0" }
+exn = { version = "0.2" }
 indicatif = { version = "0.18" }
 jiff = { version = "0.2", features = ["serde"] }
-logos = { version = "0.15.0" }
-mea = { version = "0.4.0" }
+logos = { version = "0.15" }
+mea = { version = "0.4" }
 memchr = { version = "2.7.6" }
 nu-ansi-term = { version = "0.50" }
-reedline = { version = "0.43.0" }
+reedline = { version = "0.43" }
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
@@ -58,9 +59,11 @@ toml_edit = { version = "0.23.2", features = ["serde"] }
 uuid = { version = "1.17", features = ["v7", "serde"] }
 
 [build-dependencies]
-build-data = { version = "0.3.0" }
-gix-discover = { version = "0.42.0" }
-shadow-rs = { version = "1.2.1", default-features = false, features = ["build"] }
+build-data = { version = "0.3" }
+gix-discover = { version = "0.42" }
+shadow-rs = { version = "1.2.1", default-features = false, features = [
+  "build",
+] }
 
 [lints.rust]
 unknown_lints = "deny"

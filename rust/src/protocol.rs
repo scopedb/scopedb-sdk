@@ -84,7 +84,7 @@ pub enum IngestData {
 }
 
 impl IngestData {
-    pub fn format(&self) -> &str {
+    pub fn format(&self) -> &'static str {
         match self {
             Self::Json { .. } => "json",
         }

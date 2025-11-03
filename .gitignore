@@ -2,4 +2,8 @@
 logs
 tmp
 
+# environment variables
 .env
+
+# generated files
+/target

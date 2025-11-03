@@ -24,6 +24,7 @@ use crate::command::Subcommand;
 use crate::config::Config;
 use crate::config::load_config;
 use crate::execute::execute;
+use crate::load::load;
 
 mod client;
 mod command;
@@ -31,6 +32,7 @@ mod config;
 mod error;
 mod execute;
 mod global;
+mod load;
 mod pretty;
 mod repl;
 mod tokenizer;
@@ -69,6 +71,14 @@ fn main() {
         Subcommand::Command { statements } => {
             let config = load_config(args.config_file);
             execute(config, statements.into_inner())
+        }
+        Subcommand::Load {
+            file,
+            transform,
+            format,
+        } => {
+            let config = load_config(args.config_file);
+            load(config, file, transform, format)
         }
     }
 }

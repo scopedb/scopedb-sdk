@@ -20,8 +20,10 @@ use uuid::Uuid;
 use crate::Error;
 use crate::ErrorKind;
 use crate::Statement;
+use crate::protocol::IngestData;
 use crate::protocol::IngestRequest;
 use crate::protocol::IngestResult;
+use crate::protocol::IngestType;
 use crate::protocol::Response;
 use crate::protocol::ResultFormat;
 use crate::protocol::StatementCancelResult;
@@ -68,25 +70,21 @@ impl Client {
         Ok(())
     }
 
-    #[fastrace::trace]
-    pub async fn ingest(&self, request: IngestRequest) -> Result<Response<IngestResult>, Error> {
-        let format = request.data.format();
-        let url = self.make_url("v1/ingest")?;
-        let response = self
-            .client
-            .post(url)
-            .headers(traceparent_headers())
-            .json(&request)
-            .send()
-            .await
-            .map_err(|err| {
-                Error::new(
-                    ErrorKind::Unexpected,
-                    format!("failed to ingest data in {format}"),
-                )
-                .set_source(err)
-            })?;
-        Response::from_http_response(response).await
+    pub async fn insert(&self, data: IngestData, transform: String) -> Result<IngestResult, Error> {
+        match self
+            .ingest(IngestRequest {
+                ty: IngestType::Committed,
+                data,
+                statement: transform,
+            })
+            .await?
+        {
+            Response::Success(result) => Ok(result),
+            Response::Failed(err) => Err(Error::new(
+                ErrorKind::Unexpected,
+                format!("fail to insert data: {err}"),
+            )),
+        }
     }
 }
 
@@ -156,6 +154,30 @@ impl Client {
                 Error::new(
                     ErrorKind::Unexpected,
                     format!("failed to cancel statement: {statement_id:?}"),
+                )
+                .set_source(err)
+            })?;
+        Response::from_http_response(response).await
+    }
+
+    #[fastrace::trace]
+    pub(crate) async fn ingest(
+        &self,
+        request: IngestRequest,
+    ) -> Result<Response<IngestResult>, Error> {
+        let format = request.data.format();
+        let url = self.make_url("v1/ingest")?;
+        let response = self
+            .client
+            .post(url)
+            .headers(traceparent_headers())
+            .json(&request)
+            .send()
+            .await
+            .map_err(|err| {
+                Error::new(
+                    ErrorKind::Unexpected,
+                    format!("failed to ingest data in {format}"),
                 )
                 .set_source(err)
             })?;

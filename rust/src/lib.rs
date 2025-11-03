@@ -22,6 +22,8 @@ pub use client::Client;
 pub use error::Error;
 pub use error::ErrorKind;
 pub use protocol::DataType;
+pub use protocol::IngestData;
+pub use protocol::IngestResult;
 pub use protocol::ResultFormat;
 pub use protocol::StatementCancelResult;
 pub use protocol::StatementEstimatedProgress;
