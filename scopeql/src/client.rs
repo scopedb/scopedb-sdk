@@ -19,6 +19,8 @@ use exn::ResultExt;
 use exn::bail;
 use jiff::SignedDuration;
 use nu_ansi_term::Color;
+use scopedb_client::IngestData;
+use scopedb_client::IngestResult;
 use scopedb_client::ResultSet;
 use scopedb_client::StatementCancelResult;
 use scopedb_client::StatementEstimatedProgress;
@@ -114,6 +116,20 @@ impl ScopeQLClient {
         ScopeQLClient {
             client: scopedb_client::Client::new(endpoint, client).unwrap(),
         }
+    }
+
+    pub async fn load_data(
+        &self,
+        data: IngestData,
+        transform: String,
+    ) -> Result<IngestResult, Error> {
+        let format = data.format();
+        let make_error = || Error(format!("failed to load {format} data: {transform}"));
+
+        self.client
+            .insert(data, transform.clone())
+            .await
+            .or_raise(make_error)
     }
 
     pub async fn execute_statement(

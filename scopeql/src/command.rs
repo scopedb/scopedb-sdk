@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use clap::ValueHint;
 use clap_stdin::MaybeStdin;
 
+use crate::load::DataFormat;
 use crate::version::version;
 
 #[derive(Debug, clap::Parser)]
@@ -55,17 +56,25 @@ pub struct Args {
 pub enum Subcommand {
     #[clap(about = "Start an interactive REPL [default]")]
     Repl,
-    #[clap(
-        name = "cmd",
-        visible_alias = "-c",
-        about = "Execute only single statement and exit"
-    )]
+    #[clap(name = "cmd", visible_alias = "-c", about = "Execute statements")]
     Command {
         /// The statements to execute ("-" to read from stdin).
         ///
         /// If not provided, read from stdin.
         #[clap(value_hint = ValueHint::Other, default_value = "-")]
         statements: MaybeStdin<String>,
+    },
+    #[clap(about = "Perform a load operation of source with transformations")]
+    Load {
+        /// The file path to load the source from.
+        #[clap(short, long, value_hint = ValueHint::FilePath)]
+        file: PathBuf,
+        /// The transformation to apply during the load.
+        #[clap(short, long)]
+        transform: String,
+        /// The source data format.
+        #[clap(long, value_enum)]
+        format: Option<DataFormat>,
     },
     #[clap(name = "gen", about = "Generate command-line interface utilities")]
     Generate {
