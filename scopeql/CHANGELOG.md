@@ -4,6 +4,10 @@ All significant changes to this software be documented in this file.
 
 ## Unreleased
 
+### New Features
+
+* Support `scopeql -c < script.sql` to run script from file.
+
 ## v0.2.1 (2025-10-30)
 
 ### New Features

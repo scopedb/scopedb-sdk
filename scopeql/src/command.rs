@@ -55,9 +55,16 @@ pub struct Args {
 pub enum Subcommand {
     #[clap(about = "Start an interactive REPL [default]")]
     Repl,
-    #[clap(visible_alias = "-c", about = "Execute only single statement and exit")]
+    #[clap(
+        name = "cmd",
+        visible_alias = "-c",
+        about = "Execute only single statement and exit"
+    )]
     Command {
         /// The statements to execute ("-" to read from stdin).
+        ///
+        /// If not provided, read from stdin.
+        #[clap(value_hint = ValueHint::Other, default_value = "-")]
         statements: MaybeStdin<String>,
     },
     #[clap(name = "gen", about = "Generate command-line interface utilities")]
