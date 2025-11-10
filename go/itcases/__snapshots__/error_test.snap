@@ -5,7 +5,7 @@ result set not found: c8fe71d6-3695-11f0-85b3-063c3400fda9
 
 [TestSubmitStatementFail - 1]
 0: failed to prepare statement: "SELECT UNKNOWN_FUNCTION()"
-1: failed to type check expression: unknown_function()
+1: failed to build physical plan
 2: failed to type check function: unknown_function()
 3: function not found: unknown_function()
 
@@ -16,6 +16,5 @@ error: failed to execute statement
   |
 1 | SELECT UNKNOWN_FUNCTION()
   |        ^^^^^^^^^^^^^^^^^^ function not found: unknown_function()
-  |
 
 ---
