@@ -4,10 +4,13 @@ All significant changes to this software be documented in this file.
 
 ## Unreleased
 
+## v0.2.2 (2025-12-08)
+
 ### New Features
 
 * Support `scopeql -c < script.sql` to run script from file.
 * Support `scopeql load -f <file> -t <transform>` command to load data from file.
+* Support `ANALYZE` keyword so that `EXPLAIN ANALYZE <query>` works.
 
 ## v0.2.1 (2025-10-30)
 
