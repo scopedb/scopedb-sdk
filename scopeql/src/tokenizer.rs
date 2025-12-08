@@ -186,6 +186,8 @@ pub enum TokenKind {
     ALTER,
     #[token("AND", ignore(ascii_case))]
     AND,
+    #[token("ANALYZE", ignore(ascii_case))]
+    ANALYZE,
     #[token("ANY", ignore(ascii_case))]
     ANY,
     #[token("ARRAY", ignore(ascii_case))]
