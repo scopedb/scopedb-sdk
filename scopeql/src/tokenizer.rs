@@ -176,217 +176,217 @@ pub enum TokenKind {
     Arrow,
 
     // Keywords
-    #[token("ADD", ignore(ascii_case))]
+    #[token("ADD", ignore(case))]
     ADD,
-    #[token("AGGREGATE", ignore(ascii_case))]
+    #[token("AGGREGATE", ignore(case))]
     AGGREGATE,
-    #[token("ALL", ignore(ascii_case))]
+    #[token("ALL", ignore(case))]
     ALL,
-    #[token("ALTER", ignore(ascii_case))]
+    #[token("ALTER", ignore(case))]
     ALTER,
-    #[token("AND", ignore(ascii_case))]
+    #[token("AND", ignore(case))]
     AND,
-    #[token("ANALYZE", ignore(ascii_case))]
+    #[token("ANALYZE", ignore(case))]
     ANALYZE,
-    #[token("ANY", ignore(ascii_case))]
+    #[token("ANY", ignore(case))]
     ANY,
-    #[token("ARRAY", ignore(ascii_case))]
+    #[token("ARRAY", ignore(case))]
     ARRAY,
-    #[token("AS", ignore(ascii_case))]
+    #[token("AS", ignore(case))]
     AS,
-    #[token("ASC", ignore(ascii_case))]
+    #[token("ASC", ignore(case))]
     ASC,
-    #[token("BEGIN", ignore(ascii_case))]
+    #[token("BEGIN", ignore(case))]
     BEGIN,
-    #[token("BETWEEN", ignore(ascii_case))]
+    #[token("BETWEEN", ignore(case))]
     BETWEEN,
-    #[token("BOOLEAN", ignore(ascii_case))]
+    #[token("BOOLEAN", ignore(case))]
     BOOLEAN,
-    #[token("BY", ignore(ascii_case))]
+    #[token("BY", ignore(case))]
     BY,
-    #[token("CASE", ignore(ascii_case))]
+    #[token("CASE", ignore(case))]
     CASE,
-    #[token("CAST", ignore(ascii_case))]
+    #[token("CAST", ignore(case))]
     CAST,
-    #[token("CLUSTER", ignore(ascii_case))]
+    #[token("CLUSTER", ignore(case))]
     CLUSTER,
-    #[token("COLUMN", ignore(ascii_case))]
+    #[token("COLUMN", ignore(case))]
     COLUMN,
-    #[token("COMMENT", ignore(ascii_case))]
+    #[token("COMMENT", ignore(case))]
     COMMENT,
-    #[token("CREATE", ignore(ascii_case))]
+    #[token("CREATE", ignore(case))]
     CREATE,
-    #[token("DATABASE", ignore(ascii_case))]
+    #[token("DATABASE", ignore(case))]
     DATABASE,
-    #[token("DELETE", ignore(ascii_case))]
+    #[token("DELETE", ignore(case))]
     DELETE,
-    #[token("DESC", ignore(ascii_case))]
+    #[token("DESC", ignore(case))]
     DESC,
-    #[token("DESCRIBE", ignore(ascii_case))]
+    #[token("DESCRIBE", ignore(case))]
     DESCRIBE,
-    #[token("DISTINCT", ignore(ascii_case))]
+    #[token("DISTINCT", ignore(case))]
     DISTINCT,
-    #[token("DROP", ignore(ascii_case))]
+    #[token("DROP", ignore(case))]
     DROP,
-    #[token("ELSE", ignore(ascii_case))]
+    #[token("ELSE", ignore(case))]
     ELSE,
-    #[token("END", ignore(ascii_case))]
+    #[token("END", ignore(case))]
     END,
-    #[token("EQUALITY", ignore(ascii_case))]
+    #[token("EQUALITY", ignore(case))]
     EQUALITY,
-    #[token("EXCLUDE", ignore(ascii_case))]
+    #[token("EXCLUDE", ignore(case))]
     EXCLUDE,
-    #[token("EXEC", ignore(ascii_case))]
+    #[token("EXEC", ignore(case))]
     EXEC,
-    #[token("EXISTS", ignore(ascii_case))]
+    #[token("EXISTS", ignore(case))]
     EXISTS,
-    #[token("EXPLAIN", ignore(ascii_case))]
+    #[token("EXPLAIN", ignore(case))]
     EXPLAIN,
-    #[token("FALSE", ignore(ascii_case))]
+    #[token("FALSE", ignore(case))]
     FALSE,
-    #[token("FIRST", ignore(ascii_case))]
+    #[token("FIRST", ignore(case))]
     FIRST,
-    #[token("FLOAT", ignore(ascii_case))]
+    #[token("FLOAT", ignore(case))]
     FLOAT,
-    #[token("FROM", ignore(ascii_case))]
+    #[token("FROM", ignore(case))]
     FROM,
-    #[token("FULL", ignore(ascii_case))]
+    #[token("FULL", ignore(case))]
     FULL,
-    #[token("GROUP", ignore(ascii_case))]
+    #[token("GROUP", ignore(case))]
     GROUP,
-    #[token("IF", ignore(ascii_case))]
+    #[token("IF", ignore(case))]
     IF,
-    #[token("IN", ignore(ascii_case))]
+    #[token("IN", ignore(case))]
     IN,
-    #[token("INDEX", ignore(ascii_case))]
+    #[token("INDEX", ignore(case))]
     INDEX,
-    #[token("INNER", ignore(ascii_case))]
+    #[token("INNER", ignore(case))]
     INNER,
-    #[token("INSERT", ignore(ascii_case))]
+    #[token("INSERT", ignore(case))]
     INSERT,
-    #[token("INT", ignore(ascii_case))]
+    #[token("INT", ignore(case))]
     INT,
-    #[token("INTERVAL", ignore(ascii_case))]
+    #[token("INTERVAL", ignore(case))]
     INTERVAL,
-    #[token("INTO", ignore(ascii_case))]
+    #[token("INTO", ignore(case))]
     INTO,
-    #[token("IS", ignore(ascii_case))]
+    #[token("IS", ignore(case))]
     IS,
-    #[token("JOB", ignore(ascii_case))]
+    #[token("JOB", ignore(case))]
     JOB,
-    #[token("JOBS", ignore(ascii_case))]
+    #[token("JOBS", ignore(case))]
     JOBS,
-    #[token("JOIN", ignore(ascii_case))]
+    #[token("JOIN", ignore(case))]
     JOIN,
-    #[token("KEY", ignore(ascii_case))]
+    #[token("KEY", ignore(case))]
     KEY,
-    #[token("LAST", ignore(ascii_case))]
+    #[token("LAST", ignore(case))]
     LAST,
-    #[token("LEFT", ignore(ascii_case))]
+    #[token("LEFT", ignore(case))]
     LEFT,
-    #[token("LIMIT", ignore(ascii_case))]
+    #[token("LIMIT", ignore(case))]
     LIMIT,
-    #[token("MATERIALIZED", ignore(ascii_case))]
+    #[token("MATERIALIZED", ignore(case))]
     MATERIALIZED,
-    #[token("NODEGROUP", ignore(ascii_case))]
+    #[token("NODEGROUP", ignore(case))]
     NODEGROUP,
-    #[token("NOT", ignore(ascii_case))]
+    #[token("NOT", ignore(case))]
     NOT,
-    #[token("NULL", ignore(ascii_case))]
+    #[token("NULL", ignore(case))]
     NULL,
-    #[token("NULLS", ignore(ascii_case))]
+    #[token("NULLS", ignore(case))]
     NULLS,
-    #[token("OBJECT", ignore(ascii_case))]
+    #[token("OBJECT", ignore(case))]
     OBJECT,
-    #[token("OFFSET", ignore(ascii_case))]
+    #[token("OFFSET", ignore(case))]
     OFFSET,
-    #[token("ON", ignore(ascii_case))]
+    #[token("ON", ignore(case))]
     ON,
-    #[token("OPTIMIZE", ignore(ascii_case))]
+    #[token("OPTIMIZE", ignore(case))]
     OPTIMIZE,
-    #[token("OR", ignore(ascii_case))]
+    #[token("OR", ignore(case))]
     OR,
-    #[token("ORDER", ignore(ascii_case))]
+    #[token("ORDER", ignore(case))]
     ORDER,
-    #[token("OUTER", ignore(ascii_case))]
+    #[token("OUTER", ignore(case))]
     OUTER,
-    #[token("PERCENT", ignore(ascii_case))]
+    #[token("PERCENT", ignore(case))]
     PERCENT,
-    #[token("PLAN", ignore(ascii_case))]
+    #[token("PLAN", ignore(case))]
     PLAN,
-    #[token("RANGE", ignore(ascii_case))]
+    #[token("RANGE", ignore(case))]
     RANGE,
-    #[token("RENAME", ignore(ascii_case))]
+    #[token("RENAME", ignore(case))]
     RENAME,
-    #[token("REPLACE", ignore(ascii_case))]
+    #[token("REPLACE", ignore(case))]
     REPLACE,
-    #[token("RESUME", ignore(ascii_case))]
+    #[token("RESUME", ignore(case))]
     RESUME,
-    #[token("RIGHT", ignore(ascii_case))]
+    #[token("RIGHT", ignore(case))]
     RIGHT,
-    #[token("SAMPLE", ignore(ascii_case))]
+    #[token("SAMPLE", ignore(case))]
     SAMPLE,
-    #[token("SCHEDULE", ignore(ascii_case))]
+    #[token("SCHEDULE", ignore(case))]
     SCHEDULE,
-    #[token("SCHEMA", ignore(ascii_case))]
+    #[token("SCHEMA", ignore(case))]
     SCHEMA,
-    #[token("SEARCH", ignore(ascii_case))]
+    #[token("SEARCH", ignore(case))]
     SEARCH,
-    #[token("SELECT", ignore(ascii_case))]
+    #[token("SELECT", ignore(case))]
     SELECT,
-    #[token("SET", ignore(ascii_case))]
+    #[token("SET", ignore(case))]
     SET,
-    #[token("SHOW", ignore(ascii_case))]
+    #[token("SHOW", ignore(case))]
     SHOW,
-    #[token("STATEMENTS", ignore(ascii_case))]
+    #[token("STATEMENTS", ignore(case))]
     STATEMENTS,
-    #[token("STRING", ignore(ascii_case))]
+    #[token("STRING", ignore(case))]
     STRING,
-    #[token("SUSPEND", ignore(ascii_case))]
+    #[token("SUSPEND", ignore(case))]
     SUSPEND,
-    #[token("TABLE", ignore(ascii_case))]
+    #[token("TABLE", ignore(case))]
     TABLE,
-    #[token("TABLES", ignore(ascii_case))]
+    #[token("TABLES", ignore(case))]
     TABLES,
-    #[token("THEN", ignore(ascii_case))]
+    #[token("THEN", ignore(case))]
     THEN,
-    #[token("TIMESTAMP", ignore(ascii_case))]
+    #[token("TIMESTAMP", ignore(case))]
     TIMESTAMP,
-    #[token("TO", ignore(ascii_case))]
+    #[token("TO", ignore(case))]
     TO,
-    #[token("TRUE", ignore(ascii_case))]
+    #[token("TRUE", ignore(case))]
     TRUE,
-    #[token("UINT", ignore(ascii_case))]
+    #[token("UINT", ignore(case))]
     UINT,
-    #[token("UNION", ignore(ascii_case))]
+    #[token("UNION", ignore(case))]
     UNION,
-    #[token("UPDATE", ignore(ascii_case))]
+    #[token("UPDATE", ignore(case))]
     UPDATE,
-    #[token("VACUUM", ignore(ascii_case))]
+    #[token("VACUUM", ignore(case))]
     VACUUM,
-    #[token("VALUES", ignore(ascii_case))]
+    #[token("VALUES", ignore(case))]
     VALUES,
-    #[token("VIEW", ignore(ascii_case))]
+    #[token("VIEW", ignore(case))]
     VIEW,
-    #[token("VIEWS", ignore(ascii_case))]
+    #[token("VIEWS", ignore(case))]
     VIEWS,
-    #[token("WHEN", ignore(ascii_case))]
+    #[token("WHEN", ignore(case))]
     WHEN,
-    #[token("WHERE", ignore(ascii_case))]
+    #[token("WHERE", ignore(case))]
     WHERE,
-    #[token("WINDOW", ignore(ascii_case))]
+    #[token("WINDOW", ignore(case))]
     WINDOW,
-    #[token("WITH", ignore(ascii_case))]
+    #[token("WITH", ignore(case))]
     WITH,
-    #[token("WITHIN", ignore(ascii_case))]
+    #[token("WITHIN", ignore(case))]
     WITHIN,
-    #[token("XOR", ignore(ascii_case))]
+    #[token("XOR", ignore(case))]
     XOR,
 
     // ScopeQL
     #[token("\\")]
     Backslash,
-    #[token("CANCEL", ignore(ascii_case))]
+    #[token("CANCEL", ignore(case))]
     CANCEL,
 }
 

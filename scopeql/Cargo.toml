@@ -14,7 +14,7 @@
 
 [package]
 name = "scopeql"
-version = "0.2.1"
+version = "0.2.2"
 
 categories = ["database"]
 description = "A command-line interface for ScopeDB"
@@ -36,11 +36,11 @@ dirs = { version = "6.0" }
 exn = { version = "0.2" }
 indicatif = { version = "0.18" }
 jiff = { version = "0.2", features = ["serde"] }
-logos = { version = "0.15" }
-mea = { version = "0.4" }
+logos = { version = "0.16.0" }
+mea = { version = "0.5.2" }
 memchr = { version = "2.7.6" }
 nu-ansi-term = { version = "0.50" }
-reedline = { version = "0.43" }
+reedline = { version = "0.44.0" }
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
@@ -60,7 +60,7 @@ uuid = { version = "1.17", features = ["v7", "serde"] }
 
 [build-dependencies]
 build-data = { version = "0.3" }
-gix-discover = { version = "0.42" }
+gix-discover = { version = "0.43.0" }
 shadow-rs = { version = "1.2.1", default-features = false, features = [
   "build",
 ] }
