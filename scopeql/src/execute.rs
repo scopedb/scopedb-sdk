@@ -19,7 +19,7 @@ use crate::error::format_error;
 use crate::global;
 use crate::tokenizer::TokenKind;
 
-pub fn execute(config: Config, stmts: String) {
+pub fn execute(config: &Config, stmts: String) {
     let endpoint = config
         .get_default_connection()
         .expect("no default connection in config");

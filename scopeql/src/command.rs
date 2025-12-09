@@ -14,78 +14,116 @@
 
 use std::path::PathBuf;
 
-use clap::ValueHint;
-use clap_stdin::MaybeStdin;
+use clap::Arg;
+use clap::ArgAction;
+use clap::Command;
 
 use crate::load::DataFormat;
 use crate::version::version;
 
-#[derive(Debug, clap::Parser)]
-#[command(name = "scopeql", version, long_version = version(), styles=styled())]
-pub struct Command {
-    #[clap(flatten)]
-    config: Args,
-
-    #[command(subcommand)]
-    subcommand: Option<Subcommand>,
-}
-
-impl Command {
-    pub fn args(&self) -> Args {
-        self.config.clone()
-    }
-
-    pub fn subcommand(&self) -> Subcommand {
-        self.subcommand.clone().unwrap_or(Subcommand::Repl)
-    }
-}
-
-#[derive(Default, Debug, Clone, clap::Args)]
-pub struct Args {
-    /// Run `scopeql` with the given config file; if not specified, the default lookup logic is
-    /// applied.
-    #[clap(long, value_hint = ValueHint::FilePath)]
-    pub config_file: Option<PathBuf>,
-
-    /// Suppress normal output.
-    #[clap(short, long, alias = "silent", default_value = "false")]
-    pub quiet: bool,
-}
-
-#[derive(Debug, Clone, clap::Subcommand)]
-pub enum Subcommand {
-    #[clap(about = "Start an interactive REPL [default]")]
-    Repl,
-    #[clap(name = "cmd", visible_alias = "-c", about = "Execute statements")]
-    Command {
-        /// The statements to execute ("-" to read from stdin).
-        ///
-        /// If not provided, read from stdin.
-        #[clap(value_hint = ValueHint::Other, default_value = "-")]
-        statements: MaybeStdin<String>,
-    },
-    #[clap(about = "Perform a load operation of source with transformations")]
-    Load {
-        /// The file path to load the source from.
-        #[clap(short, long, value_hint = ValueHint::FilePath)]
-        file: PathBuf,
-        /// The transformation to apply during the load.
-        #[clap(short, long)]
-        transform: String,
-        /// The source data format.
-        #[clap(long, value_enum)]
-        format: Option<DataFormat>,
-    },
-    #[clap(name = "gen", about = "Generate command-line interface utilities")]
-    Generate {
-        /// Output file path (if not specified, output to stdout).
-        #[clap(short, long, value_hint = ValueHint::FilePath)]
-        output: Option<PathBuf>,
-
-        /// The target to generate.
-        #[clap(value_enum)]
-        target: GenerateTarget,
-    },
+pub fn command() -> Command {
+    Command::new("scopeql")
+        .version(clap::crate_version!())
+        .long_version(version())
+        .styles(styled())
+        .arg(
+            Arg::new("quiet")
+                .short('q')
+                .long("quiet")
+                .alias("silent")
+                .action(ArgAction::SetTrue)
+                .global(true) // propagate to subcommands
+                .help("Suppress normal output"),
+        )
+        .arg(
+            Arg::new("config-file")
+                .long("config-file")
+                .value_name("FILENAME")
+                .value_hint(clap::ValueHint::FilePath)
+                .value_parser(clap::value_parser!(PathBuf))
+                .global(true) // propagate to subcommands
+                .help("Run `scopeql` with the given config file"),
+        )
+        // -q and --config-file should be used with subcommands, so avoid conflicts; e.g.,
+        //
+        //   scopeql gen config -q
+        //   scopeql load --config-file myconfig.yml -f data.csv -t "..."
+        //
+        // Therefore, we are sure that -f/-c at the top level would never be used with subcommands.
+        .args_conflicts_with_subcommands(true)
+        // BEGIN top-level DO WHAT I MEAN (DWIM) behavior
+        .arg(
+            Arg::new("file")
+                .short('f')
+                .long("file")
+                .value_name("FILENAME")
+                .value_hint(clap::ValueHint::FilePath)
+                .value_parser(clap::value_parser!(PathBuf))
+                .action(ArgAction::Append)
+                .help("The scopeql file path to execute"),
+        )
+        .arg(
+            Arg::new("command")
+                .short('c')
+                .long("command")
+                .value_name("COMMAND")
+                .value_hint(clap::ValueHint::Other)
+                .value_parser(clap::value_parser!(String))
+                .action(ArgAction::Append)
+                .help("The scopeql statement to execute"),
+        )
+        // END
+        .subcommand_required(false)
+        .subcommand(
+            Command::new("gen")
+                .about("Generate command-line interface utilities")
+                .arg(
+                    Arg::new("output")
+                        .short('o')
+                        .long("output")
+                        .value_name("OUTPUT")
+                        .value_hint(clap::ValueHint::FilePath)
+                        .value_parser(clap::value_parser!(PathBuf))
+                        .help("Output file path (if not specified, output to stdout)"),
+                )
+                .arg(
+                    Arg::new("target")
+                        .value_name("TARGET")
+                        .value_parser(clap::value_parser!(GenerateTarget))
+                        .help("The target to generate")
+                        .required(true),
+                ),
+        )
+        .subcommand(
+            Command::new("load")
+                .about("Perform a load operation of source with transformations")
+                .arg(
+                    Arg::new("file")
+                        .short('f')
+                        .long("file")
+                        .value_name("FILENAME")
+                        .value_hint(clap::ValueHint::FilePath)
+                        .value_parser(clap::value_parser!(PathBuf))
+                        .help("The file path to load the source from")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("transform")
+                        .short('t')
+                        .long("transform")
+                        .value_name("TRANSFORM")
+                        .value_parser(clap::value_parser!(String))
+                        .help("The transformation to apply during the load")
+                        .required(true),
+                )
+                .arg(
+                    Arg::new("format")
+                        .long("format")
+                        .value_name("FORMAT")
+                        .value_parser(clap::value_parser!(DataFormat))
+                        .help("The source data format"),
+                ),
+        )
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -94,7 +132,7 @@ pub enum GenerateTarget {
     Config,
 }
 
-pub fn styled() -> clap::builder::Styles {
+fn styled() -> clap::builder::Styles {
     use anstyle::AnsiColor;
     use anstyle::Color;
     use anstyle::Style;

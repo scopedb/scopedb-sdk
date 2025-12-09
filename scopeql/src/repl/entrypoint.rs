@@ -56,7 +56,7 @@ fn make_file_history() -> Option<FileBackedHistory> {
     Some(history)
 }
 
-pub fn entrypoint(config: Config) {
+pub fn entrypoint(config: &Config) {
     let endpoint = config
         .get_default_connection()
         .expect("no default connection in config");
