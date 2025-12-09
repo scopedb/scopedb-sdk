@@ -16,6 +16,7 @@ use std::path::PathBuf;
 
 use clap::Arg;
 use clap::ArgAction;
+use clap::ArgGroup;
 use clap::Command;
 
 use crate::load::DataFormat;
@@ -54,17 +55,21 @@ pub fn command() -> Command {
                         .value_hint(clap::ValueHint::FilePath)
                         .value_parser(clap::value_parser!(PathBuf))
                         .action(ArgAction::Append)
+                        .conflicts_with("statement")
                         .help("The scopeql script file to run"),
                 )
                 .arg(
-                    Arg::new("command")
-                        .short('c')
-                        .long("command")
+                    Arg::new("statement")
                         .value_name("STATEMENT")
                         .value_hint(clap::ValueHint::Other)
                         .value_parser(clap::value_parser!(String))
                         .action(ArgAction::Append)
                         .help("The scopeql statement to run"),
+                )
+                .group(
+                    ArgGroup::new("input")
+                        .args(&["file", "statement"])
+                        .required(true),
                 ),
         )
         .subcommand(

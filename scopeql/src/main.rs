@@ -46,46 +46,19 @@ fn main() {
             repl::entrypoint(&config);
         }
         Some(("run", args)) => {
+            // command definition ensures exactly one of statement or file is provided
+
             let config = load_config(config_file);
-
-            #[derive(Debug)]
-            enum ScriptSource {
-                File(PathBuf),
-                String(String),
+            for cmd in args.get_many::<String>("statement").unwrap_or_default() {
+                execute::execute(&config, cmd.to_string());
             }
-
-            let mut ordered_args = vec![];
-            if let (Some(indices), Some(values)) = (
-                args.indices_of("command"),
-                args.get_many::<String>("command"),
-            ) {
-                for (index, value) in indices.zip(values) {
-                    ordered_args.push((index, ScriptSource::String(value.to_string())));
-                }
-            }
-            if let (Some(indices), Some(values)) =
-                (args.indices_of("file"), args.get_many::<PathBuf>("file"))
-            {
-                for (index, value) in indices.zip(values) {
-                    ordered_args.push((index, ScriptSource::File(value.to_owned())));
-                }
-            }
-            ordered_args.sort_by_key(|k| k.0);
-
-            if ordered_args.is_empty() {
-                global::display("no script provided to run");
-            } else {
-                for (_, arg) in ordered_args {
-                    match arg {
-                        ScriptSource::String(cmd) => execute::execute(&config, cmd),
-                        ScriptSource::File(file) => match std::fs::read_to_string(&file) {
-                            Ok(content) => execute::execute(&config, content),
-                            Err(err) => global::display(format!(
-                                "failed to read script file {}: {err}",
-                                file.display()
-                            )),
-                        },
-                    }
+            for file in args.get_many::<PathBuf>("file").unwrap_or_default() {
+                match std::fs::read_to_string(&file) {
+                    Ok(content) => execute::execute(&config, content),
+                    Err(err) => global::display(format!(
+                        "failed to read script file {}: {err}",
+                        file.display()
+                    )),
                 }
             }
         }
