@@ -4,6 +4,19 @@ All significant changes to this software be documented in this file.
 
 ## Unreleased
 
+### Breaking Changes
+
+* `scopeql -c < script.sql` no longer supported, use `scopeql -f script.sql` instead.
+* `scopeql -c -` no longer supported, use `-f <filename>` and `-c <statement>` mixed instead.
+* `-q/--quiet` and `--config-file` options should follow the last subcommand.
+  * `scopeql -q`: OK
+  * `scopeql load -q ...`: OK
+  * `scopeql -q load ...`: NOT OK
+
+### New Features
+
+* Support `scopeql -f <filename>` to run script from file.
+
 ## v0.2.2 (2025-12-08)
 
 ### New Features
