@@ -72,7 +72,7 @@ fn main() {
                 let format = args.get_one::<load::DataFormat>("format").copied();
 
                 let config = load_config(config_file);
-                load::load(config, file, transform, format)
+                load::load(&config, file, transform, format)
             }
             _ => unreachable!("unknown subcommand: {name}"),
         }

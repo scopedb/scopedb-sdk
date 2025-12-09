@@ -35,7 +35,7 @@ pub enum DataFormat {
     Json,
 }
 
-pub fn load(config: Config, file: PathBuf, transform: String, format: Option<DataFormat>) {
+pub fn load(config: &Config, file: PathBuf, transform: String, format: Option<DataFormat>) {
     let endpoint = config
         .get_default_connection()
         .expect("no default connection in config");
