@@ -43,7 +43,7 @@ impl Command {
 #[derive(Default, Debug, Clone, clap::Args)]
 pub struct Args {
     /// Run `scopeql` with the given config file.
-    #[clap(name = "FILE", long, value_hint = ValueHint::FilePath)]
+    #[clap(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
     pub config_file: Option<PathBuf>,
 
     /// Suppress normal output.
@@ -53,7 +53,7 @@ pub struct Args {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum Subcommand {
-    #[clap(about = "Execute statements")]
+    /// Run scopeql statements.
     Run {
         /// The scopeql script file to run.
         #[clap(group = "input", short, long, value_hint = ValueHint::FilePath, action = ArgAction::Append)]
@@ -62,7 +62,7 @@ pub enum Subcommand {
         #[clap(group = "input", action = ArgAction::Append)]
         statements: Vec<String>,
     },
-    #[clap(about = "Perform a load operation of source with transformations")]
+    /// Perform a load operation of source with transformations.
     Load {
         /// The file path to load the source from.
         #[clap(short, long, value_hint = ValueHint::FilePath)]
@@ -74,7 +74,8 @@ pub enum Subcommand {
         #[clap(long, value_enum)]
         format: Option<DataFormat>,
     },
-    #[clap(name = "gen", about = "Generate command-line interface utilities")]
+    /// Generate command-line interface utilities.
+    #[clap(name = "gen")]
     Generate {
         /// Output file path (if not specified, output to stdout).
         #[clap(short, long, value_hint = ValueHint::FilePath)]
