@@ -26,6 +26,9 @@ pub struct Command {
     #[clap(flatten)]
     config: Args,
 
+    #[clap(value_hint = ValueHint::Other, value_name = "STATEMENTS")]
+    statements: Option<MaybeStdin<String>>,
+
     #[command(subcommand)]
     subcommand: Option<Subcommand>,
 }
@@ -36,7 +39,15 @@ impl Command {
     }
 
     pub fn subcommand(&self) -> Subcommand {
-        self.subcommand.clone().unwrap_or(Subcommand::Repl)
+        if let Some(subcommand) = self.subcommand.clone() {
+            return subcommand;
+        }
+
+        if let Some(statements) = self.statements.clone() {
+            return Subcommand::Command { statements };
+        }
+
+        Subcommand::Repl
     }
 }
 
