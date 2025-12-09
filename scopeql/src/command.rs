@@ -14,8 +14,8 @@
 
 use std::path::PathBuf;
 
+use clap::ArgAction;
 use clap::ValueHint;
-use clap_stdin::MaybeStdin;
 
 use crate::load::DataFormat;
 use crate::version::version;
@@ -35,16 +35,15 @@ impl Command {
         self.config.clone()
     }
 
-    pub fn subcommand(&self) -> Subcommand {
-        self.subcommand.clone().unwrap_or(Subcommand::Repl)
+    pub fn subcommand(&self) -> Option<Subcommand> {
+        self.subcommand.clone()
     }
 }
 
 #[derive(Default, Debug, Clone, clap::Args)]
 pub struct Args {
-    /// Run `scopeql` with the given config file; if not specified, the default lookup logic is
-    /// applied.
-    #[clap(long, value_hint = ValueHint::FilePath)]
+    /// Run `scopeql` with the given config file.
+    #[clap(long, value_hint = ValueHint::FilePath, value_name = "FILE")]
     pub config_file: Option<PathBuf>,
 
     /// Suppress normal output.
@@ -54,17 +53,16 @@ pub struct Args {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum Subcommand {
-    #[clap(about = "Start an interactive REPL [default]")]
-    Repl,
-    #[clap(name = "cmd", visible_alias = "-c", about = "Execute statements")]
-    Command {
-        /// The statements to execute ("-" to read from stdin).
-        ///
-        /// If not provided, read from stdin.
-        #[clap(value_hint = ValueHint::Other, default_value = "-")]
-        statements: MaybeStdin<String>,
+    /// Run scopeql statements.
+    Run {
+        /// The scopeql script file to run.
+        #[clap(group = "input", short, long, value_hint = ValueHint::FilePath, action = ArgAction::Append)]
+        files: Vec<PathBuf>,
+        /// The statements to run.
+        #[clap(group = "input", action = ArgAction::Append)]
+        statements: Vec<String>,
     },
-    #[clap(about = "Perform a load operation of source with transformations")]
+    /// Perform a load operation of source with transformations.
     Load {
         /// The file path to load the source from.
         #[clap(short, long, value_hint = ValueHint::FilePath)]
@@ -76,7 +74,8 @@ pub enum Subcommand {
         #[clap(long, value_enum)]
         format: Option<DataFormat>,
     },
-    #[clap(name = "gen", about = "Generate command-line interface utilities")]
+    /// Generate command-line interface utilities.
+    #[clap(name = "gen")]
     Generate {
         /// Output file path (if not specified, output to stdout).
         #[clap(short, long, value_hint = ValueHint::FilePath)]
@@ -94,7 +93,7 @@ pub enum GenerateTarget {
     Config,
 }
 
-pub fn styled() -> clap::builder::Styles {
+fn styled() -> clap::builder::Styles {
     use anstyle::AnsiColor;
     use anstyle::Color;
     use anstyle::Style;

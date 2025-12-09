@@ -4,6 +4,16 @@ All significant changes to this software be documented in this file.
 
 ## Unreleased
 
+### Breaking Changes
+
+* `scopeql -c < script.sql` no longer supported, use `scopeql run -f script.sql` instead.
+* `scopeql -c -` no longer supported.
+
+### New Features
+
+* Support `scopeql run <statement>` to run statement directly.
+* Support `scopeql run -f <filename>` to run script from file.
+
 ## v0.2.2 (2025-12-08)
 
 ### New Features

@@ -15,17 +15,6 @@
 #![feature(random)]
 #![feature(string_from_utf8_lossy_owned)]
 
-use clap::Parser;
-use repl::entrypoint;
-
-use crate::command::Command;
-use crate::command::GenerateTarget;
-use crate::command::Subcommand;
-use crate::config::Config;
-use crate::config::load_config;
-use crate::execute::execute;
-use crate::load::load;
-
 mod client;
 mod command;
 mod config;
@@ -38,14 +27,48 @@ mod repl;
 mod tokenizer;
 mod version;
 
+use clap::Parser;
+
+use crate::command::Args;
+use crate::command::Command;
+use crate::command::GenerateTarget;
+use crate::command::Subcommand;
+use crate::config::Config;
+use crate::config::load_config;
+
 fn main() {
     let cmd = Command::parse();
 
-    let args = cmd.args();
-    global::set_printer(args.quiet);
+    let Args { config_file, quiet } = cmd.args();
+    global::set_printer(quiet);
 
     match cmd.subcommand() {
-        Subcommand::Generate { output, target } => {
+        None => {
+            let config = load_config(config_file);
+            repl::entrypoint(&config);
+        }
+        Some(Subcommand::Run { files, statements }) => {
+            // command definition ensures exactly one of statement or file is provided
+            debug_assert!(
+                files.is_empty() ^ statements.is_empty(),
+                "files: {files:?}, statements: {statements:?}"
+            );
+
+            let config = load_config(config_file);
+            for stmt in statements {
+                execute::execute(&config, stmt);
+            }
+            for file in files {
+                match std::fs::read_to_string(&file) {
+                    Ok(content) => execute::execute(&config, content),
+                    Err(err) => {
+                        let file = file.display();
+                        global::display(format!("failed to read script file {file}: {err}"));
+                    }
+                }
+            }
+        }
+        Some(Subcommand::Generate { target, output }) => {
             let content = match target {
                 GenerateTarget::Config => {
                     let config = Config::default();
@@ -55,30 +78,23 @@ fn main() {
 
             if let Some(output) = output {
                 std::fs::write(&output, content).unwrap_or_else(|err| {
+                    let output = output.display();
                     let target = match target {
                         GenerateTarget::Config => "configurations",
                     };
-                    panic!("failed to write {target} to {}: {err}", output.display())
+                    panic!("failed to write {target} to {output}: {err}")
                 });
             } else {
                 println!("{content}");
             }
         }
-        Subcommand::Repl => {
-            let config = load_config(args.config_file);
-            entrypoint(config)
-        }
-        Subcommand::Command { statements } => {
-            let config = load_config(args.config_file);
-            execute(config, statements.into_inner())
-        }
-        Subcommand::Load {
+        Some(Subcommand::Load {
             file,
             transform,
             format,
-        } => {
-            let config = load_config(args.config_file);
-            load(config, file, transform, format)
+        }) => {
+            let config = load_config(config_file);
+            load::load(&config, file, transform, format);
         }
     }
 }

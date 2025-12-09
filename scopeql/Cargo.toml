@@ -27,8 +27,7 @@ repository = "https://github.com/scopedb/scopedb-sdk"
 
 [dependencies]
 anstyle = { version = "1.0" }
-clap = { version = "4.5", features = ["derive"] }
-clap-stdin = { version = "0.8.0" }
+clap = { version = "4.5", features = ["cargo", "derive"] }
 comfy-table = { version = "7.1.4", default-features = false }
 const_format = { version = "0.2.34" }
 csv = { version = "1.4" }
