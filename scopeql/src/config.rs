@@ -23,11 +23,13 @@ use toml_edit::DocumentMut;
 
 use crate::global;
 
-pub fn load_config(config_file: Option<&Path>) -> Config {
+pub fn load_config<P: AsRef<Path>>(config_file: Option<P>) -> Config {
     // Layer 0: the config file
-    let content = if let Some(file) = config_file {
-        std::fs::read_to_string(file)
-            .unwrap_or_else(|err| panic!("failed to read config file {}: {err}", file.display()))
+    let content = if let Some(file) = config_file.as_ref().map(AsRef::as_ref) {
+        std::fs::read_to_string(file).unwrap_or_else(|err| {
+            let file = file.display();
+            panic!("failed to read config file {file}: {err}")
+        })
     } else {
         let mut candidates = vec![];
         if let Some(home_dir) = dirs::home_dir() {

@@ -27,45 +27,48 @@ mod repl;
 mod tokenizer;
 mod version;
 
-use std::path::PathBuf;
+use clap::Parser;
 
+use crate::command::Args;
+use crate::command::Command;
 use crate::command::GenerateTarget;
+use crate::command::Subcommand;
 use crate::config::Config;
 use crate::config::load_config;
 
 fn main() {
-    let cmd = command::command().get_matches();
+    let cmd = Command::parse();
 
-    let quiet = cmd.get_flag("quiet");
+    let Args { config_file, quiet } = cmd.args();
     global::set_printer(quiet);
 
-    let config_file = cmd.get_one::<PathBuf>("config-file").map(|p| p.as_path());
     match cmd.subcommand() {
         None => {
             let config = load_config(config_file);
             repl::entrypoint(&config);
         }
-        Some(("run", args)) => {
+        Some(Subcommand::Run { files, statements }) => {
             // command definition ensures exactly one of statement or file is provided
+            debug_assert!(
+                files.is_empty() ^ statements.is_empty(),
+                "files: {files:?}, statements: {statements:?}"
+            );
 
             let config = load_config(config_file);
-            for cmd in args.get_many::<String>("statement").unwrap_or_default() {
-                execute::execute(&config, cmd.to_string());
+            for stmt in statements {
+                execute::execute(&config, stmt);
             }
-            for file in args.get_many::<PathBuf>("file").unwrap_or_default() {
+            for file in files {
                 match std::fs::read_to_string(&file) {
                     Ok(content) => execute::execute(&config, content),
-                    Err(err) => global::display(format!(
-                        "failed to read script file {}: {err}",
-                        file.display()
-                    )),
+                    Err(err) => {
+                        let file = file.display();
+                        global::display(format!("failed to read script file {file}: {err}"));
+                    }
                 }
             }
         }
-        Some(("gen", args)) => {
-            let target = args.get_one::<GenerateTarget>("target").unwrap();
-            let output = args.get_one::<PathBuf>("output");
-
+        Some(Subcommand::Generate { target, output }) => {
             let content = match target {
                 GenerateTarget::Config => {
                     let config = Config::default();
@@ -74,7 +77,7 @@ fn main() {
             };
 
             if let Some(output) = output {
-                std::fs::write(output, content).unwrap_or_else(|err| {
+                std::fs::write(&output, content).unwrap_or_else(|err| {
                     let output = output.display();
                     let target = match target {
                         GenerateTarget::Config => "configurations",
@@ -85,14 +88,13 @@ fn main() {
                 println!("{content}");
             }
         }
-        Some(("load", args)) => {
-            let file = args.get_one::<PathBuf>("file").unwrap().to_owned();
-            let transform = args.get_one::<String>("transform").unwrap().to_owned();
-            let format = args.get_one::<load::DataFormat>("format").copied();
-
+        Some(Subcommand::Load {
+            file,
+            transform,
+            format,
+        }) => {
             let config = load_config(config_file);
             load::load(&config, file, transform, format);
         }
-        Some((name, _)) => unreachable!("unknown subcommand: {}", name),
     }
 }
