@@ -32,7 +32,6 @@ pub fn command() -> Command {
                 .long("quiet")
                 .alias("silent")
                 .action(ArgAction::SetTrue)
-                .global(true) // propagate to subcommands
                 .help("Suppress normal output"),
         )
         .arg(
@@ -41,39 +40,33 @@ pub fn command() -> Command {
                 .value_name("FILENAME")
                 .value_hint(clap::ValueHint::FilePath)
                 .value_parser(clap::value_parser!(PathBuf))
-                .global(true) // propagate to subcommands
                 .help("Run `scopeql` with the given config file"),
         )
-        // -q and --config-file should be used with subcommands, so avoid conflicts; e.g.,
-        //
-        //   scopeql gen config -q
-        //   scopeql load --config-file myconfig.yml -f data.csv -t "..."
-        //
-        // Therefore, we are sure that -f/-c at the top level would never be used with subcommands.
-        .args_conflicts_with_subcommands(true)
-        // BEGIN top-level DO WHAT I MEAN (DWIM) behavior
-        .arg(
-            Arg::new("file")
-                .short('f')
-                .long("file")
-                .value_name("FILENAME")
-                .value_hint(clap::ValueHint::FilePath)
-                .value_parser(clap::value_parser!(PathBuf))
-                .action(ArgAction::Append)
-                .help("The scopeql file path to execute"),
-        )
-        .arg(
-            Arg::new("command")
-                .short('c')
-                .long("command")
-                .value_name("COMMAND")
-                .value_hint(clap::ValueHint::Other)
-                .value_parser(clap::value_parser!(String))
-                .action(ArgAction::Append)
-                .help("The scopeql statement to execute"),
-        )
-        // END
         .subcommand_required(false)
+        .subcommand(
+            Command::new("run")
+                .about("Run scopeql statements")
+                .arg(
+                    Arg::new("file")
+                        .short('f')
+                        .long("file")
+                        .value_name("FILENAME")
+                        .value_hint(clap::ValueHint::FilePath)
+                        .value_parser(clap::value_parser!(PathBuf))
+                        .action(ArgAction::Append)
+                        .help("The scopeql script file to run"),
+                )
+                .arg(
+                    Arg::new("command")
+                        .short('c')
+                        .long("command")
+                        .value_name("STATEMENT")
+                        .value_hint(clap::ValueHint::Other)
+                        .value_parser(clap::value_parser!(String))
+                        .action(ArgAction::Append)
+                        .help("The scopeql statement to run"),
+                ),
+        )
         .subcommand(
             Command::new("gen")
                 .about("Generate command-line interface utilities")
