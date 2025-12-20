@@ -35,7 +35,6 @@ use scopedb_client::StatementEstimatedProgress;
 
 use crate::client::ScopeQLClient;
 use crate::config::Config;
-use crate::error::format_error;
 use crate::global;
 use crate::repl::command::ReplCommand;
 use crate::repl::command::ReplSubCommand;
@@ -207,20 +206,13 @@ pub fn entrypoint(config: &Config) {
             pb.finish_and_clear();
 
             match output {
-                Some(output) => {
-                    let output = output.unwrap_or_else(format_error);
-                    println!("{output}");
-                }
+                Some(Ok(output)) => println!("{output}"),
+                Some(Err(err)) => println!("{err:?}"),
                 None => {
                     let output = global::rt().block_on(client.cancel_statement(statement_id));
                     match output {
-                        Ok(_) => {
-                            println!("Canceled");
-                        }
-                        Err(err) => {
-                            let output = format_error(err);
-                            println!("{output}");
-                        }
+                        Ok(_) => println!("Statement {statement_id} has ben cancelled"),
+                        Err(err) => println!("{err:?}"),
                     }
                 }
             }

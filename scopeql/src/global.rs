@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt;
 use std::sync::LazyLock;
-use std::sync::OnceLock;
 
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
@@ -30,34 +28,4 @@ pub fn rt() -> &'static Runtime {
     });
 
     &RT
-}
-
-static PRINTER: OnceLock<Printer> = OnceLock::new();
-
-pub fn set_printer(quiet: bool) {
-    if PRINTER.set(Printer::new(quiet)).is_err() {
-        eprintln!("printer already set");
-    }
-}
-
-pub fn display<M: fmt::Display>(message: M) {
-    let p = PRINTER.get_or_init(|| Printer::new(false));
-    p.display(message);
-}
-
-#[derive(Debug)]
-struct Printer {
-    quiet: bool,
-}
-
-impl Printer {
-    fn new(quiet: bool) -> Self {
-        Self { quiet }
-    }
-
-    fn display<M: fmt::Display>(&self, message: M) {
-        if !self.quiet {
-            println!("{message}");
-        }
-    }
 }

@@ -16,7 +16,6 @@ use clap::Parser;
 use clap::Subcommand;
 
 use crate::client::ScopeQLClient;
-use crate::error::format_result;
 use crate::global::rt;
 
 #[derive(Debug, Parser)]
@@ -74,13 +73,9 @@ impl CommandCancel {
         });
 
         match output {
-            Some(output) => {
-                let output = format_result(&output);
-                println!("{output}");
-            }
-            None => {
-                println!("interrupted");
-            }
+            Some(Ok(result)) => println!("{}", serde_json::to_string_pretty(&result).unwrap()),
+            Some(Err(err)) => println!("{err:?}"),
+            None => println!("interrupted"),
         }
     }
 }
