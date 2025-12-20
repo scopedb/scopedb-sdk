@@ -26,7 +26,6 @@ use scopedb_client::IngestData;
 use crate::client::ScopeQLClient;
 use crate::config::Config;
 use crate::error::Error;
-use crate::error::format_error;
 use crate::global;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
@@ -48,8 +47,8 @@ pub fn load(config: &Config, file: PathBuf, transform: String, format: Option<Da
             Some("json") => DataFormat::Json,
             Some("csv") => DataFormat::Csv,
             _ => {
-                global::display(format!("unknown data file format: {}", file.display()));
-                global::display("Please specify the format using the --format option.");
+                log::error!("unknown data file format: {}", file.display());
+                log::error!("Please specify the format using the --format option.");
                 std::process::exit(1);
             }
         },
@@ -63,20 +62,20 @@ pub fn load(config: &Config, file: PathBuf, transform: String, format: Option<Da
     let data = match content {
         Ok(rows) => IngestData::Json { rows },
         Err(err) => {
-            global::display(format_error(err));
+            log::error!("failed to load data: {err:?}");
             std::process::exit(1);
         }
     };
 
     let result = global::rt().block_on(client.load_data(data, transform));
     match result {
-        Ok(result) => global::display(match result.num_rows_inserted {
-            0 => "no rows were inserted".to_string(),
-            1 => "successfully inserted 1 row".to_string(),
-            n => format!("successfully inserted {n} rows"),
-        }),
+        Ok(result) => match result.num_rows_inserted {
+            0 => log::info!("no rows were inserted"),
+            1 => log::info!("successfully inserted 1 row"),
+            n => log::info!("successfully inserted {n} rows"),
+        },
         Err(err) => {
-            global::display(format_error(err));
+            log::error!("failed to load data: {err:?}");
             std::process::exit(1);
         }
     }

@@ -28,6 +28,7 @@ mod tokenizer;
 mod version;
 
 use clap::Parser;
+use logforth::filter::env_filter::EnvFilterBuilder;
 
 use crate::command::Args;
 use crate::command::Command;
@@ -40,7 +41,11 @@ fn main() {
     let cmd = Command::parse();
 
     let Args { config_file, quiet } = cmd.args();
-    global::set_printer(quiet);
+    if !quiet {
+        logforth::starter_log::stdout()
+            .filter(EnvFilterBuilder::from_default_env_or("info").build())
+            .apply();
+    }
 
     match cmd.subcommand() {
         None => {
@@ -63,7 +68,7 @@ fn main() {
                     Ok(content) => execute::execute(&config, content),
                     Err(err) => {
                         let file = file.display();
-                        global::display(format!("failed to read script file {file}: {err}"));
+                        log::error!("failed to read script file {file}: {err}");
                     }
                 }
             }

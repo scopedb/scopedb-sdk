@@ -14,10 +14,9 @@
 
 use crate::client::ScopeQLClient;
 use crate::config::Config;
-use crate::error::Error;
-use crate::error::format_error;
 use crate::global;
 use crate::tokenizer::TokenKind;
+use crate::tokenizer::run_tokenizer;
 
 pub fn execute(config: &Config, stmts: String) {
     let endpoint = config
@@ -26,11 +25,10 @@ pub fn execute(config: &Config, stmts: String) {
     let endpoint = endpoint.endpoint().to_owned();
     let client = ScopeQLClient::new(endpoint);
 
-    let tokens = match crate::tokenizer::run_tokenizer(&stmts) {
+    let tokens = match run_tokenizer(&stmts) {
         Ok(tokens) => tokens,
         Err(err) => {
-            let err = err.raise(Error("failed to parse statements".to_string()));
-            global::display(format!("{err:?}"));
+            log::error!("failed to parse statements: {err:?}");
             std::process::exit(1);
         }
     };
@@ -72,23 +70,19 @@ pub fn execute(config: &Config, stmts: String) {
     }
 
     if stmts_range.is_empty() {
-        global::display("No statements provided.");
+        log::info!("no statements provided");
         return;
     }
-
-    global::display("Starting execute statements ...");
 
     for range in stmts_range {
         let stmt = stmts[range].to_string();
         let id = uuid::Uuid::now_v7();
-        global::display(format!("statement_id: {id}"));
+        log::info!("executing statement {id}: {stmt}");
 
-        let result = global::rt().block_on(client.execute_statement(id, stmt, |_, _| ()));
-
-        match result {
-            Ok(output) => global::display(output),
+        match global::rt().block_on(client.execute_statement(id, stmt, |_, _| ())) {
+            Ok(output) => log::info!("statement {id} results in:\n{output}"),
             Err(err) => {
-                global::display(format_error(err));
+                log::error!("failed to execute statement: {err:?}");
                 std::process::exit(1);
             }
         }

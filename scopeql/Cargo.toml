@@ -35,6 +35,8 @@ dirs = { version = "6.0" }
 exn = { version = "0.2" }
 indicatif = { version = "0.18" }
 jiff = { version = "0.2", features = ["serde"] }
+log = { version = "0.4.29" }
+logforth = { version = "0.29.1", features = ["starter-log"] }
 logos = { version = "0.16.0" }
 mea = { version = "0.5.2" }
 memchr = { version = "2.7.6" }
@@ -54,7 +56,7 @@ shadow-rs = { version = "1.2.1", default-features = false }
 thiserror = { version = "2.0" }
 tokio = { version = "1.47.1", features = ["full"] }
 toml = { version = "0.9.3" }
-toml_edit = { version = "0.23.2", features = ["serde"] }
+toml_edit = { version = "0.24", features = ["serde"] }
 uuid = { version = "1.17", features = ["v7", "serde"] }
 
 [build-dependencies]

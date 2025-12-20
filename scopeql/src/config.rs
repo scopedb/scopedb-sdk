@@ -21,8 +21,6 @@ use serde::Serialize;
 use serde::de::IntoDeserializer;
 use toml_edit::DocumentMut;
 
-use crate::global;
-
 pub fn load_config<P: AsRef<Path>>(config_file: Option<P>) -> Config {
     // Layer 0: the config file
     let content = if let Some(file) = config_file.as_ref().map(AsRef::as_ref) {
@@ -96,9 +94,7 @@ pub fn load_config<P: AsRef<Path>>(config_file: Option<P>) -> Config {
             continue;
         }
 
-        global::display(format!(
-            "ignore unknown environment variable {k} with value {v}"
-        ));
+        log::warn!("ignore unknown environment variable {k} with value {v}");
     }
 
     Config::deserialize(config.into_deserializer()).expect("failed to deserialize config")

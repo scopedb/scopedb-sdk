@@ -16,7 +16,6 @@ use std::time::Duration;
 
 use exn::Result;
 use exn::ResultExt;
-use exn::bail;
 use jiff::SignedDuration;
 use nu_ansi_term::Color;
 use scopedb_client::IngestData;
@@ -174,10 +173,10 @@ impl ScopeQLClient {
                     return format_result_set(s.result_set(), elapsed, s.progress.clone());
                 }
                 StatementStatus::Failed(s) => {
-                    bail!(Error(format!("statement failed: {}", s.message)));
+                    return Ok(s.message.clone());
                 }
                 StatementStatus::Cancelled(s) => {
-                    bail!(Error(format!("statement cancelled: {}", s.message)));
+                    return Ok(s.message.clone());
                 }
             }
 
