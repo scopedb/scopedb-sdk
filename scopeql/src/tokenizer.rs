@@ -218,6 +218,8 @@ pub enum TokenKind {
     CREATE,
     #[token("DATABASE", ignore(case))]
     DATABASE,
+    #[token("DATABASES", ignore(case))]
+    DATABASES,
     #[token("DELETE", ignore(case))]
     DELETE,
     #[token("DESC", ignore(case))]
@@ -330,6 +332,8 @@ pub enum TokenKind {
     SCHEDULE,
     #[token("SCHEMA", ignore(case))]
     SCHEMA,
+    #[token("SCHEMAS", ignore(case))]
+    SCHEMAS,
     #[token("SEARCH", ignore(case))]
     SEARCH,
     #[token("SELECT", ignore(case))]
