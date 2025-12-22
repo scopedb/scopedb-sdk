@@ -13,6 +13,7 @@ All significant changes to this software be documented in this file.
 
 * Support `scopeql run <statement>` to run statement directly.
 * Support `scopeql run -f <filename>` to run script from file.
+* Recognize `DATABASES` and `SCHEMAS` tokens to support related SHOW statements.
 
 ## v0.2.2 (2025-12-08)
 
