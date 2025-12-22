@@ -313,18 +313,30 @@ pub struct FieldMetadata {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum DataType {
+    #[serde(rename = "int")]
     Int,
+    #[serde(alias = "u_int")] // backward compatibility
+    #[serde(rename = "uint")]
     UInt,
+    #[serde(rename = "float")]
     Float,
+    #[serde(rename = "binary")]
     Binary,
+    #[serde(rename = "string")]
     String,
+    #[serde(rename = "boolean")]
     Boolean,
+    #[serde(rename = "timestamp")]
     Timestamp,
+    #[serde(rename = "interval")]
     Interval,
+    #[serde(rename = "array")]
     Array,
+    #[serde(rename = "object")]
     Object,
+    #[serde(rename = "any")]
     Any,
+    #[serde(rename = "null")]
     Null,
 }
