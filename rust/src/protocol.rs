@@ -287,7 +287,6 @@ impl StatementProgress {
         };
 
         scan_progress.max(stage_progress)
-       
     }
 }
 
