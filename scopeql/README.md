@@ -1,3 +1,3 @@
-# ScopeDB Command Line Interface and Interactive Shell
+# ScopeQL: ScopeDB Command Line Interface
 
-`scopeql` provides a command line interface and interactive shell for ScopeDB.
+This project has been moved to https://github.com/scopedb/scopeql.
