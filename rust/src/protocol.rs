@@ -266,15 +266,27 @@ pub struct StatementProgress {
     pub scanned_rows: i64,
     pub scanned_compressed_bytes: i64,
     pub scanned_uncompressed_bytes: i64,
+    pub skipped_partitions: i64,
+    pub skipped_rows: i64,
+    pub skipped_compressed_bytes: i64,
+    pub skipped_uncompressed_bytes: i64,
 }
 
 impl StatementProgress {
     pub fn total_percentage(&self) -> f64 {
-        if self.total_stages == 0 {
+        let scan_progress = if self.total_rows == 0 {
+            0.0
+        } else {
+            (self.scanned_rows + self.skipped_rows) as f64 / self.total_rows as f64 * 100.0
+        };
+
+        let stage_progress = if self.total_stages == 0 {
             0.0
         } else {
             self.scanned_stages as f64 / self.total_stages as f64 * 100.0
-        }
+        };
+
+        scan_progress.max(stage_progress)
     }
 }
 

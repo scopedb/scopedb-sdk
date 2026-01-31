@@ -181,7 +181,11 @@ pub fn entrypoint(config: &Config) {
                 pb.set_message(status.to_string());
                 if progress.details.total_uncompressed_bytes > 0 {
                     pb.set_length(progress.details.total_uncompressed_bytes as u64);
-                    pb.set_position(progress.details.scanned_uncompressed_bytes as u64);
+                    pb.set_position(
+                        (progress.details.total_percentage() / 100.0
+                            * progress.details.total_uncompressed_bytes as f64)
+                            as u64,
+                    );
                 }
             };
 
