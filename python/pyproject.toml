@@ -1,0 +1,31 @@
+[project]
+name = "scopedb-sdk"
+version = "0.1.0"
+description = "ScopeDB Python SDK"
+readme = "README.md"
+authors = [{ name = "tison", email = "wander4096@gmail.com" }]
+requires-python = ">=3.12"
+dependencies = ["httpx>=0.28.1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scopedb"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "respx>=0.21.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.mypy]
+strict = true
