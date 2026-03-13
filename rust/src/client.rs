@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use crate::Error;
 use crate::ErrorKind;
-use crate::JsonBatcherBuilder;
+use crate::IngestStreamBuilder;
 use crate::Statement;
 use crate::Table;
 use crate::protocol::IngestData;
@@ -64,8 +64,8 @@ impl Client {
         Table::new(self.clone(), table.into())
     }
 
-    pub fn json_batcher(&self, statement: impl Into<String>) -> JsonBatcherBuilder {
-        JsonBatcherBuilder::new(self.clone(), statement.into())
+    pub fn ingest_stream(&self, statement: impl Into<String>) -> IngestStreamBuilder {
+        IngestStreamBuilder::new(self.clone(), statement.into())
     }
 
     pub async fn health_check(&self) -> Result<(), Error> {

@@ -6,8 +6,8 @@ use std::time::Duration;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = common::client()?;
 
-    let batcher = client
-        .json_batcher(
+    let stream = client
+        .ingest_stream(
             r#"
             SELECT
                 $0["ts"]::timestamp as ts,
@@ -20,14 +20,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .flush_interval(Duration::from_millis(250))
         .build();
 
-    batcher
+    stream
         .send(&serde_json::json!({
             "ts": "2026-03-13T12:00:00Z",
             "name": "alpha",
             "extra": {"source": "example"},
         }))
         .await?;
-    batcher
+    stream
         .send(&serde_json::json!({
             "ts": "2026-03-13T12:00:01Z",
             "name": "beta",
@@ -35,10 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }))
         .await?;
 
-    let flushed = batcher.flush().await?;
+    let flushed = stream.flush().await?;
     println!("flush result: {flushed:?}");
 
-    let final_flush = batcher.shutdown().await?;
+    let final_flush = stream.shutdown().await?;
     println!("shutdown result: {final_flush:?}");
 
     Ok(())

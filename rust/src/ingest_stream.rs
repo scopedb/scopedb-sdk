@@ -63,15 +63,7 @@ enum BatchCommand {
     Shutdown(oneshot::Sender<Result<Option<IngestResult>, Error>>),
 }
 
-pub struct JsonBatcherBuilder {
-    client: Client,
-    statement: String,
-    batch_bytes: usize,
-    flush_interval: Duration,
-    channel_capacity: usize,
-}
-
-impl JsonBatcherBuilder {
+impl IngestStreamBuilder {
     pub(crate) fn new(client: Client, statement: String) -> Self {
         Self {
             client,
@@ -97,8 +89,8 @@ impl JsonBatcherBuilder {
         self
     }
 
-    pub fn build(self) -> JsonBatcher {
-        JsonBatcher::new(
+    pub fn build(self) -> IngestStream {
+        IngestStream::new(
             self.client,
             self.statement,
             self.batch_bytes,
@@ -108,13 +100,21 @@ impl JsonBatcherBuilder {
     }
 }
 
-pub struct JsonBatcher {
+pub struct IngestStreamBuilder {
+    client: Client,
+    statement: String,
+    batch_bytes: usize,
+    flush_interval: Duration,
+    channel_capacity: usize,
+}
+
+pub struct IngestStream {
     tx: mpsc::Sender<BatchCommand>,
     task: Mutex<Option<JoinHandle<()>>>,
     fatal: Arc<Mutex<Option<FatalState>>>,
 }
 
-impl JsonBatcher {
+impl IngestStream {
     fn new(
         client: Client,
         statement: String,
@@ -183,7 +183,7 @@ impl JsonBatcher {
             task.await.map_err(|err| {
                 Error::new(
                     ErrorKind::Unexpected,
-                    "json batcher background task panicked".to_string(),
+                    "ingest stream background task panicked".to_string(),
                 )
                 .set_source(err)
             })?;
@@ -206,7 +206,7 @@ impl JsonBatcher {
             .clone()
             .map(FatalState::into_error)
             .unwrap_or_else(|| {
-                Error::new(ErrorKind::Unexpected, "json batcher is closed".to_string())
+                Error::new(ErrorKind::Unexpected, "ingest stream is closed".to_string())
                     .set_persistent()
             })
     }

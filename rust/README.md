@@ -55,8 +55,8 @@ println!("fields = {}", schema.fields().len());
 ```rust
 # async fn demo() -> Result<(), scopedb_client::Error> {
 # let client = scopedb_client::Client::new("http://127.0.0.1:6543", reqwest::Client::new())?;
-let batcher = client
-    .json_batcher(
+let stream = client
+    .ingest_stream(
         r#"
         SELECT
             $0["ts"]::timestamp as ts,
@@ -66,15 +66,15 @@ let batcher = client
     )
     .build();
 
-batcher
+stream
     .send(&serde_json::json!({
         "ts": "2026-03-13T12:00:00Z",
         "name": "scopedb",
     }))
     .await?;
 
-batcher.flush().await?;
-batcher.shutdown().await?;
+stream.flush().await?;
+stream.shutdown().await?;
 # Ok(())
 # }
 ```
