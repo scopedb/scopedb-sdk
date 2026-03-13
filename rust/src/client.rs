@@ -19,7 +19,9 @@ use uuid::Uuid;
 
 use crate::Error;
 use crate::ErrorKind;
+use crate::IngestStreamBuilder;
 use crate::Statement;
+use crate::Table;
 use crate::protocol::IngestData;
 use crate::protocol::IngestRequest;
 use crate::protocol::IngestResult;
@@ -58,6 +60,14 @@ impl Client {
         StatementHandle::new(self.clone(), statement_id, ResultFormat::Json)
     }
 
+    pub fn table(&self, table: impl Into<String>) -> Table {
+        Table::new(self.clone(), table.into())
+    }
+
+    pub fn ingest_stream(&self, statement: impl Into<String>) -> IngestStreamBuilder {
+        IngestStreamBuilder::new(self.clone(), statement.into())
+    }
+
     pub async fn health_check(&self) -> Result<(), Error> {
         let url = self.make_url("v1/health")?;
         self.client.get(url).send().await.map_err(|err| {
@@ -70,19 +80,19 @@ impl Client {
         Ok(())
     }
 
-    pub async fn insert(&self, data: IngestData, transform: String) -> Result<IngestResult, Error> {
+    pub async fn insert(&self, rows: String, transform: String) -> Result<IngestResult, Error> {
         match self
             .ingest(IngestRequest {
                 ty: IngestType::Committed,
-                data,
+                data: IngestData::Json { rows },
                 statement: transform,
             })
             .await?
         {
             Response::Success(result) => Ok(result),
-            Response::Failed(err) => Err(Error::new(
-                ErrorKind::Unexpected,
-                format!("fail to insert data: {err}"),
+            Response::Failed(err) => Err(map_failed_response(
+                err,
+                "failed to insert data".to_string(),
             )),
         }
     }
@@ -189,5 +199,17 @@ impl Client {
         self.endpoint.join(path).map_err(|err| {
             Error::new(ErrorKind::Unexpected, "failed to construct URL".to_string()).set_source(err)
         })
+    }
+}
+
+fn map_failed_response(err: crate::protocol::ErrorStatus, message: String) -> Error {
+    let error = Error::new(ErrorKind::Unexpected, format!("{message}: {err}"));
+    match err.code() {
+        reqwest::StatusCode::TOO_MANY_REQUESTS
+        | reqwest::StatusCode::BAD_GATEWAY
+        | reqwest::StatusCode::SERVICE_UNAVAILABLE
+        | reqwest::StatusCode::GATEWAY_TIMEOUT => error.set_temporary(),
+        code if code.is_server_error() => error.set_temporary(),
+        _ => error.set_permanent(),
     }
 }

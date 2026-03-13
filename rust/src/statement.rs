@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::time::Duration;
+
 use jiff::SignedDuration;
+use tokio::time::sleep;
 use uuid::Uuid;
 
 use crate::Error;
@@ -32,6 +35,7 @@ pub struct Statement {
     statement: String,
     statement_id: Option<Uuid>,
     exec_timeout: Option<SignedDuration>,
+    max_parallelism: Option<usize>,
     format: ResultFormat,
 }
 
@@ -46,12 +50,18 @@ impl Statement {
         self
     }
 
+    pub fn with_max_parallelism(mut self, max_parallelism: usize) -> Self {
+        self.max_parallelism = Some(max_parallelism);
+        self
+    }
+
     pub async fn submit(self) -> Result<StatementHandle, Error> {
         let Statement {
             client,
             statement,
             statement_id,
             exec_timeout,
+            max_parallelism,
             format,
         } = self;
 
@@ -60,6 +70,7 @@ impl Statement {
                 statement,
                 statement_id,
                 exec_timeout,
+                max_parallelism,
                 params: StatementRequestParams { format },
             })
             .await?;
@@ -78,12 +89,17 @@ impl Statement {
         }
     }
 
+    pub async fn execute(self) -> Result<ResultSet, Error> {
+        self.submit().await?.fetch().await
+    }
+
     pub(crate) fn new(client: Client, statement: String) -> Self {
         Self {
             client,
             statement,
             statement_id: None,
             exec_timeout: None,
+            max_parallelism: None,
             format: ResultFormat::Json,
         }
     }
@@ -106,6 +122,10 @@ impl StatementHandle {
         self.status.as_ref()
     }
 
+    pub fn progress(&self) -> Option<&crate::StatementEstimatedProgress> {
+        self.status.as_ref().map(StatementStatus::progress)
+    }
+
     pub fn result_set(&self) -> Option<ResultSet> {
         self.status.as_ref().and_then(|status| match status {
             StatementStatus::Finished(s) => Some(s.result_set()),
@@ -115,7 +135,7 @@ impl StatementHandle {
 
     pub async fn fetch_once(&mut self) -> Result<(), Error> {
         // already terminated - no need to fetch again
-        match self.status {
+        match self.status.as_ref() {
             Some(StatementStatus::Finished(..))
             | Some(StatementStatus::Failed(..))
             | Some(StatementStatus::Cancelled(..)) => {
@@ -138,6 +158,33 @@ impl StatementHandle {
                 ErrorKind::Unexpected,
                 format!("failed to fetch statement: {err}"),
             )),
+        }
+    }
+
+    pub async fn fetch(&mut self) -> Result<ResultSet, Error> {
+        let mut delay = Duration::from_millis(5);
+        let max_delay = Duration::from_secs(1);
+
+        loop {
+            self.fetch_once().await?;
+
+            if let Some(status) = self.status.as_ref() {
+                match status {
+                    StatementStatus::Finished(finished) => return Ok(finished.result_set()),
+                    StatementStatus::Failed(failed) => {
+                        return Err(Error::new(ErrorKind::Unexpected, failed.message.clone()));
+                    }
+                    StatementStatus::Cancelled(cancelled) => {
+                        return Err(Error::new(ErrorKind::Unexpected, cancelled.message.clone()));
+                    }
+                    StatementStatus::Pending(..) | StatementStatus::Running(..) => {
+                        sleep(delay).await;
+                        if delay < max_delay {
+                            delay = std::cmp::min(delay.saturating_mul(2), max_delay);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -173,7 +220,26 @@ impl StatementHandle {
         }
 
         match self.client.cancel_statement(self.statement_id).await? {
-            Response::Success(response) => Ok(response),
+            Response::Success(response) => {
+                self.status = match response.status.as_str() {
+                    "failed" => Some(StatementStatus::Failed(crate::StatementStatusFailed {
+                        statement_id: response.statement_id,
+                        created_at: response.created_at,
+                        progress: crate::StatementEstimatedProgress::default(),
+                        message: response.message.clone(),
+                    })),
+                    "cancelled" => Some(StatementStatus::Cancelled(
+                        crate::StatementStatusCancelled {
+                            statement_id: response.statement_id,
+                            created_at: response.created_at,
+                            progress: crate::StatementEstimatedProgress::default(),
+                            message: response.message.clone(),
+                        },
+                    )),
+                    _ => self.status.take(),
+                };
+                Ok(response)
+            }
             Response::Failed(err) => Err(Error::new(
                 ErrorKind::Unexpected,
                 format!("failed to cancel statement: {err}"),

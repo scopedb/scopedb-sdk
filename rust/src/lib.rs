@@ -14,17 +14,19 @@
 
 mod client;
 mod error;
+mod ingest_stream;
 mod protocol;
 mod result;
 mod statement;
+mod table;
 
 pub use client::Client;
 pub use error::Error;
 pub use error::ErrorKind;
+pub use ingest_stream::IngestStream;
+pub use ingest_stream::IngestStreamBuilder;
 pub use protocol::DataType;
-pub use protocol::IngestData;
 pub use protocol::IngestResult;
-pub use protocol::ResultFormat;
 pub use protocol::StatementCancelResult;
 pub use protocol::StatementEstimatedProgress;
 pub use protocol::StatementProgress;
@@ -40,3 +42,4 @@ pub use result::Schema;
 pub use result::Value;
 pub use statement::Statement;
 pub use statement::StatementHandle;
+pub use table::Table;
