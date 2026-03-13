@@ -17,6 +17,7 @@
 export type DataType =
   | "int"
   | "uint"
+  | "u_int" // backward-compat alias for "uint"
   | "float"
   | "timestamp"
   | "interval"

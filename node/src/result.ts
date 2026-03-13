@@ -95,6 +95,7 @@ function parseCell(cell: string | null, dataType: DataType): Value {
   switch (dataType) {
     case "int":
     case "uint":
+    case "u_int": // backward-compat alias
       try {
         return BigInt(cell);
       } catch (cause) {

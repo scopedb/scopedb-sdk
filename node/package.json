@@ -7,7 +7,11 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
@@ -17,9 +21,12 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit"
+    "check": "tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run build",
+    "test": "tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.test.json && node --test dist-test/tests/*.test.js"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "typescript": "^5.8.2"
   }
 }

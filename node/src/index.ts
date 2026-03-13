@@ -35,4 +35,5 @@ export type {
 export { FieldSchema, ResultSet, Schema } from "./result.js";
 export type { Value } from "./result.js";
 export { Statement, StatementHandle } from "./statement.js";
+export type { FetchOptions } from "./statement.js";
 export { Table } from "./table.js";
