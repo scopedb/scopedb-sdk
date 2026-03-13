@@ -15,14 +15,16 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
+use mea::mpsc;
+use mea::mutex::Mutex;
+use mea::oneshot;
+use mea::semaphore::OwnedSemaphorePermit;
+use mea::semaphore::Semaphore;
 use serde::Serialize;
-use tokio::sync::Mutex;
-use tokio::sync::OwnedSemaphorePermit;
-use tokio::sync::Semaphore;
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
 use crate::Client;
@@ -100,6 +102,7 @@ enum BatchCommand {
 struct PendingBytesBudget {
     capacity: usize,
     semaphore: Arc<Semaphore>,
+    closed: AtomicBool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,6 +119,7 @@ impl PendingBytesBudget {
         Self {
             capacity,
             semaphore: Arc::new(Semaphore::new(capacity)),
+            closed: AtomicBool::new(false),
         }
     }
 
@@ -130,15 +134,23 @@ impl PendingBytesBudget {
             });
         }
 
-        self.semaphore
-            .clone()
-            .acquire_many_owned(requested as u32)
-            .await
-            .map_err(|_| PendingBytesAcquireError::Closed)
+        if self.closed.load(Ordering::Acquire) {
+            return Err(PendingBytesAcquireError::Closed);
+        }
+
+        let reservation = self.semaphore.clone().acquire_owned(requested).await;
+        if self.closed.load(Ordering::Acquire) {
+            drop(reservation);
+            return Err(PendingBytesAcquireError::Closed);
+        }
+
+        Ok(reservation)
     }
 
     fn close(&self) {
-        self.semaphore.close();
+        if !self.closed.swap(true, Ordering::AcqRel) {
+            self.semaphore.release(self.capacity);
+        }
     }
 }
 
@@ -218,7 +230,7 @@ pub struct IngestStreamBuilder {
 }
 
 pub struct IngestStream {
-    tx: mpsc::Sender<BatchCommand>,
+    tx: mpsc::BoundedSender<BatchCommand>,
     task: Mutex<Option<JoinHandle<()>>>,
     fatal: Arc<Mutex<Option<FatalState>>>,
     pending_bytes: Arc<PendingBytesBudget>,
@@ -234,7 +246,7 @@ impl IngestStream {
         max_pending_bytes: usize,
         retry: RetryConfig,
     ) -> Self {
-        let (tx, rx) = mpsc::channel(channel_capacity.max(1));
+        let (tx, rx) = mpsc::bounded(channel_capacity.max(1));
         let fatal = Arc::new(Mutex::new(None));
         let pending_bytes = Arc::new(PendingBytesBudget::new(max_pending_bytes.max(1)));
         let task = tokio::spawn(run_batch_worker(
@@ -363,7 +375,7 @@ impl IngestStream {
 type BoxFutureIngest = Pin<Box<dyn Future<Output = Result<IngestResult, Error>> + Send>>;
 
 async fn run_batch_worker<F>(
-    mut rx: mpsc::Receiver<BatchCommand>,
+    mut rx: mpsc::BoundedReceiver<BatchCommand>,
     batch_bytes: usize,
     flush_interval: Duration,
     retry: RetryConfig,
@@ -390,7 +402,7 @@ async fn run_batch_worker<F>(
                 }
             }
             command = rx.recv() => {
-                let Some(command) = command else {
+                let Ok(command) = command else {
                     if let Err(err) = flush_pending(&mut rows, &mut current_bytes, retry, &mut flush_fn).await {
                         *fatal.lock().await = Some(FatalState::from_error(&err));
                     }
