@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod batch;
 mod client;
 mod error;
 mod protocol;
 mod result;
 mod statement;
+mod table;
 
+pub use batch::JsonBatcher;
+pub use batch::JsonBatcherBuilder;
 pub use client::Client;
 pub use error::Error;
 pub use error::ErrorKind;
@@ -40,3 +44,4 @@ pub use result::Schema;
 pub use result::Value;
 pub use statement::Statement;
 pub use statement::StatementHandle;
+pub use table::Table;

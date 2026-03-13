@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::fmt;
+use std::str::FromStr;
 
 use jiff::SignedDuration;
 use reqwest::StatusCode;
@@ -64,6 +65,12 @@ pub struct ErrorStatus {
     message: String,
 }
 
+impl ErrorStatus {
+    pub fn code(&self) -> StatusCode {
+        self.code
+    }
+}
+
 impl fmt::Display for ErrorStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -79,14 +86,29 @@ impl fmt::Display for ErrorStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "format")]
 pub enum IngestData {
+    #[serde(rename = "arrow")]
+    Arrow { rows: String },
     #[serde(rename = "json")]
     Json { rows: String },
+    #[serde(rename = "result_set")]
+    ResultSet {
+        fields: Vec<FieldMetadata>,
+        rows: String,
+    },
 }
 
 impl IngestData {
     pub fn format(&self) -> &'static str {
         match self {
+            Self::Arrow { .. } => "arrow",
             Self::Json { .. } => "json",
+            Self::ResultSet { .. } => "result_set",
+        }
+    }
+
+    pub fn data_size(&self) -> usize {
+        match self {
+            Self::Arrow { rows } | Self::Json { rows } | Self::ResultSet { rows, .. } => rows.len(),
         }
     }
 }
@@ -116,8 +138,12 @@ pub struct IngestResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResultFormat {
+    #[serde(rename = "arrow")]
+    Arrow,
     #[serde(rename = "json")]
     Json,
+    #[serde(rename = "result_set")]
+    ResultSet,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -132,7 +158,11 @@ pub struct StatementRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub statement_id: Option<Uuid>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub exec_timeout: Option<SignedDuration>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_parallelism: Option<usize>,
     #[serde(flatten)]
     pub params: StatementRequestParams,
 }
@@ -240,6 +270,19 @@ impl StatementStatus {
             StatementStatus::Cancelled(s) => &s.progress,
         }
     }
+
+    pub fn is_finished(&self) -> bool {
+        matches!(self, StatementStatus::Finished(..))
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        matches!(
+            self,
+            StatementStatus::Finished(..)
+                | StatementStatus::Failed(..)
+                | StatementStatus::Cancelled(..)
+        )
+    }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -300,14 +343,20 @@ pub struct StatementResultSet {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "format")]
 pub enum ResultSetData {
+    #[serde(rename = "arrow")]
+    Arrow { rows: String },
     #[serde(rename = "json")]
     Json { rows: Vec<Vec<Option<String>>> },
+    #[serde(rename = "result_set")]
+    ResultSet { rows: String },
 }
 
 impl ResultSetData {
     pub fn format(&self) -> ResultFormat {
         match self {
+            Self::Arrow { .. } => ResultFormat::Arrow,
             Self::Json { .. } => ResultFormat::Json,
+            Self::ResultSet { .. } => ResultFormat::ResultSet,
         }
     }
 }
@@ -351,4 +400,29 @@ pub enum DataType {
     Any,
     #[serde(rename = "null")]
     Null,
+}
+
+impl FromStr for DataType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "int" => Ok(Self::Int),
+            "uint" | "u_int" => Ok(Self::UInt),
+            "float" => Ok(Self::Float),
+            "binary" => Ok(Self::Binary),
+            "string" => Ok(Self::String),
+            "boolean" => Ok(Self::Boolean),
+            "timestamp" => Ok(Self::Timestamp),
+            "interval" => Ok(Self::Interval),
+            "array" => Ok(Self::Array),
+            "object" => Ok(Self::Object),
+            "any" => Ok(Self::Any),
+            "null" => Ok(Self::Null),
+            _ => Err(Error::new(
+                ErrorKind::Unexpected,
+                format!("unrecognized data type: {s}"),
+            )),
+        }
+    }
 }
