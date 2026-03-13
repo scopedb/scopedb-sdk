@@ -48,13 +48,10 @@ Request fields:
 - `statement`: required
 - `exec_timeout`: optional
 - `max_parallelism`: optional
-- `format`: required
+- `format`: always `json` for the current public Rust SDK
 
-Supported `format` values:
-
-- `json`
-- `arrow`
-- `result_set`
+The service may support additional wire encodings, but the Rust SDK does not
+expose them as public request options.
 
 Response body:
 
@@ -78,7 +75,7 @@ Fetches the latest state for a submitted statement.
 
 Query params:
 
-- `format`: same enum as submit
+- `format`: always `json` for the current public Rust SDK
 
 Response behavior:
 
@@ -122,11 +119,9 @@ Request body:
 }
 ```
 
-Supported data payloads:
+Supported data payloads used by the Rust SDK:
 
 - `{"format":"json","rows":"...json lines..."}`
-- `{"format":"arrow","rows":"...base64 encoded arrow record batch..."}`
-- `{"format":"result_set","fields":[...],"rows":"...encoded rowset..."}`
 
 Supported ingest type values:
 
@@ -179,13 +174,8 @@ A finished statement contains a `result_set` payload:
 }
 ```
 
-`result_set.format` variants:
-
-- `json` => `rows: Vec<Vec<Option<String>>>`
-- `arrow` => `rows: String`
-- `result_set` => `rows: String`
-
-The current high-level typed row conversion in the Rust SDK is JSON-oriented.
+The public Rust SDK currently requests JSON results only, so the main
+high-level row-conversion path is JSON-oriented.
 
 ## SDK Notes
 
