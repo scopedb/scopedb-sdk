@@ -132,6 +132,14 @@ impl Table {
 }
 
 fn quote_ident(input: &str, quote: char) -> String {
+    quote_scopeql(input, quote)
+}
+
+fn quote_string_literal(input: &str) -> String {
+    quote_scopeql(input, '\'')
+}
+
+fn quote_scopeql(input: &str, quote: char) -> String {
     let mut out = String::with_capacity(input.len() + 2);
     out.push(quote);
     for ch in input.chars() {
@@ -152,19 +160,6 @@ fn quote_ident(input: &str, quote: char) -> String {
     out
 }
 
-fn quote_string_literal(input: &str) -> String {
-    let mut out = String::with_capacity(input.len() + 2);
-    out.push('\'');
-    for ch in input.chars() {
-        match ch {
-            '\'' => out.push_str("''"),
-            c => out.push(c),
-        }
-    }
-    out.push('\'');
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::quote_ident;
@@ -180,7 +175,8 @@ mod tests {
     #[test]
     fn test_quote_string_literal() {
         assert_eq!(quote_string_literal("plain"), "'plain'");
-        assert_eq!(quote_string_literal("a'b"), "'a''b'");
-        assert_eq!(quote_string_literal("a\nb"), "'a\nb'");
+        assert_eq!(quote_string_literal("a'b"), "'a\\'b'");
+        assert_eq!(quote_string_literal("a\nb"), "'a\\nb'");
+        assert_eq!(quote_string_literal("a\\b"), "'a\\\\b'");
     }
 }
