@@ -86,3 +86,7 @@ See runnable examples under [`examples/`](examples/):
 - `cargo run --example statement`
 - `cargo run --example table`
 - `cargo run --example batch`
+
+## References
+
+- [Rust HTTP API reference](../docs/rust-http-api.md)
