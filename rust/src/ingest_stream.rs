@@ -249,6 +249,9 @@ async fn run_batch_worker<F>(
 
                 match command {
                     BatchCommand::Record(payload) => {
+                        if !rows.is_empty() {
+                            current_bytes = current_bytes.saturating_add(1);
+                        }
                         current_bytes = current_bytes.saturating_add(payload.len());
                         rows.push(payload);
                         if !rows.is_empty() && current_bytes >= batch_bytes {
@@ -295,9 +298,12 @@ where
     }
 
     let payload = rows.join("\n");
-    rows.clear();
-    *current_bytes = 0;
-    flush_fn(payload).await.map(Some)
+    let result = flush_fn(payload).await;
+    if result.is_ok() {
+        rows.clear();
+        *current_bytes = 0;
+    }
+    result.map(Some)
 }
 
 #[cfg(test)]
@@ -311,7 +317,7 @@ mod tests {
     #[tokio::test]
     async fn test_flush_pending_joins_rows() {
         let mut rows = vec!["{\"a\":1}".to_string(), "{\"a\":2}".to_string()];
-        let mut current_bytes = rows.iter().map(|row| row.len()).sum();
+        let mut current_bytes = rows.iter().map(|row| row.len()).sum::<usize>() + 1;
         let result = flush_pending(&mut rows, &mut current_bytes, &mut |payload| {
             Box::pin(async move {
                 assert_eq!(payload, "{\"a\":1}\n{\"a\":2}");
@@ -339,5 +345,25 @@ mod tests {
         .unwrap();
 
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_flush_pending_keeps_batch_on_error() {
+        let mut rows = vec!["{\"a\":1}".to_string(), "{\"a\":2}".to_string()];
+        let original_rows = rows.clone();
+        let mut current_bytes = rows.iter().map(|row| row.len()).sum::<usize>() + 1;
+
+        let err = flush_pending(&mut rows, &mut current_bytes, &mut |_payload| {
+            Box::pin(async move { Err(test_error("flush failed")) })
+        })
+        .await
+        .unwrap_err();
+
+        assert_eq!(err.to_string(), test_error("flush failed").to_string());
+        assert_eq!(rows, original_rows);
+        assert_eq!(
+            current_bytes,
+            original_rows.iter().map(|row| row.len()).sum::<usize>() + 1
+        );
     }
 }

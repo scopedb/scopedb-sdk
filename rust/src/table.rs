@@ -81,9 +81,9 @@ impl Table {
               AND database_name = {}
             SELECT column_name, data_type
             "#,
-            quote_ident(&self.table, '\''),
-            quote_ident(schema_name, '\''),
-            quote_ident(database_name, '\''),
+            quote_string_literal(&self.table),
+            quote_string_literal(schema_name),
+            quote_string_literal(database_name),
         );
 
         let rows = self
@@ -152,14 +152,35 @@ fn quote_ident(input: &str, quote: char) -> String {
     out
 }
 
+fn quote_string_literal(input: &str) -> String {
+    let mut out = String::with_capacity(input.len() + 2);
+    out.push('\'');
+    for ch in input.chars() {
+        match ch {
+            '\'' => out.push_str("''"),
+            c => out.push(c),
+        }
+    }
+    out.push('\'');
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::quote_ident;
+    use super::quote_string_literal;
 
     #[test]
     fn test_quote_ident() {
         assert_eq!(quote_ident("plain", '`'), "`plain`");
         assert_eq!(quote_ident("a`b", '`'), "`a\\`b`");
         assert_eq!(quote_ident("a\nb", '`'), "`a\\nb`");
+    }
+
+    #[test]
+    fn test_quote_string_literal() {
+        assert_eq!(quote_string_literal("plain"), "'plain'");
+        assert_eq!(quote_string_literal("a'b"), "'a''b'");
+        assert_eq!(quote_string_literal("a\nb"), "'a\nb'");
     }
 }
