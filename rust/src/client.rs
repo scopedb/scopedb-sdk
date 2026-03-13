@@ -80,11 +80,11 @@ impl Client {
         Ok(())
     }
 
-    pub async fn insert(&self, data: IngestData, transform: String) -> Result<IngestResult, Error> {
+    pub async fn insert(&self, rows: String, transform: String) -> Result<IngestResult, Error> {
         match self
             .ingest(IngestRequest {
                 ty: IngestType::Committed,
-                data,
+                data: IngestData::Json { rows },
                 statement: transform,
             })
             .await?

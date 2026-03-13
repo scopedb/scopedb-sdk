@@ -18,7 +18,6 @@ use std::str::FromStr;
 use crate::DataType;
 use crate::Error;
 use crate::ErrorKind;
-use crate::ResultFormat;
 use crate::protocol::ResultSetData;
 use crate::protocol::StatementResultSet;
 
@@ -63,10 +62,6 @@ impl ResultSet {
 
     pub fn schema(&self) -> &Schema {
         &self.schema
-    }
-
-    pub fn format(&self) -> ResultFormat {
-        self.data.format()
     }
 
     pub fn json_rows(&self) -> Option<&[Vec<Option<String>>]> {

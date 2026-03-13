@@ -15,10 +15,10 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Serialize;
+use tokio::sync::Mutex;
 use tokio::sync::OwnedSemaphorePermit;
 use tokio::sync::Semaphore;
 use tokio::sync::mpsc;
@@ -28,7 +28,6 @@ use tokio::task::JoinHandle;
 use crate::Client;
 use crate::Error;
 use crate::ErrorKind;
-use crate::IngestData;
 use crate::IngestResult;
 
 const DEFAULT_BATCH_BYTES: usize = 16 * 1024 * 1024;
@@ -248,7 +247,7 @@ impl IngestStream {
             move |rows| {
                 let client = client.clone();
                 let statement = statement.clone();
-                Box::pin(async move { client.insert(IngestData::Json { rows }, statement).await })
+                Box::pin(async move { client.insert(rows, statement).await })
             },
         ));
 
@@ -261,7 +260,7 @@ impl IngestStream {
     }
 
     pub async fn send<T: Serialize>(&self, record: &T) -> Result<(), Error> {
-        self.check_fatal()?;
+        self.check_fatal().await?;
         let payload = serde_json::to_string(record).map_err(|err| {
             Error::new(
                 ErrorKind::Unexpected,
@@ -272,7 +271,9 @@ impl IngestStream {
 
         let reserved = match self.pending_bytes.acquire(buffered_bytes(&payload)).await {
             Ok(reserved) => reserved,
-            Err(PendingBytesAcquireError::Closed) => return Err(self.closed_or_fatal_error()),
+            Err(PendingBytesAcquireError::Closed) => {
+                return Err(self.closed_or_fatal_error().await);
+            }
             Err(PendingBytesAcquireError::ExceedsCapacity {
                 requested,
                 capacity,
@@ -289,35 +290,43 @@ impl IngestStream {
             }
         };
 
-        self.tx
+        if self
+            .tx
             .send(BatchCommand::Record(BufferedRecord {
                 payload,
                 _reservation: reserved,
             }))
             .await
-            .map_err(|_| self.closed_or_fatal_error())?;
-        self.check_fatal()
+            .is_err()
+        {
+            return Err(self.closed_or_fatal_error().await);
+        }
+        self.check_fatal().await
     }
 
     pub async fn flush(&self) -> Result<Option<IngestResult>, Error> {
-        self.check_fatal()?;
+        self.check_fatal().await?;
         let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(BatchCommand::Flush(tx))
-            .await
-            .map_err(|_| self.closed_or_fatal_error())?;
-        rx.await.map_err(|_| self.closed_or_fatal_error())?
+        if self.tx.send(BatchCommand::Flush(tx)).await.is_err() {
+            return Err(self.closed_or_fatal_error().await);
+        }
+        match rx.await {
+            Ok(result) => result,
+            Err(_) => Err(self.closed_or_fatal_error().await),
+        }
     }
 
     pub async fn shutdown(self) -> Result<Option<IngestResult>, Error> {
         let (tx, rx) = oneshot::channel();
-        self.tx
-            .send(BatchCommand::Shutdown(tx))
-            .await
-            .map_err(|_| self.closed_or_fatal_error())?;
+        if self.tx.send(BatchCommand::Shutdown(tx)).await.is_err() {
+            return Err(self.closed_or_fatal_error().await);
+        }
 
-        let result = rx.await.map_err(|_| self.closed_or_fatal_error())?;
-        let task = self.task.lock().expect("lock poisoned").take();
+        let result = match rx.await {
+            Ok(result) => result,
+            Err(_) => return Err(self.closed_or_fatal_error().await),
+        };
+        let task = self.task.lock().await.take();
         if let Some(task) = task {
             task.await.map_err(|err| {
                 Error::new(
@@ -330,18 +339,18 @@ impl IngestStream {
         result
     }
 
-    fn check_fatal(&self) -> Result<(), Error> {
-        if let Some(state) = self.fatal.lock().expect("lock poisoned").clone() {
+    async fn check_fatal(&self) -> Result<(), Error> {
+        if let Some(state) = self.fatal.lock().await.clone() {
             Err(state.into_error())
         } else {
             Ok(())
         }
     }
 
-    fn closed_or_fatal_error(&self) -> Error {
+    async fn closed_or_fatal_error(&self) -> Error {
         self.fatal
             .lock()
-            .expect("lock poisoned")
+            .await
             .clone()
             .map(FatalState::into_error)
             .unwrap_or_else(|| {
@@ -376,14 +385,14 @@ async fn run_batch_worker<F>(
                     continue;
                 }
                 if let Err(err) = flush_pending(&mut rows, &mut current_bytes, retry, &mut flush_fn).await {
-                    *fatal.lock().expect("lock poisoned") = Some(FatalState::from_error(&err));
+                    *fatal.lock().await = Some(FatalState::from_error(&err));
                     break;
                 }
             }
             command = rx.recv() => {
                 let Some(command) = command else {
                     if let Err(err) = flush_pending(&mut rows, &mut current_bytes, retry, &mut flush_fn).await {
-                        *fatal.lock().expect("lock poisoned") = Some(FatalState::from_error(&err));
+                        *fatal.lock().await = Some(FatalState::from_error(&err));
                     }
                     break;
                 };
@@ -397,7 +406,7 @@ async fn run_batch_worker<F>(
                         rows.push(record);
                         if !rows.is_empty() && current_bytes >= batch_bytes {
                             if let Err(err) = flush_pending(&mut rows, &mut current_bytes, retry, &mut flush_fn).await {
-                                *fatal.lock().expect("lock poisoned") = Some(FatalState::from_error(&err));
+                                *fatal.lock().await = Some(FatalState::from_error(&err));
                                 break;
                             }
                         }
@@ -405,17 +414,17 @@ async fn run_batch_worker<F>(
                     BatchCommand::Flush(ack) => {
                         let result = flush_pending(&mut rows, &mut current_bytes, retry, &mut flush_fn).await;
                         if let Err(err) = &result {
-                            *fatal.lock().expect("lock poisoned") = Some(FatalState::from_error(err));
+                            *fatal.lock().await = Some(FatalState::from_error(err));
                         }
                         let _ = ack.send(result);
-                        if fatal.lock().expect("lock poisoned").is_some() {
+                        if fatal.lock().await.is_some() {
                             break;
                         }
                     }
                     BatchCommand::Shutdown(ack) => {
                         let result = flush_pending(&mut rows, &mut current_bytes, retry, &mut flush_fn).await;
                         if let Err(err) = &result {
-                            *fatal.lock().expect("lock poisoned") = Some(FatalState::from_error(err));
+                            *fatal.lock().await = Some(FatalState::from_error(err));
                         }
                         let _ = ack.send(result);
                         break;

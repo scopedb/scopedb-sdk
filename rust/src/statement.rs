@@ -55,11 +55,6 @@ impl Statement {
         self
     }
 
-    pub fn with_result_format(mut self, format: ResultFormat) -> Self {
-        self.format = format;
-        self
-    }
-
     pub async fn submit(self) -> Result<StatementHandle, Error> {
         let Statement {
             client,
@@ -171,6 +166,8 @@ impl StatementHandle {
         let max_delay = Duration::from_secs(1);
 
         loop {
+            self.fetch_once().await?;
+
             if let Some(status) = self.status.as_ref() {
                 match status {
                     StatementStatus::Finished(finished) => return Ok(finished.result_set()),
@@ -180,16 +177,14 @@ impl StatementHandle {
                     StatementStatus::Cancelled(cancelled) => {
                         return Err(Error::new(ErrorKind::Unexpected, cancelled.message.clone()));
                     }
-                    StatementStatus::Pending(..) | StatementStatus::Running(..) => {}
+                    StatementStatus::Pending(..) | StatementStatus::Running(..) => {
+                        sleep(delay).await;
+                        if delay < max_delay {
+                            delay = std::cmp::min(delay.saturating_mul(2), max_delay);
+                        }
+                    }
                 }
             }
-
-            sleep(delay).await;
-            if delay < max_delay {
-                delay = std::cmp::min(delay.saturating_mul(2), max_delay);
-            }
-
-            self.fetch_once().await?;
         }
     }
 

@@ -85,7 +85,7 @@ impl fmt::Display for ErrorStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "format")]
-pub enum IngestData {
+pub(crate) enum IngestData {
     #[serde(rename = "arrow")]
     Arrow { rows: String },
     #[serde(rename = "json")]
@@ -103,12 +103,6 @@ impl IngestData {
             Self::Arrow { .. } => "arrow",
             Self::Json { .. } => "json",
             Self::ResultSet { .. } => "result_set",
-        }
-    }
-
-    pub fn data_size(&self) -> usize {
-        match self {
-            Self::Arrow { rows } | Self::Json { rows } | Self::ResultSet { rows, .. } => rows.len(),
         }
     }
 }
@@ -137,7 +131,7 @@ pub struct IngestResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ResultFormat {
+pub(crate) enum ResultFormat {
     #[serde(rename = "arrow")]
     Arrow,
     #[serde(rename = "json")]
@@ -349,16 +343,6 @@ pub enum ResultSetData {
     Json { rows: Vec<Vec<Option<String>>> },
     #[serde(rename = "result_set")]
     ResultSet { rows: String },
-}
-
-impl ResultSetData {
-    pub fn format(&self) -> ResultFormat {
-        match self {
-            Self::Arrow { .. } => ResultFormat::Arrow,
-            Self::Json { .. } => ResultFormat::Json,
-            Self::ResultSet { .. } => ResultFormat::ResultSet,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
