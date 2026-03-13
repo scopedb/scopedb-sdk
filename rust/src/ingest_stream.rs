@@ -19,7 +19,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::Serialize;
-use tokio::sync::Notify;
+use tokio::sync::OwnedSemaphorePermit;
+use tokio::sync::Semaphore;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
@@ -99,20 +100,7 @@ enum BatchCommand {
 #[derive(Debug)]
 struct PendingBytesBudget {
     capacity: usize,
-    state: Mutex<PendingBytesBudgetState>,
-    notify: Notify,
-}
-
-#[derive(Debug)]
-struct PendingBytesBudgetState {
-    available: usize,
-    closed: bool,
-}
-
-#[derive(Debug)]
-struct PendingBytesReservation {
-    budget: Arc<PendingBytesBudget>,
-    bytes: usize,
+    semaphore: Arc<Semaphore>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -121,20 +109,19 @@ enum PendingBytesAcquireError {
     ExceedsCapacity { requested: usize, capacity: usize },
 }
 
+type PendingBytesReservation = OwnedSemaphorePermit;
+
 impl PendingBytesBudget {
     fn new(capacity: usize) -> Self {
+        let capacity = capacity.max(1).min(u32::MAX as usize);
         Self {
             capacity,
-            state: Mutex::new(PendingBytesBudgetState {
-                available: capacity,
-                closed: false,
-            }),
-            notify: Notify::new(),
+            semaphore: Arc::new(Semaphore::new(capacity)),
         }
     }
 
     async fn acquire(
-        self: &Arc<Self>,
+        &self,
         requested: usize,
     ) -> Result<PendingBytesReservation, PendingBytesAcquireError> {
         if requested > self.capacity {
@@ -144,43 +131,15 @@ impl PendingBytesBudget {
             });
         }
 
-        loop {
-            let notified = {
-                let mut state = self.state.lock().expect("lock poisoned");
-                if state.closed {
-                    return Err(PendingBytesAcquireError::Closed);
-                }
-                if state.available >= requested {
-                    state.available -= requested;
-                    return Ok(PendingBytesReservation {
-                        budget: self.clone(),
-                        bytes: requested,
-                    });
-                }
-                self.notify.notified()
-            };
-            notified.await;
-        }
-    }
-
-    fn release(&self, bytes: usize) {
-        let mut state = self.state.lock().expect("lock poisoned");
-        state.available = state.available.saturating_add(bytes).min(self.capacity);
-        drop(state);
-        self.notify.notify_waiters();
+        self.semaphore
+            .clone()
+            .acquire_many_owned(requested as u32)
+            .await
+            .map_err(|_| PendingBytesAcquireError::Closed)
     }
 
     fn close(&self) {
-        let mut state = self.state.lock().expect("lock poisoned");
-        state.closed = true;
-        drop(state);
-        self.notify.notify_waiters();
-    }
-}
-
-impl Drop for PendingBytesReservation {
-    fn drop(&mut self) {
-        self.budget.release(self.bytes);
+        self.semaphore.close();
     }
 }
 
