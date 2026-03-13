@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use jiff::SignedDuration;
 use std::time::Duration;
+
+use jiff::SignedDuration;
 use tokio::time::sleep;
 use uuid::Uuid;
 
