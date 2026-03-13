@@ -86,23 +86,14 @@ impl fmt::Display for ErrorStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "format")]
 pub(crate) enum IngestData {
-    #[serde(rename = "arrow")]
-    Arrow { rows: String },
     #[serde(rename = "json")]
     Json { rows: String },
-    #[serde(rename = "result_set")]
-    ResultSet {
-        fields: Vec<FieldMetadata>,
-        rows: String,
-    },
 }
 
 impl IngestData {
     pub fn format(&self) -> &'static str {
         match self {
-            Self::Arrow { .. } => "arrow",
             Self::Json { .. } => "json",
-            Self::ResultSet { .. } => "result_set",
         }
     }
 }
@@ -132,12 +123,8 @@ pub struct IngestResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum ResultFormat {
-    #[serde(rename = "arrow")]
-    Arrow,
     #[serde(rename = "json")]
     Json,
-    #[serde(rename = "result_set")]
-    ResultSet,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -337,12 +324,8 @@ pub struct StatementResultSet {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "format")]
 pub enum ResultSetData {
-    #[serde(rename = "arrow")]
-    Arrow { rows: String },
     #[serde(rename = "json")]
     Json { rows: Vec<Vec<Option<String>>> },
-    #[serde(rename = "result_set")]
-    ResultSet { rows: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

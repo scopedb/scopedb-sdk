@@ -67,39 +67,12 @@ impl ResultSet {
     pub fn json_rows(&self) -> Option<&[Vec<Option<String>>]> {
         match &self.data {
             ResultSetData::Json { rows } => Some(rows),
-            _ => None,
-        }
-    }
-
-    pub fn arrow_rows_base64(&self) -> Option<&str> {
-        match &self.data {
-            ResultSetData::Arrow { rows } => Some(rows),
-            _ => None,
-        }
-    }
-
-    pub fn result_set_rows(&self) -> Option<&str> {
-        match &self.data {
-            ResultSetData::ResultSet { rows } => Some(rows),
-            _ => None,
         }
     }
 
     pub fn into_values(self) -> Result<Vec<Vec<Value>>, Error> {
         let rows = match self.data {
             ResultSetData::Json { rows } => rows,
-            ResultSetData::Arrow { .. } => {
-                return Err(Error::new(
-                    ErrorKind::Unexpected,
-                    "cannot convert arrow result data into typed values directly".to_string(),
-                ));
-            }
-            ResultSetData::ResultSet { .. } => {
-                return Err(Error::new(
-                    ErrorKind::Unexpected,
-                    "cannot convert raw result_set payload into typed values directly".to_string(),
-                ));
-            }
         };
 
         let num_rows = self.num_rows;
