@@ -66,9 +66,28 @@ await stream.flush();
 await stream.shutdown();
 ```
 
+## Examples
+
+See the TypeScript examples under [`examples/`](examples/):
+
+- `examples/statement.ts`
+- `examples/table.ts`
+- `examples/batch.ts`
+
+These examples import from `src/` directly so they stay close to the in-repo SDK surface while the
+package is still evolving.
+
 ## Development
 
 ```sh
+npm test
 npm run build
 npm run check
 ```
+
+## Delivery Notes
+
+- The package is TypeScript-first and emits declarations from `src/index.ts`.
+- Generated artifacts should stay out of git; `dist/`, `dist-test/`, and `node_modules/` are
+  ignored in [`node/.gitignore`](.gitignore).
+- A broader package-delivery checklist lives in [`node/DELIVERY.md`](DELIVERY.md).
