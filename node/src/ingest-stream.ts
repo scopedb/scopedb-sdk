@@ -152,7 +152,8 @@ export class IngestStream {
   async send(record: unknown): Promise<void> {
     this.checkFatal();
     const payload = serializeRecord(record);
-    const bytes = bufferedBytes(payload);
+    const payloadBytes = byteLength(payload);
+    const bytes = payloadBytes + 1; // +1 for newline separator
 
     let reservation: PendingBytesReservation;
     try {
@@ -164,7 +165,7 @@ export class IngestStream {
     try {
       await this.queue.send({
         type: "record",
-        record: { payload, bytes: byteLength(payload), reservation },
+        record: { payload, bytes: payloadBytes, reservation },
       });
     } catch {
       reservation.release();
@@ -603,9 +604,6 @@ function serializeRecord(record: unknown): string {
   }
 }
 
-function bufferedBytes(payload: string): number {
-  return byteLength(payload) + 1;
-}
 
 function byteLength(payload: string): number {
   return TEXT_ENCODER.encode(payload).byteLength;

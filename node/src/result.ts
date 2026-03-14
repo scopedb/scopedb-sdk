@@ -119,6 +119,12 @@ export class ResultSet {
       return null;
     }
     const fields = this.resultSchema.fields();
+    if (row.length !== fields.length) {
+      throw new ScopeDBError(
+        "Unexpected",
+        `row field count mismatch: expected ${fields.length}, got ${row.length}`,
+      );
+    }
     const obj: Record<string, Value> = {};
     row.forEach((cell, i) => {
       obj[fields[i]!.name()] = parseCell(cell, fields[i]!.dataType());
