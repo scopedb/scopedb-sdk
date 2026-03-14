@@ -229,13 +229,7 @@ async function responseToError(response: Response): Promise<ScopeDBError> {
     "Unexpected",
     `${response.status} ${response.statusText}: ${message}`,
   );
-  if (
-    response.status === 429 ||
-    response.status === 502 ||
-    response.status === 503 ||
-    response.status === 504 ||
-    response.status >= 500
-  ) {
+  if (response.status === 429 || response.status >= 500) {
     return error.setTemporary();
   }
   return error.setPermanent();

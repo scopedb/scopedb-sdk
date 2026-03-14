@@ -240,7 +240,10 @@ async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   }
 
   await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
     const onAbort = () => {
       clearTimeout(timer);
       reject(signal?.reason ?? new Error("aborted"));

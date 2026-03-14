@@ -26,6 +26,8 @@ const DEFAULT_MAX_RETRIES = 8;
 const DEFAULT_INITIAL_BACKOFF_MS = 100;
 const DEFAULT_MAX_BACKOFF_MS = 5_000;
 
+const TEXT_ENCODER = new TextEncoder();
+
 type FatalStatus = "permanent" | "temporary" | "persistent";
 
 interface FatalState {
@@ -606,7 +608,7 @@ function bufferedBytes(payload: string): number {
 }
 
 function byteLength(payload: string): number {
-  return new TextEncoder().encode(payload).byteLength;
+  return TEXT_ENCODER.encode(payload).byteLength;
 }
 
 function releaseRows(rows: BufferedRecord[]): void {
