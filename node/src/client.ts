@@ -24,7 +24,9 @@ import type {
   StatementRequest,
   StatementStatus,
 } from "./protocol.js";
+import type { ResultSet } from "./result.js";
 import { Statement, StatementHandle } from "./statement.js";
+import type { FetchOptions } from "./statement.js";
 import { Table } from "./table.js";
 
 export interface RequestOptions {
@@ -33,7 +35,14 @@ export interface RequestOptions {
 
 export interface ClientOptions {
   fetch?: typeof globalThis.fetch;
+  /** Default headers sent with every request. */
   headers?: HeadersInit;
+  /**
+   * Bearer token for authentication.
+   * Equivalent to `headers: { Authorization: 'Bearer <token>' }`.
+   * If both `token` and `headers.Authorization` are provided, `token` wins.
+   */
+  token?: string;
 }
 
 export class Client {
@@ -50,6 +59,9 @@ export class Client {
 
     this.fetchFn = options.fetch ?? globalThis.fetch;
     this.defaultHeaders = new Headers(options.headers);
+    if (options.token !== undefined) {
+      this.defaultHeaders.set("Authorization", `Bearer ${options.token}`);
+    }
   }
 
   statement(statement: string): Statement {
@@ -66,6 +78,21 @@ export class Client {
 
   ingestStream(statement: string): IngestStreamBuilder {
     return new IngestStreamBuilder(this, statement);
+  }
+
+  /**
+   * Executes a ScopeQL statement and returns all rows.
+   *
+   * Shorthand for `client.statement(sql).execute(options)`.
+   *
+   * @example
+   * const result = await client.query("SELECT * FROM events LIMIT 10");
+   * for (const row of result.intoObjects()) {
+   *   console.log(row);
+   * }
+   */
+  async query(sql: string, options: FetchOptions = {}): Promise<ResultSet> {
+    return this.statement(sql).execute(options);
   }
 
   async healthCheck(options: RequestOptions = {}): Promise<void> {

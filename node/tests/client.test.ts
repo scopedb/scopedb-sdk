@@ -209,3 +209,50 @@ describe("Client.healthCheck", () => {
     assert.equal((call.init as RequestInit).method, "GET");
   });
 });
+
+describe("Client.query shorthand", () => {
+  it("executes statement and returns ResultSet", async () => {
+    const rs = {
+      metadata: { fields: [{ name: "n", data_type: "int" as const }], num_rows: 1 },
+      format: "json" as const,
+      rows: [["5"]],
+    };
+    const { fn, calls } = makeFetchStub([
+      jsonResponse(200, pendingStatus()),
+      jsonResponse(200, finishedStatus(rs)),
+    ]);
+    const client = new Client("http://localhost:8080", { fetch: fn });
+
+    const result = await client.query("SELECT 5", { initialDelayMs: 0, maxDelayMs: 0 });
+
+    assert.ok(calls.length >= 1);
+    assert.equal(result.numRows(), 1);
+    assert.deepEqual(result.first(), { n: 5n });
+  });
+});
+
+describe("ClientOptions.token", () => {
+  it("sends Authorization Bearer header on every request", async () => {
+    const { fn, calls } = makeFetchStub([jsonResponse(200, {})]);
+    const client = new Client("http://localhost:8080", { fetch: fn, token: "my-secret" });
+
+    await client.healthCheck();
+
+    const headers = (calls[0]!.init as RequestInit).headers as Headers;
+    assert.equal(headers.get("Authorization"), "Bearer my-secret");
+  });
+
+  it("token takes precedence over explicit Authorization header", async () => {
+    const { fn, calls } = makeFetchStub([jsonResponse(200, {})]);
+    const client = new Client("http://localhost:8080", {
+      fetch: fn,
+      token: "token-wins",
+      headers: { Authorization: "Bearer other" },
+    });
+
+    await client.healthCheck();
+
+    const headers = (calls[0]!.init as RequestInit).headers as Headers;
+    assert.equal(headers.get("Authorization"), "Bearer token-wins");
+  });
+});

@@ -23,10 +23,20 @@ import type {
   StatementStatus,
 } from "./protocol.js";
 import { statementIsFinished, statementIsTerminated } from "./protocol.js";
+import type { Value } from "./result.js";
 import { ResultSet } from "./result.js";
 
 export interface FetchOptions extends RequestOptions {
+  /**
+   * Initial polling delay in milliseconds.
+   * The delay doubles on each poll up to `maxDelayMs`.
+   * @default 5
+   */
   initialDelayMs?: number;
+  /**
+   * Maximum polling delay in milliseconds.
+   * @default 1000
+   */
   maxDelayMs?: number;
 }
 
@@ -74,6 +84,20 @@ export class Statement {
   async execute(options: FetchOptions = {}): Promise<ResultSet> {
     const handle = await this.submit(options);
     return handle.fetch(options);
+  }
+
+  /**
+   * Executes the statement and returns the first row as a plain object, or
+   * `null` if the result set is empty.
+   *
+   * Useful for point lookups and aggregate queries that return at most one row.
+   *
+   * @example
+   * const row = await client.statement("SELECT count(*) AS n FROM events").executeOne();
+   * console.log(row?.["n"]); // bigint
+   */
+  async executeOne(options: FetchOptions = {}): Promise<Record<string, Value> | null> {
+    return (await this.execute(options)).first();
   }
 }
 
@@ -124,7 +148,7 @@ export class StatementHandle {
           return ResultSet.fromStatementResultSet(this.currentStatus.result_set);
         case "failed":
         case "cancelled":
-          throw new ScopeDBError("Unexpected", this.currentStatus.message);
+          throw new ScopeDBError("StatementFailed", this.currentStatus.message);
         case "pending":
         case "running":
           await sleep(delayMs, options.signal);

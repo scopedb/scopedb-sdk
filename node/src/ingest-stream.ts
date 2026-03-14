@@ -146,6 +146,7 @@ export class IngestStream {
     this.task = this.runWorker();
   }
 
+  /** Enqueues a single record for batched ingestion. Blocks when backpressure is applied. */
   async send(record: unknown): Promise<void> {
     this.checkFatal();
     const payload = serializeRecord(record);
@@ -171,6 +172,14 @@ export class IngestStream {
     this.checkFatal();
   }
 
+  /**
+   * Flushes any buffered records to the server immediately, without closing the stream.
+   *
+   * This is an optional checkpoint operation. You do NOT need to call `flush()`
+   * before `shutdown()` — `shutdown()` already flushes remaining records before closing.
+   *
+   * Returns the ingest result for the flushed batch, or `null` if there was nothing to flush.
+   */
   async flush(): Promise<IngestResult | null> {
     this.checkFatal();
     const ack = new Deferred<IngestResult | null>();
@@ -182,6 +191,14 @@ export class IngestStream {
     return waitForAck(ack, () => this.closedOrFatalError());
   }
 
+  /**
+   * Flushes any remaining buffered records and shuts down the stream.
+   *
+   * Always call `shutdown()` when you are done sending records. It automatically
+   * flushes whatever is still in the buffer — you do not need to call `flush()` first.
+   *
+   * Returns the ingest result for the final batch, or `null` if there were no pending records.
+   */
   async shutdown(): Promise<IngestResult | null> {
     const ack = new Deferred<IngestResult | null>();
     try {

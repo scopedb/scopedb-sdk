@@ -183,3 +183,53 @@ describe("Schema and FieldSchema", () => {
     assert.equal(fields[2]!.dataType(), "boolean");
   });
 });
+
+describe("ResultSet.intoObjects", () => {
+  it("returns rows as objects keyed by column name", () => {
+    const rs = makeResultSet(
+      [{ name: "id", data_type: "int" }, { name: "label", data_type: "string" }],
+      [["1", "alpha"], ["2", "beta"]],
+    );
+    const rows = rs.intoObjects();
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0]!["id"], 1n);
+    assert.equal(rows[0]!["label"], "alpha");
+    assert.equal(rows[1]!["id"], 2n);
+    assert.equal(rows[1]!["label"], "beta");
+  });
+
+  it("returns empty array for empty result set", () => {
+    const rs = makeResultSet([{ name: "x", data_type: "int" }], []);
+    assert.deepEqual(rs.intoObjects(), []);
+  });
+
+  it("maps null cells to null values", () => {
+    const rs = makeResultSet([{ name: "v", data_type: "string" }], [[null]]);
+    assert.equal(rs.intoObjects()[0]!["v"], null);
+  });
+
+  it("throws ScopeDBError when row field count mismatches schema", () => {
+    const rs = makeResultSet(
+      [{ name: "a", data_type: "string" }, { name: "b", data_type: "string" }],
+      [["only-one"]],
+    );
+    assert.throws(() => rs.intoObjects(), ScopeDBError);
+  });
+});
+
+describe("ResultSet.first", () => {
+  it("returns first row as object when result set is non-empty", () => {
+    const rs = makeResultSet(
+      [{ name: "n", data_type: "int" }],
+      [["7"], ["8"]],
+    );
+    const row = rs.first();
+    assert.ok(row !== null);
+    assert.equal(row["n"], 7n);
+  });
+
+  it("returns null for empty result set", () => {
+    const rs = makeResultSet([{ name: "n", data_type: "int" }], []);
+    assert.equal(rs.first(), null);
+  });
+});

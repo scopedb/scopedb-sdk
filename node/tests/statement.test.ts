@@ -155,6 +155,7 @@ describe("StatementHandle.fetch", () => {
       () => handle.fetch(noDelay),
       (err: unknown) => {
         assert.ok(err instanceof ScopeDBError);
+        assert.equal(err.kind, "StatementFailed");
         assert.ok(err.message.includes("query error"), `message was: ${err.message}`);
         return true;
       },
@@ -170,6 +171,7 @@ describe("StatementHandle.fetch", () => {
       () => handle.fetch(noDelay),
       (err: unknown) => {
         assert.ok(err instanceof ScopeDBError);
+        assert.equal(err.kind, "StatementFailed");
         assert.ok(err.message.includes("cancelled by user"), `message was: ${err.message}`);
         return true;
       },
@@ -298,5 +300,41 @@ describe("StatementHandle.cancel", () => {
     await handle.cancel();
 
     assert.equal(handle.status()?.status, "cancelled");
+  });
+});
+
+describe("Statement.executeOne", () => {
+  it("returns first row as object when result set is non-empty", async () => {
+    const rs = {
+      metadata: {
+        fields: [{ name: "count", data_type: "int" as const }],
+        num_rows: 1,
+      },
+      format: "json" as const,
+      rows: [["42"]],
+    };
+    const { fn } = makeFetchStub([
+      jsonResponse(200, pendingStatus()),
+      jsonResponse(200, finishedStatus(rs)),
+    ]);
+    const client = new Client("http://localhost:8080", { fetch: fn });
+
+    const row = await client.statement("SELECT count(*) AS count FROM t").executeOne(noDelay);
+
+    assert.ok(row !== null);
+    assert.equal(row["count"], 42n);
+  });
+
+  it("returns null when result set is empty", async () => {
+    const rs = {
+      metadata: { fields: [{ name: "x", data_type: "int" as const }], num_rows: 0 },
+      format: "json" as const,
+      rows: [],
+    };
+    const { fn } = makeFetchStub([jsonResponse(200, finishedStatus(rs))]);
+    const client = new Client("http://localhost:8080", { fetch: fn });
+
+    const row = await client.statement("SELECT 1 WHERE false").executeOne(noDelay);
+    assert.equal(row, null);
   });
 });

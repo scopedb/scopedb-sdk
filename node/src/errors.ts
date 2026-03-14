@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
-export type ErrorKind = "Unexpected" | "ConfigInvalid";
+export type ErrorKind =
+  | "Unexpected"
+  | "ConfigInvalid"
+  /** The statement execution was rejected by the server (failed or cancelled in-band). */
+  | "StatementFailed";
 export type ErrorStatus = "permanent" | "temporary" | "persistent";
 
 export class ScopeDBError extends Error {
@@ -75,6 +79,17 @@ export class ScopeDBError extends Error {
 
   isPersistent(): boolean {
     return this.errorStatus === "persistent";
+  }
+
+  override toString(): string {
+    let s = `ScopeDBError [${this.kind}/${this.errorStatus}]: ${this.message}`;
+    if (this.errorContext.size > 0) {
+      const ctx = [...this.errorContext.entries()]
+        .map(([k, v]) => `${k}=${v}`)
+        .join(", ");
+      s += ` { ${ctx} }`;
+    }
+    return s;
   }
 }
 

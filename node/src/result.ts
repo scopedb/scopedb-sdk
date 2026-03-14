@@ -74,6 +74,58 @@ export class ResultSet {
     });
   }
 
+  /**
+   * Returns all rows as plain objects keyed by column name.
+   *
+   * This is the most convenient form for typical application code — use this
+   * instead of `intoValues()` when you need to access columns by name.
+   *
+   * @example
+   * const rows = result.intoObjects();
+   * console.log(rows[0]?.["user_id"]); // bigint
+   */
+  intoObjects(): Record<string, Value>[] {
+    const fields = this.resultSchema.fields();
+    return this.rows.map((row) => {
+      if (row.length !== fields.length) {
+        throw new ScopeDBError(
+          "Unexpected",
+          `row field count mismatch: expected ${fields.length}, got ${row.length}`,
+        );
+      }
+      const obj: Record<string, Value> = {};
+      row.forEach((cell, i) => {
+        obj[fields[i]!.name()] = parseCell(cell, fields[i]!.dataType());
+      });
+      return obj;
+    });
+  }
+
+  /**
+   * Returns the first row as a plain object keyed by column name, or `null`
+   * if the result set is empty.
+   *
+   * Useful for queries that return at most one row (lookups, aggregates, etc.).
+   *
+   * @example
+   * const row = result.first();
+   * if (row !== null) {
+   *   console.log(row["count"]); // bigint
+   * }
+   */
+  first(): Record<string, Value> | null {
+    const row = this.rows[0];
+    if (row === undefined) {
+      return null;
+    }
+    const fields = this.resultSchema.fields();
+    const obj: Record<string, Value> = {};
+    row.forEach((cell, i) => {
+      obj[fields[i]!.name()] = parseCell(cell, fields[i]!.dataType());
+    });
+    return obj;
+  }
+
   static fromStatementResultSet(resultSet: StatementResultSet): ResultSet {
     return new ResultSet(
       new Schema(
