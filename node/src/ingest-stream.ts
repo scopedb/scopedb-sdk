@@ -26,7 +26,6 @@ const DEFAULT_MAX_RETRIES = 8;
 const DEFAULT_INITIAL_BACKOFF_MS = 100;
 const DEFAULT_MAX_BACKOFF_MS = 5_000;
 
-const TEXT_ENCODER = new TextEncoder();
 
 type FatalStatus = "permanent" | "temporary" | "persistent";
 
@@ -606,7 +605,7 @@ function serializeRecord(record: unknown): string {
 
 
 function byteLength(payload: string): number {
-  return TEXT_ENCODER.encode(payload).byteLength;
+  return Buffer.byteLength(payload, "utf8");
 }
 
 function releaseRows(rows: BufferedRecord[]): void {
