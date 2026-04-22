@@ -23,6 +23,7 @@ Use NewClient to create a client struct. This is the major entrance to construct
 
 	client := scopedb.NewClient(&scopedb.Config{
 		Endpoint: "http://<scopedb-host>:<scopedb-port:-6543>",
+		APIKey:   "<scopedb-api-key>",
 	})
 
 # Write Data via Cables
