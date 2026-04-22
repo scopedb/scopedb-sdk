@@ -1,6 +1,9 @@
 # How to release ScopeDB Go SDK
 
-It should be as simple as tagging the release and pushing the Git tag to the repository:
+Before tagging a release, update `CHANGELOG.md` and any release-specific
+documentation such as `README.md`.
+
+Then tag the release and push the Git tag to the repository:
 
 ```shell
 export version=v0.1.0

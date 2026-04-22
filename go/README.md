@@ -47,11 +47,13 @@ client := scopedb.NewClient(&scopedb.Config{
 ## Docs
 
 For detailed documentation and basic usage examples, please see the documentation at [godoc.org](https://godoc.org/github.com/scopedb/scopedb-sdk/go).
+Release notes are tracked in [CHANGELOG.md](CHANGELOG.md).
 
 ## Compatibility
 
 | Go SDK Version | ScopeDB Version |
 | -------------- | --------------- |
+| 0.5.0          | >= 0.1.116      |
 | 0.4.0          | >= 0.1.116      |
 | <= 0.3.0       | archived        |
 
