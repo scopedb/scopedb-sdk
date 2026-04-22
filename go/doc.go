@@ -22,9 +22,13 @@ Package scopedb provides a lightweight and easy-to-use client for interacting wi
 Use NewClient to create a client struct. This is the major entrance to construct structs for interacting with ScopeDB:
 
 	client := scopedb.NewClient(&scopedb.Config{
-		Endpoint: "http://<scopedb-host>:<scopedb-port:-6543>",
-		APIKey:   "<scopedb-api-key>",
+		Endpoint:    "http://<scopedb-host>:<scopedb-port:-6543>",
+		APIKey:      "<scopedb-api-key>",
+		Compression: scopedb.CompressionZstd,
 	})
+
+POST requests use zstd compression by default. Set CompressionGzip in Config
+when talking to older deployments that do not support zstd yet.
 
 # Write Data via Cables
 

@@ -21,12 +21,14 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/klauspost/compress/zstd"
 )
 
 // Client is the major entrance to construct structs for interacting with ScopeDB.
@@ -42,6 +44,7 @@ func NewClient(config *Config) *Client {
 		http: &httpClient{
 			client:        http.DefaultClient,
 			authorization: bearerAuthorization(config),
+			compression:   requestCompression(config),
 		},
 	}
 }
@@ -59,6 +62,7 @@ func (c *Client) Close() {
 type httpClient struct {
 	client        *http.Client
 	authorization string
+	compression   Compression
 }
 
 // doGet sends a GET request to the ScopeDB server.
@@ -76,21 +80,17 @@ func (c *httpClient) doGet(ctx context.Context, u *url.URL) (*http.Response, err
 func (c *httpClient) doPost(ctx context.Context, u *url.URL, body []byte) (*http.Response, error) {
 	uncompressedContentLength := len(body)
 
-	var b bytes.Buffer
-	g := gzip.NewWriter(&b)
-	if _, err := g.Write(body); err != nil {
-		return nil, err
-	}
-	if err := g.Close(); err != nil {
+	compressedBody, compression, err := compressRequestBody(body, c.compression)
+	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), &b)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), &compressedBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Content-Encoding", string(compression))
 	req.Header.Set("X-ScopeDB-Uncompressed-Content-Length", strconv.Itoa(uncompressedContentLength))
 	c.applyAuthorization(req)
 	resp, err := c.client.Do(req)
@@ -118,6 +118,44 @@ func bearerAuthorization(config *Config) string {
 		return ""
 	}
 	return "Bearer " + config.APIKey
+}
+
+func requestCompression(config *Config) Compression {
+	if config == nil || config.Compression == "" {
+		return CompressionZstd
+	}
+	return config.Compression
+}
+
+func compressRequestBody(body []byte, compression Compression) (bytes.Buffer, Compression, error) {
+	var b bytes.Buffer
+
+	switch compression {
+	case CompressionZstd:
+		zw, err := zstd.NewWriter(&b)
+		if err != nil {
+			return bytes.Buffer{}, "", err
+		}
+		if _, err := zw.Write(body); err != nil {
+			zw.Close()
+			return bytes.Buffer{}, "", err
+		}
+		if err := zw.Close(); err != nil {
+			return bytes.Buffer{}, "", err
+		}
+	case CompressionGzip:
+		gw := gzip.NewWriter(&b)
+		if _, err := gw.Write(body); err != nil {
+			return bytes.Buffer{}, "", err
+		}
+		if err := gw.Close(); err != nil {
+			return bytes.Buffer{}, "", err
+		}
+	default:
+		return bytes.Buffer{}, "", fmt.Errorf("unsupported compression: %q", compression)
+	}
+
+	return b, compression, nil
 }
 
 type statementRequest struct {
