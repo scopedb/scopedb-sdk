@@ -5,7 +5,7 @@
 
 This module provides a ScopeDB SDK for Go. You can use it to ingest data to or query over ScopeDB.
 
-This SDK requires a minimum version of Go 1.22.
+This SDK requires a minimum version of Go 1.24.
 
 ## Installation
 
@@ -27,8 +27,20 @@ Create a client with your ScopeDB endpoint and API key:
 
 ```go
 client := scopedb.NewClient(&scopedb.Config{
-	Endpoint: "https://your-tenant.scopedb.io",
-	APIKey:   os.Getenv("SCOPEDB_API_KEY"),
+	Endpoint:    "https://your-tenant.scopedb.io",
+	APIKey:      os.Getenv("SCOPEDB_API_KEY"),
+	Compression: scopedb.CompressionZstd,
+})
+```
+
+`zstd` is the default POST compression. If you need to talk to an older
+ScopeDB deployment that only supports `gzip`, set `Compression` explicitly:
+
+```go
+client := scopedb.NewClient(&scopedb.Config{
+	Endpoint:    "https://your-tenant.scopedb.io",
+	APIKey:      os.Getenv("SCOPEDB_API_KEY"),
+	Compression: scopedb.CompressionGzip,
 })
 ```
 
