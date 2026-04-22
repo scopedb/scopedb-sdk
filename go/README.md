@@ -40,7 +40,7 @@ For detailed documentation and basic usage examples, please see the documentatio
 
 | Go SDK Version | ScopeDB Version |
 | -------------- | --------------- |
-| 0.3.1          | >= 0.1.116      |
+| 0.4.0          | >= 0.1.116      |
 | <= 0.3.0       | archived        |
 
 ## Development
