@@ -40,7 +40,8 @@ func NewClient(config *Config) *Client {
 	return &Client{
 		config: config,
 		http: &httpClient{
-			client: http.DefaultClient,
+			client:        http.DefaultClient,
+			authorization: bearerAuthorization(config),
 		},
 	}
 }
@@ -56,7 +57,8 @@ func (c *Client) Close() {
 
 // httpClient is a wrapper around the standard http.Client to decorate GET/POST requests.
 type httpClient struct {
-	client *http.Client
+	client        *http.Client
+	authorization string
 }
 
 // doGet sends a GET request to the ScopeDB server.
@@ -65,6 +67,7 @@ func (c *httpClient) doGet(ctx context.Context, u *url.URL) (*http.Response, err
 	if err != nil {
 		return nil, err
 	}
+	c.applyAuthorization(req)
 	resp, err := c.client.Do(req)
 	return resp, err
 }
@@ -89,8 +92,16 @@ func (c *httpClient) doPost(ctx context.Context, u *url.URL, body []byte) (*http
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
 	req.Header.Set("X-ScopeDB-Uncompressed-Content-Length", strconv.Itoa(uncompressedContentLength))
+	c.applyAuthorization(req)
 	resp, err := c.client.Do(req)
 	return resp, err
+}
+
+func (c *httpClient) applyAuthorization(req *http.Request) {
+	if c.authorization == "" {
+		return
+	}
+	req.Header.Set("Authorization", c.authorization)
 }
 
 // Close closes the HTTP client.
@@ -100,6 +111,13 @@ func (c *httpClient) doPost(ctx context.Context, u *url.URL, body []byte) (*http
 // useful to call this if you want to release the resources immediately.
 func (c *httpClient) Close() {
 	c.client.CloseIdleConnections()
+}
+
+func bearerAuthorization(config *Config) string {
+	if config == nil || config.APIKey == "" {
+		return ""
+	}
+	return "Bearer " + config.APIKey
 }
 
 type statementRequest struct {

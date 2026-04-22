@@ -21,6 +21,17 @@ Get the ScopeDB GO SDK source code, if not installed.
 go get -u github.com/scopedb/scopedb-sdk/go
 ```
 
+## Usage
+
+Create a client with your ScopeDB endpoint and API key:
+
+```go
+client := scopedb.NewClient(&scopedb.Config{
+	Endpoint: "https://your-tenant.scopedb.io",
+	APIKey:   os.Getenv("SCOPEDB_API_KEY"),
+})
+```
+
 ## Docs
 
 For detailed documentation and basic usage examples, please see the documentation at [godoc.org](https://godoc.org/github.com/scopedb/scopedb-sdk/go).

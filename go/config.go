@@ -20,4 +20,9 @@ package scopedb
 type Config struct {
 	// Endpoint is the URL of the ScopeDB service.
 	Endpoint string `json:"endpoint"`
+	// APIKey is the API key used for authentication.
+	//
+	// When provided, the client sends it as the Authorization header using the
+	// Bearer scheme.
+	APIKey string `json:"api_key"`
 }
