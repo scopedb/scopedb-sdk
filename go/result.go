@@ -17,12 +17,17 @@
 package scopedb
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
+
+var fixedDurationPattern = regexp.MustCompile(`^(-)?PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.(\d{1,9}))?S)?$`)
 
 // Value stores the contents of a single cell from a ScopeDB statement result.
 type Value any
@@ -42,6 +47,10 @@ type ResultSet struct {
 // ToValues reads the result set and returns the rows as a 2D array of values,
 // i.e., rows of value lists.
 //
+// Binary cells are returned as []byte, timestamps as time.Time, and intervals
+// as time.Duration. Array, object, and any cells remain JSON strings, while
+// null cells are returned as nil.
+//
 // This method is only valid if the result set is of the JSON format.
 func (rs *ResultSet) ToValues() ([][]Value, error) {
 	if rs.Format != ResultFormatJSON {
@@ -57,6 +66,12 @@ func (rs *ResultSet) ToValues() ([][]Value, error) {
 		switch typ {
 		case StringDataType:
 			return v, nil
+		case BinaryDataType:
+			value, err := hex.DecodeString(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid binary value %q: %w", v, err)
+			}
+			return value, nil
 		case IntDataType:
 			return strconv.ParseInt(v, 10, 64)
 		case UIntDataType:
@@ -68,10 +83,12 @@ func (rs *ResultSet) ToValues() ([][]Value, error) {
 		case TimestampDataType:
 			return time.Parse(time.RFC3339Nano, v)
 		case IntervalDataType:
-			return time.ParseDuration(v)
+			return parseInterval(v)
 		case ArrayDataType, ObjectDataType, AnyDataType:
 			// represent as JSON string
 			return v, nil
+		case NullDataType:
+			return nil, fmt.Errorf("unexpected non-null value for null data type: %q", v)
 		default:
 			return nil, fmt.Errorf("unrecognized type: %s", typ)
 		}
@@ -101,6 +118,26 @@ func (rs *ResultSet) ToValues() ([][]Value, error) {
 	return valueLists, nil
 }
 
+func parseInterval(value string) (time.Duration, error) {
+	matches := fixedDurationPattern.FindStringSubmatch(value)
+	if matches == nil || matches[2]+matches[3]+matches[4] == "" {
+		return 0, fmt.Errorf("invalid interval value %q: expected fixed-duration ISO 8601 PT form", value)
+	}
+
+	duration := strings.TrimPrefix(value, "-")
+	duration = strings.TrimPrefix(duration, "PT")
+	duration = strings.NewReplacer("H", "h", "M", "m", "S", "s").Replace(duration)
+	if matches[1] == "-" {
+		duration = "-" + duration
+	}
+
+	parsed, err := time.ParseDuration(duration)
+	if err != nil {
+		return 0, fmt.Errorf("invalid interval value %q: %w", value, err)
+	}
+	return parsed, nil
+}
+
 // Schema describes the fields in a table or query result.
 type Schema []*FieldSchema
 
@@ -118,6 +155,8 @@ type DataType string
 const (
 	// StringDataType indicates the data is of string data type.
 	StringDataType DataType = "string"
+	// BinaryDataType indicates the data is of binary data type.
+	BinaryDataType DataType = "binary"
 	// IntDataType indicates the data is of int data type.
 	IntDataType DataType = "int"
 	// UIntDataType indicates the data is of uint data type.
@@ -136,4 +175,6 @@ const (
 	ObjectDataType DataType = "object"
 	// AnyDataType indicates the data is of any data type.
 	AnyDataType DataType = "any"
+	// NullDataType indicates the data is of null data type.
+	NullDataType DataType = "null"
 )
