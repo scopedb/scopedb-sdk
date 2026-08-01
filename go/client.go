@@ -21,6 +21,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -137,8 +138,7 @@ func compressRequestBody(body []byte, compression Compression) (bytes.Buffer, Co
 			return bytes.Buffer{}, "", err
 		}
 		if _, err := zw.Write(body); err != nil {
-			zw.Close()
-			return bytes.Buffer{}, "", err
+			return bytes.Buffer{}, "", errors.Join(err, zw.Close())
 		}
 		if err := zw.Close(); err != nil {
 			return bytes.Buffer{}, "", err

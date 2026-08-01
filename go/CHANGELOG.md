@@ -4,6 +4,11 @@ All significant changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Bug Fixes
+
+* Added the missing binary and null data type constants.
+* Fixed `ResultSet.ToValues` conversion for binary and interval columns.
+
 ## v0.5.0 (2026-04-23)
 
 ### Breaking Changes

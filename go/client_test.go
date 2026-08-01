@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -119,8 +120,8 @@ func decodeCompressedRequestBody(r *http.Request) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer gr.Close()
-		return io.ReadAll(gr)
+		decoded, readErr := io.ReadAll(gr)
+		return decoded, errors.Join(readErr, gr.Close())
 	default:
 		return nil, io.ErrUnexpectedEOF
 	}
