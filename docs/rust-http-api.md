@@ -4,16 +4,6 @@ This document describes the HTTP surface modeled by the Rust SDK and the
 delivery rules that its higher-level helpers preserve. Public endpoints are
 rooted at `/v1`.
 
-## Health
-
-### `GET /v1/health`
-
-Returns a plain-text connectivity and liveness response:
-
-```text
-OK
-```
-
 ## REST catalog API
 
 Catalog endpoints are read-only. Every user-provided database, schema, and

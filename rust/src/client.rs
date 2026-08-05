@@ -16,7 +16,6 @@ use fastrace_reqwest::traceparent_headers;
 use reqwest::IntoUrl;
 use reqwest::StatusCode;
 use reqwest::Url;
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
@@ -45,6 +44,7 @@ use crate::protocol::StatementRequestParams;
 use crate::protocol::StatementStatus;
 use crate::protocol::TableResource;
 use crate::protocol::TableResourceSummary;
+use crate::protocol::http_error_message;
 use crate::statement::StatementHandle;
 
 #[derive(Debug, Clone)]
@@ -89,18 +89,6 @@ impl Client {
 
     pub fn ingest_stream(&self, statement: impl Into<String>) -> IngestStreamBuilder {
         IngestStreamBuilder::new(self.clone(), statement.into())
-    }
-
-    pub async fn health_check(&self) -> Result<(), Error> {
-        let url = self.make_url("v1/health")?;
-        self.client.get(url).send().await.map_err(|err| {
-            Error::new(
-                ErrorKind::Unexpected,
-                "failed to send health check request".to_string(),
-            )
-            .set_source(err)
-        })?;
-        Ok(())
     }
 
     pub async fn list_databases(
@@ -436,14 +424,7 @@ fn decode_append_response(status: StatusCode, payload: &[u8]) -> Result<AppendRo
         }
     }
 
-    #[derive(Deserialize)]
-    struct ErrorMessage {
-        message: String,
-    }
-
-    let message = serde_json::from_slice::<ErrorMessage>(payload)
-        .map(|payload| payload.message)
-        .unwrap_or_else(|_| String::from_utf8_lossy(payload).into_owned());
+    let message = http_error_message(payload);
     Err(append_unknown_error(format_http_error(status, &message)))
 }
 
@@ -551,6 +532,22 @@ mod tests {
             decode_append_response(StatusCode::BAD_REQUEST, br#"{"message":"bad request"}"#)
                 .unwrap_err();
 
+        assert!(error.is_persistent());
+        assert_eq!(
+            error.append_details().unwrap().append_state,
+            AppendState::Unknown
+        );
+    }
+
+    #[test]
+    fn nested_append_error_has_clean_message_and_unknown_outcome() {
+        let error = decode_append_response(
+            StatusCode::NOT_FOUND,
+            br#"{"error":{"message":"unsupported path"}}"#,
+        )
+        .unwrap_err();
+
+        assert_eq!(error.message(), "Not Found (404): unsupported path");
         assert!(error.is_persistent());
         assert_eq!(
             error.append_details().unwrap().append_state,

@@ -28,6 +28,12 @@ let client = Client::new(
 # Ok::<(), scopedb_client::Error>(())
 ```
 
+The runnable examples read authentication from `SCOPEDB_API_KEY`. For backward
+compatibility, they fall back to `SCOPEDB_TOKEN` when the API key variable is
+unset or empty. The shared helper marks the resulting authorization header as
+sensitive so standard header and request `Debug` formatting redacts the
+credential.
+
 ## Run a statement
 
 ```rust

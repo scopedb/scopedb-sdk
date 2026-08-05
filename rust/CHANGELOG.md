@@ -4,6 +4,18 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+### Bug Fixes
+
+* Removed `Client::health_check`, which targeted an internal liveness endpoint
+  and could report non-success HTTP responses as healthy.
+* Decode error messages from both direct and nested API error envelopes,
+  including unknown-outcome append failures.
+
+### Documentation
+
+* Prefer `SCOPEDB_API_KEY` in examples while retaining `SCOPEDB_TOKEN` as a
+  backward-compatible fallback, and mark authorization headers as sensitive.
+
 ## v0.2.1 (2026-08-05)
 
 ### Bug Fixes

@@ -40,7 +40,8 @@ CREATE TABLE public.sdk_example_events (
 Configuration comes from:
 
 - `SCOPEDB_ENDPOINT` (defaults to `http://127.0.0.1:6543`)
-- `SCOPEDB_TOKEN` (optional Bearer token)
+- `SCOPEDB_API_KEY` (optional Bearer API key; preferred)
+- `SCOPEDB_TOKEN` (fallback when `SCOPEDB_API_KEY` is unset or empty)
 - `SCOPEDB_DATABASE` (defaults to `scopedb`)
 - `SCOPEDB_SCHEMA` (defaults to `public`)
 - `SCOPEDB_TABLE` (required for writes)
