@@ -17,7 +17,11 @@ mod common;
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = common::client()?;
-    let table = client.table("events").with_schema("public");
+    let table_name = std::env::var("SCOPEDB_TABLE").unwrap_or_else(|_| "events".to_string());
+    let table = client
+        .table(table_name)
+        .with_database(common::database())
+        .with_schema(common::schema());
 
     println!("identifier: {}", table.identifier());
 
