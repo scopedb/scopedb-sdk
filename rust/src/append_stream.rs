@@ -2029,6 +2029,7 @@ mod tests {
         max_active: Arc<AtomicUsize>,
         responder: Arc<Responder>,
     ) {
+        stream.set_nonblocking(false).unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
             .unwrap();
@@ -2107,6 +2108,28 @@ mod tests {
             headers,
             body,
         })
+    }
+
+    #[test]
+    fn mock_server_waits_for_delayed_request_bytes() {
+        let server = MockServer::start(|_, request| MockResponse::committed(request));
+        let mut stream = TcpStream::connect(server.endpoint.trim_start_matches("http://")).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .unwrap();
+
+        thread::sleep(Duration::from_millis(20));
+        let body = "{\"id\":1}\n";
+        let request = format!(
+            "POST /rows HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(request.as_bytes()).unwrap();
+
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
+        assert_eq!(server.requests().len(), 1);
     }
 
     #[test]
