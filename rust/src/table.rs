@@ -12,15 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::str::FromStr;
-
 use crate::Client;
-use crate::DataType;
 use crate::Error;
-use crate::ErrorKind;
 use crate::FieldSchema;
 use crate::Schema;
-use crate::Value;
+use crate::append_stream::AppendStreamBuilder;
+use crate::protocol::AppendRowsResult;
 
 #[derive(Debug, Clone)]
 pub struct Table {
@@ -70,62 +67,45 @@ impl Table {
             .map(|_| ())
     }
 
+    /// Appends newline-delimited JSON rows to this table.
+    pub async fn append(&self, ndjson: impl Into<String>) -> Result<AppendRowsResult, Error> {
+        self.client
+            .append_rows(
+                self.database.as_deref().unwrap_or("scopedb"),
+                self.schema.as_deref().unwrap_or("public"),
+                &self.table,
+                ndjson,
+            )
+            .await
+    }
+
+    /// Builds an asynchronous, bounded and concurrent append stream for this table.
+    pub fn append_stream(&self) -> AppendStreamBuilder {
+        AppendStreamBuilder::new(
+            self.client.clone(),
+            self.database
+                .clone()
+                .unwrap_or_else(|| "scopedb".to_string()),
+            self.schema.clone().unwrap_or_else(|| "public".to_string()),
+            self.table.clone(),
+        )
+    }
+
     pub async fn table_schema(&self) -> Result<Schema, Error> {
         let database_name = self.database.as_deref().unwrap_or("scopedb");
         let schema_name = self.schema.as_deref().unwrap_or("public");
-        let statement = format!(
-            r#"
-            FROM scopedb.system.columns
-            WHERE table_name = {}
-              AND schema_name = {}
-              AND database_name = {}
-            SELECT column_name, data_type
-            "#,
-            quote_string_literal(&self.table),
-            quote_string_literal(schema_name),
-            quote_string_literal(database_name),
-        );
-
-        let rows = self
+        let table = self
             .client
-            .statement(statement)
-            .execute()
-            .await?
-            .into_values()?;
-
-        let mut fields = Vec::with_capacity(rows.len());
-        for row in rows {
-            if row.len() != 2 {
-                return Err(Error::new(
-                    ErrorKind::Unexpected,
-                    format!("expected 2 columns in table schema row, got {}", row.len()),
-                ));
-            }
-
-            let column_name = match &row[0] {
-                Value::String(value) => value.clone(),
-                value => {
-                    return Err(Error::new(
-                        ErrorKind::Unexpected,
-                        format!("expected string column name, got {value:?}"),
-                    ));
-                }
-            };
-            let data_type = match &row[1] {
-                Value::String(value) => DataType::from_str(value)?,
-                value => {
-                    return Err(Error::new(
-                        ErrorKind::Unexpected,
-                        format!("expected string data type, got {value:?}"),
-                    ));
-                }
-            };
-
-            fields.push(FieldSchema {
-                name: column_name,
-                data_type,
-            });
-        }
+            .fetch_table(database_name, schema_name, &self.table)
+            .await?;
+        let fields = table
+            .columns
+            .into_iter()
+            .map(|column| FieldSchema {
+                name: column.name,
+                data_type: column.data_type,
+            })
+            .collect();
 
         Ok(Schema { fields })
     }
@@ -133,10 +113,6 @@ impl Table {
 
 fn quote_ident(input: &str, quote: char) -> String {
     quote_scopeql(input, quote)
-}
-
-fn quote_string_literal(input: &str) -> String {
-    quote_scopeql(input, '\'')
 }
 
 fn quote_scopeql(input: &str, quote: char) -> String {
@@ -163,20 +139,11 @@ fn quote_scopeql(input: &str, quote: char) -> String {
 #[cfg(test)]
 mod tests {
     use super::quote_ident;
-    use super::quote_string_literal;
 
     #[test]
     fn test_quote_ident() {
         assert_eq!(quote_ident("plain", '`'), "`plain`");
         assert_eq!(quote_ident("a`b", '`'), "`a\\`b`");
         assert_eq!(quote_ident("a\nb", '`'), "`a\\nb`");
-    }
-
-    #[test]
-    fn test_quote_string_literal() {
-        assert_eq!(quote_string_literal("plain"), "'plain'");
-        assert_eq!(quote_string_literal("a'b"), "'a\\'b'");
-        assert_eq!(quote_string_literal("a\nb"), "'a\\nb'");
-        assert_eq!(quote_string_literal("a\\b"), "'a\\\\b'");
     }
 }

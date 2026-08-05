@@ -26,6 +26,151 @@ use crate::Error;
 use crate::ErrorKind;
 use crate::ResultSet;
 
+/// The commit outcome reported by the table append API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppendState {
+    /// Every row in the request was committed.
+    Committed,
+    /// The request was rejected before any row was committed.
+    Rejected,
+    /// The server cannot determine whether the request committed.
+    Unknown,
+}
+
+impl fmt::Display for AppendState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Committed => f.write_str("committed"),
+            Self::Rejected => f.write_str("rejected"),
+            Self::Unknown => f.write_str("unknown"),
+        }
+    }
+}
+
+/// The result of a committed table append.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppendRowsResult {
+    pub append_state: AppendState,
+    pub num_rows_inserted: i64,
+}
+
+/// A validation error for one row in an append request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppendRowError {
+    pub row_index: u64,
+    pub column: String,
+    pub message: String,
+}
+
+/// Structured failure details returned by the table append API.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AppendErrorDetails {
+    pub append_state: AppendState,
+    #[serde(default)]
+    pub row_errors: Vec<AppendRowError>,
+    #[serde(default)]
+    pub row_errors_truncated: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct AppendRowsErrorPayload {
+    pub message: String,
+    #[serde(flatten)]
+    pub details: AppendErrorDetails,
+}
+
+/// Pagination options for catalog list requests.
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CatalogListOptions {
+    /// Number of resources to return. The server accepts values from 1 to 1000.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<usize>,
+    /// Opaque token returned as `next_page_token` by the previous page.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page_token: Option<String>,
+}
+
+/// One page of catalog resources.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CatalogPage<T> {
+    pub items: Vec<T>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_page_token: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatabaseResource {
+    pub name: String,
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SchemaResource {
+    pub database: String,
+    pub name: String,
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TableResourceSummary {
+    pub database: String,
+    pub schema: String,
+    pub name: String,
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TableColumnSpec {
+    pub name: String,
+    pub data_type: DataType,
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TableDistinctSpec {
+    pub on: Vec<String>,
+    pub by: Vec<String>,
+}
+
+/// The public specification of a table resource.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TableSpec {
+    pub columns: Vec<TableColumnSpec>,
+    pub partition_by: Vec<String>,
+    pub cluster_by: Vec<String>,
+    pub distinct_on: TableDistinctSpec,
+    pub data_retention_days: Option<i32>,
+    pub comment: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TableResource {
+    pub database: String,
+    pub schema: String,
+    pub name: String,
+    pub columns: Vec<TableColumnSpec>,
+    pub partition_by: Vec<String>,
+    pub cluster_by: Vec<String>,
+    pub distinct_on: TableDistinctSpec,
+    pub data_retention_days: Option<i32>,
+    pub comment: Option<String>,
+}
+
+impl TableResource {
+    /// Returns the reusable table specification without its catalog identity.
+    pub fn spec(&self) -> TableSpec {
+        TableSpec {
+            columns: self.columns.clone(),
+            partition_by: self.partition_by.clone(),
+            cluster_by: self.cluster_by.clone(),
+            distinct_on: self.distinct_on.clone(),
+            data_retention_days: self.data_retention_days,
+            comment: self.comment.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Response<T> {
     Success(T),
@@ -75,8 +220,8 @@ impl fmt::Display for ErrorStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{:?} ({}): {}",
-            self.code.canonical_reason(),
+            "{} ({}): {}",
+            self.code.canonical_reason().unwrap_or("Unknown"),
             self.code.as_u16(),
             self.message,
         )
@@ -391,5 +536,46 @@ impl FromStr for DataType {
                 format!("unrecognized data type: {s}"),
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppendRowsErrorPayload;
+    use super::AppendState;
+    use super::DataType;
+    use super::TableResource;
+
+    #[test]
+    fn append_error_details_use_wire_defaults() {
+        let payload: AppendRowsErrorPayload =
+            serde_json::from_str(r#"{"message":"not committed","append_state":"rejected"}"#)
+                .unwrap();
+
+        assert_eq!(payload.details.append_state, AppendState::Rejected);
+        assert!(payload.details.row_errors.is_empty());
+        assert!(!payload.details.row_errors_truncated);
+    }
+
+    #[test]
+    fn table_resource_deserializes_flattened_spec() {
+        let table: TableResource = serde_json::from_str(
+            r#"{
+                "database":"scopedb",
+                "schema":"public",
+                "name":"events",
+                "columns":[{"name":"message","data_type":"string","comment":null}],
+                "partition_by":["date(ts)"],
+                "cluster_by":["service"],
+                "distinct_on":{"on":[],"by":[]},
+                "data_retention_days":30,
+                "comment":"application events"
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(table.name, "events");
+        assert_eq!(table.columns[0].data_type, DataType::String);
+        assert_eq!(table.data_retention_days, Some(30));
     }
 }

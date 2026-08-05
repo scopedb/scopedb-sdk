@@ -18,6 +18,7 @@ on:
     branches: [ main ]
     paths: [
       'rust/**',
+      'docs/rust-http-api.md',
       '.github/workflows/ci-rust.yml',
     ]
   schedule:
@@ -40,7 +41,7 @@ jobs:
           components: rustfmt,clippy
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@just
-      - name: Check Go SDK
+      - name: Check Rust SDK
         run: just check
         working-directory: rust
 
@@ -49,6 +50,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+      - name: Install MSRV toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.85.0
       - uses: taiki-e/install-action@just
       - name: Run full tests
         timeout-minutes: 10
@@ -65,10 +70,16 @@ jobs:
     steps:
       - name: Guardian
         run: |
-          if [[ ! ( \
-                 ("${{ needs.check.result }}" == "success" || ${{ github.event_name != 'schedule' }}) \
-              && "${{ needs.test.result }}" == "success" \
-              ) ]]; then
-            echo "Required jobs haven't been completed successfully."
-            exit -1
+          check_result="${{ needs.check.result }}"
+          test_result="${{ needs.test.result }}"
+          event_name="${{ github.event_name }}"
+
+          if [[ "$test_result" != "success" ]]; then
+            echo "The test job did not complete successfully: $test_result"
+            exit 1
+          fi
+
+          if [[ "$event_name" != "schedule" && "$check_result" != "success" ]]; then
+            echo "The check job did not complete successfully: $check_result"
+            exit 1
           fi

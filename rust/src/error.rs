@@ -14,6 +14,8 @@
 
 use std::fmt;
 
+use crate::protocol::AppendErrorDetails;
+
 /// ErrorKind is all kinds of Error of ScopeDB client.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -24,6 +26,9 @@ pub enum ErrorKind {
 
     /// The config for ScopeDB client is invalid.
     ConfigInvalid,
+
+    /// A table append was rejected or its commit outcome is unknown.
+    AppendRowsFailed,
 }
 
 impl ErrorKind {
@@ -44,6 +49,7 @@ impl From<ErrorKind> for &'static str {
         match v {
             ErrorKind::Unexpected => "Unexpected",
             ErrorKind::ConfigInvalid => "ConfigInvalid",
+            ErrorKind::AppendRowsFailed => "AppendRowsFailed",
         }
     }
 }
@@ -86,6 +92,7 @@ pub struct Error {
 
     status: ErrorStatus,
     context: Vec<(&'static str, String)>,
+    append_details: Option<AppendErrorDetails>,
 
     source: Option<anyhow::Error>,
 }
@@ -129,6 +136,7 @@ impl fmt::Debug for Error {
             de.field("message", &self.message);
             de.field("status", &self.status);
             de.field("context", &self.context);
+            de.field("append_details", &self.append_details);
             de.field("source", &self.source);
             return de.finish();
         }
@@ -171,6 +179,7 @@ impl Error {
 
             status: ErrorStatus::Permanent,
             context: Vec::default(),
+            append_details: None,
             source: None,
         }
     }
@@ -190,6 +199,16 @@ impl Error {
         debug_assert!(self.source.is_none(), "the source error has been set");
 
         self.source = Some(src.into());
+        self
+    }
+
+    /// Return structured table-append failure details, when available.
+    pub fn append_details(&self) -> Option<&AppendErrorDetails> {
+        self.append_details.as_ref()
+    }
+
+    pub(crate) fn set_append_details(mut self, details: AppendErrorDetails) -> Self {
+        self.append_details = Some(details);
         self
     }
 
@@ -218,6 +237,11 @@ impl Error {
     /// Return the kind of this error.
     pub fn kind(&self) -> ErrorKind {
         self.kind
+    }
+
+    /// Return the error message.
+    pub fn message(&self) -> &str {
+        &self.message
     }
 
     /// Check if this error is temporary.

@@ -19,33 +19,29 @@ use std::time::Duration;
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = common::client()?;
+    let target = common::write_table(&client)?;
 
+    // Prefer Table::append or Table::append_stream when records already have
+    // the target shape. IngestStream is useful when each record needs a SQL
+    // transformation before insertion.
     let stream = client
-        .ingest_stream(
+        .ingest_stream(format!(
             r#"
             SELECT
-                $0["ts"]::timestamp as ts,
-                $0["name"]::string as name,
-                $0
-            INSERT INTO public.events (ts, name, raw)
+                $0["ts"]::timestamp as occurred_at,
+                $0["name"]::string as name
+            INSERT INTO {} (occurred_at, name)
             "#,
-        )
-        .batch_bytes(1024)
+            target.identifier()
+        ))
+        .batch_bytes(1024 * 1024)
         .flush_interval(Duration::from_millis(250))
         .build();
 
     stream
         .send(&serde_json::json!({
             "ts": "2026-03-13T12:00:00Z",
-            "name": "alpha",
-            "extra": {"source": "example"},
-        }))
-        .await?;
-    stream
-        .send(&serde_json::json!({
-            "ts": "2026-03-13T12:00:01Z",
-            "name": "beta",
-            "extra": {"source": "example"},
+            "name": "ScopeDB",
         }))
         .await?;
 
