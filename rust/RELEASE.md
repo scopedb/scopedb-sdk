@@ -10,7 +10,7 @@ version must all match.
    not already present on crates.io:
 
    ```sh
-   export scopedb_rust_version=0.2.0
+   export scopedb_rust_version=0.2.1
    if cargo info "scopedb-client@$scopedb_rust_version" >/dev/null 2>&1; then
      echo "scopedb-client $scopedb_rust_version already exists" >&2
      exit 1
@@ -32,7 +32,7 @@ version must all match.
    test "$(git branch --show-current)" = main
    test -z "$(git status --porcelain)"
    test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
-   export scopedb_rust_version=0.2.0
+   export scopedb_rust_version=0.2.1
    if cargo info "scopedb-client@$scopedb_rust_version" >/dev/null 2>&1; then
      echo "scopedb-client $scopedb_rust_version already exists" >&2
      exit 1

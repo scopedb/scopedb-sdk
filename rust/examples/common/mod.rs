@@ -16,11 +16,12 @@
 
 use std::io;
 
-use reqwest::header::AUTHORIZATION;
-use reqwest::header::HeaderMap;
-use reqwest::header::HeaderValue;
 use scopedb_client::Client;
 use scopedb_client::Table;
+use scopedb_client::reqwest;
+use scopedb_client::reqwest::header::AUTHORIZATION;
+use scopedb_client::reqwest::header::HeaderMap;
+use scopedb_client::reqwest::header::HeaderValue;
 
 pub fn endpoint() -> String {
     std::env::var("SCOPEDB_ENDPOINT").unwrap_or_else(|_| "http://127.0.0.1:6543".to_string())

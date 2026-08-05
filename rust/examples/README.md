@@ -2,6 +2,9 @@
 
 Start with a quickstart, then choose a write pattern whose delivery tradeoffs
 match the workload. Every example uses only the public `scopedb-client` API.
+The shared client helper uses the SDK's compatible HTTP client re-export at
+`scopedb_client::reqwest`, so copied examples do not need a direct reqwest
+dependency.
 
 The commands below run from the [`rust/`](../) directory in a source checkout.
 

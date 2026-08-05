@@ -4,6 +4,13 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+## v0.2.1 (2026-08-05)
+
+### Bug Fixes
+
+* Re-exported the SDK's compatible reqwest version and corrected the installation
+  guide so new consumers do not resolve an incompatible reqwest major.
+
 ## v0.2.0 (2026-08-05)
 
 ### Breaking Changes
