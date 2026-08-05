@@ -6,7 +6,8 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ### Bug Fixes
 
-* Return an error when the health endpoint responds with a non-success status.
+* Removed `Client::health_check`, which targeted an internal liveness endpoint
+  and could report non-success HTTP responses as healthy.
 * Decode error messages from both direct and nested API error envelopes,
   including unknown-outcome append failures.
 

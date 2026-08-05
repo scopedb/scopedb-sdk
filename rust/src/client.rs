@@ -91,35 +91,6 @@ impl Client {
         IngestStreamBuilder::new(self.clone(), statement.into())
     }
 
-    pub async fn health_check(&self) -> Result<(), Error> {
-        let url = self.make_url("v1/health")?;
-        let response = self.client.get(url).send().await.map_err(|err| {
-            Error::new(
-                ErrorKind::Unexpected,
-                "failed to send health check request".to_string(),
-            )
-            .set_source(err)
-            .set_temporary()
-        })?;
-        let status = response.status();
-        if status.is_success() {
-            return Ok(());
-        }
-
-        let payload = response.bytes().await.map_err(|err| {
-            Error::new(
-                ErrorKind::Unexpected,
-                "failed to read health check response".to_string(),
-            )
-            .set_source(err)
-            .set_temporary()
-        })?;
-        Err(map_failed_response(
-            crate::protocol::ErrorStatus::from_http_payload(status, &payload),
-            "health check failed".to_string(),
-        ))
-    }
-
     pub async fn list_databases(
         &self,
         options: CatalogListOptions,
@@ -485,40 +456,12 @@ fn format_http_error(status: StatusCode, message: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
-    use std::io::Write;
-    use std::net::TcpListener;
-    use std::thread;
-
     use reqwest::StatusCode;
 
     use super::Client;
     use super::decode_append_response;
     use crate::ErrorKind;
     use crate::protocol::AppendState;
-
-    fn serve_once(status: &'static str, body: &'static str) -> (String, thread::JoinHandle<()>) {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let server = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut request = [0; 1024];
-            let request_len = stream.read(&mut request).unwrap();
-            assert!(request_len > 0);
-            write!(
-                stream,
-                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-                body.len()
-            )
-            .unwrap();
-        });
-        (format!("http://{address}"), server)
-    }
-
-    fn loopback_client(endpoint: String) -> Client {
-        let http_client = reqwest::Client::builder().no_proxy().build().unwrap();
-        Client::new(endpoint, http_client).unwrap()
-    }
 
     #[test]
     fn resource_url_preserves_base_path_and_encodes_segments() {
@@ -532,59 +475,6 @@ mod tests {
             url.as_str(),
             "https://example.com/proxy/v1/databases/analytics%2F2026/schemas/events%20archive"
         );
-    }
-
-    #[tokio::test]
-    async fn health_check_rejects_nested_error_status() {
-        let body = r#"{"error":{"message":"unsupported path"}}"#;
-        let (endpoint, server) = serve_once("404 Not Found", body);
-        let client = loopback_client(endpoint);
-
-        let error = client.health_check().await.unwrap_err();
-        server.join().unwrap();
-
-        assert_eq!(error.kind(), ErrorKind::Unexpected);
-        assert!(error.is_permanent());
-        assert_eq!(
-            error.message(),
-            "health check failed: Not Found (404): unsupported path"
-        );
-    }
-
-    #[tokio::test]
-    async fn health_check_marks_service_unavailable_as_temporary() {
-        let body = r#"{"error":{"message":"try again later"}}"#;
-        let (endpoint, server) = serve_once("503 Service Unavailable", body);
-        let client = loopback_client(endpoint);
-
-        let error = client.health_check().await.unwrap_err();
-        server.join().unwrap();
-
-        assert!(error.is_temporary());
-        assert_eq!(
-            error.message(),
-            "health check failed: Service Unavailable (503): try again later"
-        );
-    }
-
-    #[tokio::test]
-    async fn health_check_marks_transport_failure_as_temporary() {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = listener.local_addr().unwrap();
-        let server = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut request = [0; 1024];
-            let request_len = stream.read(&mut request).unwrap();
-            assert!(request_len > 0);
-            // Close the connection without sending an HTTP response.
-        });
-        let client = loopback_client(format!("http://{address}"));
-
-        let error = client.health_check().await.unwrap_err();
-        server.join().unwrap();
-
-        assert!(error.is_temporary());
-        assert_eq!(error.message(), "failed to send health check request");
     }
 
     #[test]
