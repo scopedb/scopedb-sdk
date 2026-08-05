@@ -37,13 +37,18 @@ pub fn schema() -> String {
 
 pub fn client() -> Result<Client, Box<dyn std::error::Error>> {
     let mut headers = HeaderMap::new();
-    if let Ok(token) = std::env::var("SCOPEDB_TOKEN") {
-        if !token.is_empty() {
-            headers.insert(
-                AUTHORIZATION,
-                HeaderValue::from_str(&format!("Bearer {token}"))?,
-            );
-        }
+    let token = std::env::var("SCOPEDB_API_KEY")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            std::env::var("SCOPEDB_TOKEN")
+                .ok()
+                .filter(|value| !value.is_empty())
+        });
+    if let Some(token) = token {
+        let mut authorization = HeaderValue::from_str(&format!("Bearer {token}"))?;
+        authorization.set_sensitive(true);
+        headers.insert(AUTHORIZATION, authorization);
     }
 
     let http_client = reqwest::Client::builder()

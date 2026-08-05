@@ -16,7 +16,6 @@ use fastrace_reqwest::traceparent_headers;
 use reqwest::IntoUrl;
 use reqwest::StatusCode;
 use reqwest::Url;
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
@@ -45,6 +44,7 @@ use crate::protocol::StatementRequestParams;
 use crate::protocol::StatementStatus;
 use crate::protocol::TableResource;
 use crate::protocol::TableResourceSummary;
+use crate::protocol::http_error_message;
 use crate::statement::StatementHandle;
 
 #[derive(Debug, Clone)]
@@ -93,14 +93,31 @@ impl Client {
 
     pub async fn health_check(&self) -> Result<(), Error> {
         let url = self.make_url("v1/health")?;
-        self.client.get(url).send().await.map_err(|err| {
+        let response = self.client.get(url).send().await.map_err(|err| {
             Error::new(
                 ErrorKind::Unexpected,
                 "failed to send health check request".to_string(),
             )
             .set_source(err)
+            .set_temporary()
         })?;
-        Ok(())
+        let status = response.status();
+        if status.is_success() {
+            return Ok(());
+        }
+
+        let payload = response.bytes().await.map_err(|err| {
+            Error::new(
+                ErrorKind::Unexpected,
+                "failed to read health check response".to_string(),
+            )
+            .set_source(err)
+            .set_temporary()
+        })?;
+        Err(map_failed_response(
+            crate::protocol::ErrorStatus::from_http_payload(status, &payload),
+            "health check failed".to_string(),
+        ))
     }
 
     pub async fn list_databases(
@@ -436,14 +453,7 @@ fn decode_append_response(status: StatusCode, payload: &[u8]) -> Result<AppendRo
         }
     }
 
-    #[derive(Deserialize)]
-    struct ErrorMessage {
-        message: String,
-    }
-
-    let message = serde_json::from_slice::<ErrorMessage>(payload)
-        .map(|payload| payload.message)
-        .unwrap_or_else(|_| String::from_utf8_lossy(payload).into_owned());
+    let message = http_error_message(payload);
     Err(append_unknown_error(format_http_error(status, &message)))
 }
 
@@ -475,12 +485,40 @@ fn format_http_error(status: StatusCode, message: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Read;
+    use std::io::Write;
+    use std::net::TcpListener;
+    use std::thread;
+
     use reqwest::StatusCode;
 
     use super::Client;
     use super::decode_append_response;
     use crate::ErrorKind;
     use crate::protocol::AppendState;
+
+    fn serve_once(status: &'static str, body: &'static str) -> (String, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 1024];
+            let request_len = stream.read(&mut request).unwrap();
+            assert!(request_len > 0);
+            write!(
+                stream,
+                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+        });
+        (format!("http://{address}"), server)
+    }
+
+    fn loopback_client(endpoint: String) -> Client {
+        let http_client = reqwest::Client::builder().no_proxy().build().unwrap();
+        Client::new(endpoint, http_client).unwrap()
+    }
 
     #[test]
     fn resource_url_preserves_base_path_and_encodes_segments() {
@@ -494,6 +532,59 @@ mod tests {
             url.as_str(),
             "https://example.com/proxy/v1/databases/analytics%2F2026/schemas/events%20archive"
         );
+    }
+
+    #[tokio::test]
+    async fn health_check_rejects_proxy_error_status() {
+        let body = r#"{"error":{"message":"unsupported path"}}"#;
+        let (endpoint, server) = serve_once("404 Not Found", body);
+        let client = loopback_client(endpoint);
+
+        let error = client.health_check().await.unwrap_err();
+        server.join().unwrap();
+
+        assert_eq!(error.kind(), ErrorKind::Unexpected);
+        assert!(error.is_permanent());
+        assert_eq!(
+            error.message(),
+            "health check failed: Not Found (404): unsupported path"
+        );
+    }
+
+    #[tokio::test]
+    async fn health_check_marks_service_unavailable_as_temporary() {
+        let body = r#"{"error":{"message":"try again later"}}"#;
+        let (endpoint, server) = serve_once("503 Service Unavailable", body);
+        let client = loopback_client(endpoint);
+
+        let error = client.health_check().await.unwrap_err();
+        server.join().unwrap();
+
+        assert!(error.is_temporary());
+        assert_eq!(
+            error.message(),
+            "health check failed: Service Unavailable (503): try again later"
+        );
+    }
+
+    #[tokio::test]
+    async fn health_check_marks_transport_failure_as_temporary() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 1024];
+            let request_len = stream.read(&mut request).unwrap();
+            assert!(request_len > 0);
+            // Close the connection without sending an HTTP response.
+        });
+        let client = loopback_client(format!("http://{address}"));
+
+        let error = client.health_check().await.unwrap_err();
+        server.join().unwrap();
+
+        assert!(error.is_temporary());
+        assert_eq!(error.message(), "failed to send health check request");
     }
 
     #[test]
@@ -551,6 +642,22 @@ mod tests {
             decode_append_response(StatusCode::BAD_REQUEST, br#"{"message":"bad request"}"#)
                 .unwrap_err();
 
+        assert!(error.is_persistent());
+        assert_eq!(
+            error.append_details().unwrap().append_state,
+            AppendState::Unknown
+        );
+    }
+
+    #[test]
+    fn proxy_append_error_has_clean_message_and_unknown_outcome() {
+        let error = decode_append_response(
+            StatusCode::NOT_FOUND,
+            br#"{"error":{"message":"unsupported path"}}"#,
+        )
+        .unwrap_err();
+
+        assert_eq!(error.message(), "Not Found (404): unsupported path");
         assert!(error.is_persistent());
         assert_eq!(
             error.append_details().unwrap().append_state,

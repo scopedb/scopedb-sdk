@@ -4,6 +4,17 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+### Bug Fixes
+
+* Return an error when the health endpoint responds with a non-success status.
+* Decode error messages from both direct server responses and nested cloud proxy
+  error envelopes, including unknown-outcome append failures.
+
+### Documentation
+
+* Prefer `SCOPEDB_API_KEY` in examples while retaining `SCOPEDB_TOKEN` as a
+  backward-compatible fallback, and mark authorization headers as sensitive.
+
 ## v0.2.1 (2026-08-05)
 
 ### Bug Fixes

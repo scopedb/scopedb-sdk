@@ -189,18 +189,10 @@ impl<T: DeserializeOwned> Response<T> {
             return Ok(Response::Success(result));
         }
 
-        #[derive(Deserialize)]
-        struct ErrorMessage {
-            message: String,
-        }
-
         let payload = r.bytes().await.map_err(make_error)?;
-        if let Ok(ErrorMessage { message }) = serde_json::from_slice::<ErrorMessage>(&payload) {
-            Ok(Response::Failed(ErrorStatus { code, message }))
-        } else {
-            let message = String::from_utf8_lossy(&payload).into_owned();
-            Ok(Response::Failed(ErrorStatus { code, message }))
-        }
+        Ok(Response::Failed(ErrorStatus::from_http_payload(
+            code, &payload,
+        )))
     }
 }
 
@@ -211,9 +203,35 @@ pub struct ErrorStatus {
 }
 
 impl ErrorStatus {
+    pub(crate) fn from_http_payload(code: StatusCode, payload: &[u8]) -> Self {
+        Self {
+            code,
+            message: http_error_message(payload),
+        }
+    }
+
     pub fn code(&self) -> StatusCode {
         self.code
     }
+}
+
+pub(crate) fn http_error_message(payload: &[u8]) -> String {
+    if let Ok(payload) = serde_json::from_slice::<serde_json::Value>(payload) {
+        let message = payload
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .or_else(|| {
+                payload
+                    .get("error")
+                    .and_then(|error| error.get("message"))
+                    .and_then(serde_json::Value::as_str)
+            });
+        if let Some(message) = message {
+            return message.to_string();
+        }
+    }
+
+    String::from_utf8_lossy(payload).into_owned()
 }
 
 impl fmt::Display for ErrorStatus {
@@ -545,6 +563,7 @@ mod tests {
     use super::AppendState;
     use super::DataType;
     use super::TableResource;
+    use super::http_error_message;
 
     #[test]
     fn append_error_details_use_wire_defaults() {
@@ -555,6 +574,18 @@ mod tests {
         assert_eq!(payload.details.append_state, AppendState::Rejected);
         assert!(payload.details.row_errors.is_empty());
         assert!(!payload.details.row_errors_truncated);
+    }
+
+    #[test]
+    fn http_error_message_supports_direct_and_proxy_payloads() {
+        assert_eq!(
+            http_error_message(br#"{"message":"direct failure","error":"details"}"#),
+            "direct failure"
+        );
+        assert_eq!(
+            http_error_message(br#"{"error":{"message":"proxy failure"}}"#),
+            "proxy failure"
+        );
     }
 
     #[test]
