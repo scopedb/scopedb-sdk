@@ -34,6 +34,15 @@ unset or empty. The shared helper marks the resulting authorization header as
 sensitive so standard header and request `Debug` formatting redacts the
 credential.
 
+## ScopeQL
+
+This SDK sends ScopeQL statements to ScopeDB; the language is documented
+separately. Use these canonical entry points:
+
+- [Quickstart](https://docs.scopedb.io/guides/quickstart)
+- [Query guide](https://docs.scopedb.io/guides/query-events)
+- [Language reference](https://docs.scopedb.io/reference/)
+
 ## Run a statement
 
 ```rust
@@ -81,8 +90,8 @@ println!("first page: {} databases, {} schemas, {} tables", databases.items.len(
 # }
 ```
 
-See [`examples/catalog.rs`](examples/catalog.rs) for complete database
-pagination and table metadata discovery.
+See [`examples/catalog.rs`][catalog-example] for complete database pagination
+and table metadata discovery.
 
 ## Streaming writes with NDJSON
 
@@ -270,11 +279,11 @@ available for reconciliation.
 
 | Workload | Admission and delivery | Example |
 | --- | --- | --- |
-| One exact NDJSON payload | Caller owns the request boundary | [`append.rs`](examples/append.rs) |
-| Basic asynchronous batching | SDK owns batches; strict barriers | [`append_stream.rs`](examples/append_stream.rs) |
-| Backfill or file import | Bounded producer memory and concurrent strict batches | [`bulk_append.rs`](examples/bulk_append.rs) |
-| Long-running logs and events | Non-blocking continue mode with observable loss | [`telemetry.rs`](examples/telemetry.rs) |
-| SQL transformation before insert | Transform-oriented ingest stream | [`ingest_transform.rs`](examples/ingest_transform.rs) |
+| One exact NDJSON payload | Caller owns the request boundary | [`append.rs`][append-example] |
+| Basic asynchronous batching | SDK owns batches; strict barriers | [`append_stream.rs`][append-stream-example] |
+| Backfill or file import | Bounded producer memory and concurrent strict batches | [`bulk_append.rs`][bulk-append-example] |
+| Long-running logs and events | Non-blocking continue mode with observable loss | [`telemetry.rs`][telemetry-example] |
+| SQL transformation before insert | Transform-oriented ingest stream | [`ingest_transform.rs`][ingest-transform-example] |
 
 ## Table helper
 
@@ -323,7 +332,7 @@ stream.shutdown().await?;
 
 ## Examples and development
 
-The [example guide](examples/README.md) includes setup, safety guards, delivery
+The [example guide][example-guide] includes setup, safety guards, delivery
 contracts, and runnable commands.
 
 ```sh
@@ -333,6 +342,17 @@ cargo clippy --all-targets --all-features
 ```
 
 The wire-level endpoint and payload reference is in
-[`docs/rust-http-api.md`](https://github.com/scopedb/scopedb-sdk/blob/main/docs/rust-http-api.md).
-Release history and the maintainer runbook are in [`CHANGELOG.md`](CHANGELOG.md)
-and [`RELEASE.md`](RELEASE.md).
+[`docs/rust-http-api.md`][rust-http-api].
+Release history and the maintainer runbook are in
+[`CHANGELOG.md`][changelog] and [`RELEASE.md`][release].
+
+[append-example]: https://github.com/scopedb/scopedb-sdk/blob/main/rust/examples/append.rs
+[append-stream-example]: https://github.com/scopedb/scopedb-sdk/blob/main/rust/examples/append_stream.rs
+[bulk-append-example]: https://github.com/scopedb/scopedb-sdk/blob/main/rust/examples/bulk_append.rs
+[catalog-example]: https://github.com/scopedb/scopedb-sdk/blob/main/rust/examples/catalog.rs
+[changelog]: https://github.com/scopedb/scopedb-sdk/blob/main/rust/CHANGELOG.md
+[example-guide]: https://github.com/scopedb/scopedb-sdk/blob/main/rust/examples/README.md
+[ingest-transform-example]: https://github.com/scopedb/scopedb-sdk/blob/main/rust/examples/ingest_transform.rs
+[release]: https://github.com/scopedb/scopedb-sdk/blob/main/rust/RELEASE.md
+[rust-http-api]: https://github.com/scopedb/scopedb-sdk/blob/main/docs/rust-http-api.md
+[telemetry-example]: https://github.com/scopedb/scopedb-sdk/blob/main/rust/examples/telemetry.rs
