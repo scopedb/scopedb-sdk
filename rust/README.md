@@ -326,3 +326,5 @@ cargo clippy --all-targets --all-features
 
 The wire-level endpoint and payload reference is in
 [`docs/rust-http-api.md`](https://github.com/scopedb/scopedb-sdk/blob/main/docs/rust-http-api.md).
+Release history and the maintainer runbook are in [`CHANGELOG.md`](CHANGELOG.md)
+and [`RELEASE.md`](RELEASE.md).
