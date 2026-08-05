@@ -54,6 +54,10 @@ pub struct Client {
 }
 
 impl Client {
+    /// Creates a ScopeDB client from an endpoint and a compatible HTTP client.
+    ///
+    /// Use the HTTP types re-exported from [`crate::reqwest`] to avoid a
+    /// dependency-version mismatch in applications using another reqwest major.
     pub fn new<E: IntoUrl>(endpoint: E, client: reqwest::Client) -> Result<Self, Error> {
         match endpoint.into_url() {
             Ok(mut endpoint) => {

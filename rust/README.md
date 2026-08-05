@@ -7,21 +7,23 @@ streaming writes, and transform-oriented JSON ingest.
 ## Installation
 
 ```sh
-cargo add scopedb-client reqwest serde_json
+cargo add scopedb-client serde_json
 cargo add tokio --features macros,rt-multi-thread
 ```
 
 ## Create a client
 
-The SDK accepts a configured `reqwest::Client`, so applications can own TLS,
-timeouts, authentication headers, and connection pooling.
+The SDK accepts a configured HTTP client, so applications can own TLS, timeouts,
+authentication headers, and connection pooling. Use the compatible reqwest
+version re-exported as `scopedb_client::reqwest`; a separate direct reqwest
+dependency is not needed.
 
 ```rust
 use scopedb_client::Client;
 
 let client = Client::new(
     "http://127.0.0.1:6543",
-    reqwest::Client::new(),
+    scopedb_client::reqwest::Client::new(),
 )?;
 # Ok::<(), scopedb_client::Error>(())
 ```
@@ -30,7 +32,7 @@ let client = Client::new(
 
 ```rust
 # async fn demo() -> Result<(), scopedb_client::Error> {
-# let client = scopedb_client::Client::new("http://127.0.0.1:6543", reqwest::Client::new())?;
+# let client = scopedb_client::Client::new("http://127.0.0.1:6543", scopedb_client::reqwest::Client::new())?;
 let result = client.statement("SELECT 1".to_string()).execute().await?;
 let rows = result.into_values()?;
 println!("{rows:?}");
@@ -47,7 +49,7 @@ Fetch methods return the full database, schema, or table resource.
 use scopedb_client::CatalogListOptions;
 
 # async fn demo() -> Result<(), scopedb_client::Error> {
-# let client = scopedb_client::Client::new("http://127.0.0.1:6543", reqwest::Client::new())?;
+# let client = scopedb_client::Client::new("http://127.0.0.1:6543", scopedb_client::reqwest::Client::new())?;
 let databases = client
     .list_databases(CatalogListOptions {
         page_size: Some(100),
@@ -91,7 +93,7 @@ Use direct append when the caller already owns one exact NDJSON request boundary
 use scopedb_client::Client;
 
 # async fn demo() -> Result<(), scopedb_client::Error> {
-# let client = Client::new("http://127.0.0.1:6543", reqwest::Client::new())?;
+# let client = Client::new("http://127.0.0.1:6543", scopedb_client::reqwest::Client::new())?;
 let table = client
     .table("events")
     .with_database("scopedb")
@@ -149,7 +151,7 @@ bounded number of HTTP append requests concurrently.
 use std::time::Duration;
 
 # async fn demo() -> Result<(), scopedb_client::Error> {
-# let client = scopedb_client::Client::new("http://127.0.0.1:6543", reqwest::Client::new())?;
+# let client = scopedb_client::Client::new("http://127.0.0.1:6543", scopedb_client::reqwest::Client::new())?;
 let table = client.table("events").with_schema("public");
 let stream = table
     .append_stream()
@@ -204,7 +206,7 @@ use scopedb_client::AppendDeliveryOutcome;
 use scopedb_client::AppendFailurePolicy;
 
 # async fn demo() -> Result<(), scopedb_client::Error> {
-# let client = scopedb_client::Client::new("http://127.0.0.1:6543", reqwest::Client::new())?;
+# let client = scopedb_client::Client::new("http://127.0.0.1:6543", scopedb_client::reqwest::Client::new())?;
 let telemetry = client
     .table("events")
     .append_stream()
@@ -272,7 +274,7 @@ available for reconciliation.
 
 ```rust
 # async fn demo() -> Result<(), scopedb_client::Error> {
-# let client = scopedb_client::Client::new("http://127.0.0.1:6543", reqwest::Client::new())?;
+# let client = scopedb_client::Client::new("http://127.0.0.1:6543", scopedb_client::reqwest::Client::new())?;
 let table = client.table("events").with_schema("public");
 println!("identifier = {}", table.identifier());
 
@@ -290,7 +292,7 @@ match the destination table.
 
 ```rust
 # async fn demo() -> Result<(), scopedb_client::Error> {
-# let client = scopedb_client::Client::new("http://127.0.0.1:6543", reqwest::Client::new())?;
+# let client = scopedb_client::Client::new("http://127.0.0.1:6543", scopedb_client::reqwest::Client::new())?;
 let stream = client
     .ingest_stream(
         r#"

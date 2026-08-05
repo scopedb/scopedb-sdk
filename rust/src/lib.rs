@@ -65,6 +65,8 @@ pub use protocol::TableDistinctSpec;
 pub use protocol::TableResource;
 pub use protocol::TableResourceSummary;
 pub use protocol::TableSpec;
+/// The HTTP client version used by this SDK.
+pub use reqwest;
 pub use result::FieldSchema;
 pub use result::ResultSet;
 pub use result::Schema;
