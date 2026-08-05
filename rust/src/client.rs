@@ -535,7 +535,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn health_check_rejects_proxy_error_status() {
+    async fn health_check_rejects_nested_error_status() {
         let body = r#"{"error":{"message":"unsupported path"}}"#;
         let (endpoint, server) = serve_once("404 Not Found", body);
         let client = loopback_client(endpoint);
@@ -650,7 +650,7 @@ mod tests {
     }
 
     #[test]
-    fn proxy_append_error_has_clean_message_and_unknown_outcome() {
+    fn nested_append_error_has_clean_message_and_unknown_outcome() {
         let error = decode_append_response(
             StatusCode::NOT_FOUND,
             br#"{"error":{"message":"unsupported path"}}"#,

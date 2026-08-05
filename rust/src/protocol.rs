@@ -577,14 +577,14 @@ mod tests {
     }
 
     #[test]
-    fn http_error_message_supports_direct_and_proxy_payloads() {
+    fn http_error_message_supports_direct_and_nested_payloads() {
         assert_eq!(
             http_error_message(br#"{"message":"direct failure","error":"details"}"#),
             "direct failure"
         );
         assert_eq!(
-            http_error_message(br#"{"error":{"message":"proxy failure"}}"#),
-            "proxy failure"
+            http_error_message(br#"{"error":{"message":"nested failure"}}"#),
+            "nested failure"
         );
     }
 
