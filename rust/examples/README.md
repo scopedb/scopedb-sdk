@@ -6,6 +6,11 @@ The shared client helper uses the SDK's compatible HTTP client re-export at
 `scopedb_client::reqwest`, so copied examples do not need a direct reqwest
 dependency.
 
+These examples focus on SDK integration and assume valid ScopeQL. For language
+syntax, use the canonical [Quickstart](https://docs.scopedb.io/guides/quickstart),
+[query guide](https://docs.scopedb.io/guides/query-events), and
+[language reference](https://docs.scopedb.io/reference/).
+
 The commands below run from the [`rust/`](../) directory in a source checkout.
 
 ## Read-only discovery
