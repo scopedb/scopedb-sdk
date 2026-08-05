@@ -48,10 +48,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let telemetry = table
         .append_stream()
         .failure_policy(AppendFailurePolicy::Continue)
-        .batch_bytes(1024 * 1024)
+        .target_batch_bytes(1024 * 1024)
+        .max_batch_rows(10_000)
         .flush_interval(Duration::from_secs(1))
-        .max_pending_bytes(32 * 1024 * 1024)
-        .max_in_flight_requests(2)
+        .max_buffered_bytes(32 * 1024 * 1024)
+        .max_concurrent_batches(2)
         .attempt_timeout(Duration::from_secs(10))
         .on_batch_failure(|event| {
             // A synchronous observer; use a separate diagnostics sink.

@@ -50,6 +50,11 @@ shape for every resource type:
 `next_page_token` is omitted when there is no next page. Clients must pass it
 back unchanged and must not parse or synthesize it.
 
+`Client::iterate_databases`, `iterate_schemas`, and `iterate_tables` follow the
+token automatically, fetch pages lazily, and reject a repeated token instead of
+looping forever. The `list_*` methods expose one explicit page when an
+application needs page boundaries.
+
 ### Resource shapes
 
 Database:
@@ -194,11 +199,14 @@ it is not a separate HTTP endpoint.
 - Every accepted Rust value is serialized to exactly one NDJSON line.
 - `send` and `send_all` wait for local admission capacity, not a remote commit.
 - `try_send` attempts local admission immediately.
-- Size and time thresholds seal batches.
-- `max_in_flight_requests` bounds concurrent append requests.
-- `max_pending_bytes` bounds accepted serialized data that has not settled.
+- `target_batch_bytes`, `max_batch_rows`, and the flush interval seal batches.
+- `max_concurrent_batches` bounds concurrent append requests.
+- `max_buffered_bytes` bounds accepted serialized data that has not settled.
 - `flush` settles all rows accepted before its barrier.
 - `shutdown` closes admission and settles the final accepted prefix.
+
+The older `batch_bytes`, `max_in_flight_requests`, and `max_pending_bytes`
+builder names remain source-compatible deprecated aliases.
 
 With the default `Stop` failure policy, a failed batch makes the stream terminal
 and barriers return an error. With `Continue`, rejected and unknown batches are
@@ -240,7 +248,10 @@ in-band states, so HTTP success does not imply statement success.
 ### `GET /v1/statements/{statement_id}?format=json`
 
 Fetches the latest state for a submitted statement and returns the same state
-payload family as statement submission.
+payload family as statement submission. `StatementHandle::refresh` performs one
+fetch; `StatementHandle::wait` polls with bounded exponential delay until a
+terminal state. The older `fetch_once` and `fetch` names remain deprecated
+aliases.
 
 ### `POST /v1/statements/{statement_id}/cancel`
 
@@ -319,3 +330,11 @@ Non-append non-2xx responses generally use:
 
 The SDK distinguishes transport or deserialization errors, non-2xx server
 errors, structured append outcomes, and in-band statement terminal states.
+Server messages remain unchanged in `Error::message()`. When available,
+`http_status()`, `request_id()`, and `retry_after()` expose response metadata;
+`is_retryable()` includes an explicit `retryable` value from direct or nested
+error envelopes before falling back to HTTP status classification.
+
+`Retry-After` accepts delta seconds and HTTP dates. Streaming writes use it only
+for a temporary append explicitly reported as `rejected`, and cap the delay at
+the configured maximum backoff. Unknown append outcomes are never retried.

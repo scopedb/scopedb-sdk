@@ -25,9 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("identifier: {}", table.identifier());
 
-    let schema = table.table_schema().await?;
-    for field in schema.fields() {
-        println!("{}: {:?}", field.name(), field.data_type());
+    let description = table.describe().await?;
+    for column in description.columns {
+        println!("{}: {:?}", column.name, column.data_type);
     }
 
     Ok(())

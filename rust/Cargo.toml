@@ -32,6 +32,7 @@ anyhow = { version = "1.0.99" }
 fastrace = { version = "0.7" }
 fastrace-reqwest = { version = "0.2" }
 hex = { version = "0.4" }
+httpdate = { version = "1" }
 jiff = { version = "0.2", features = ["serde"] }
 mea = { version = "0.6.3" }
 reqwest = { version = "0.12", default-features = false, features = [

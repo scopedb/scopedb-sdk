@@ -82,15 +82,12 @@ impl Statement {
                 format,
                 status: Some(response),
             }),
-            Response::Failed(err) => Err(Error::new(
-                ErrorKind::Unexpected,
-                format!("failed to submit statement: {err}"),
-            )),
+            Response::Failed(err) => Err(err.into_error(ErrorKind::Unexpected)),
         }
     }
 
     pub async fn execute(self) -> Result<ResultSet, Error> {
-        self.submit().await?.fetch().await
+        self.submit().await?.wait().await
     }
 
     pub(crate) fn new(client: Client, statement: String) -> Self {
@@ -133,13 +130,14 @@ impl StatementHandle {
         })
     }
 
-    pub async fn fetch_once(&mut self) -> Result<(), Error> {
+    /// Fetches and returns the latest statement status.
+    pub async fn refresh(&mut self) -> Result<&StatementStatus, Error> {
         // already terminated - no need to fetch again
         match self.status.as_ref() {
             Some(StatementStatus::Finished(..))
             | Some(StatementStatus::Failed(..))
             | Some(StatementStatus::Cancelled(..)) => {
-                return Ok(());
+                return Ok(self.status.as_ref().expect("status was matched above"));
             }
             _ => {}
         }
@@ -152,30 +150,40 @@ impl StatementHandle {
         {
             Response::Success(status) => {
                 self.status = Some(status);
-                Ok(())
+                Ok(self.status.as_ref().expect("status was just assigned"))
             }
-            Response::Failed(err) => Err(Error::new(
-                ErrorKind::Unexpected,
-                format!("failed to fetch statement: {err}"),
-            )),
+            Response::Failed(err) => Err(err.into_error(ErrorKind::Unexpected)),
         }
     }
 
-    pub async fn fetch(&mut self) -> Result<ResultSet, Error> {
+    /// Backward-compatible alias for [`StatementHandle::refresh`].
+    #[deprecated(note = "use refresh")]
+    pub async fn fetch_once(&mut self) -> Result<(), Error> {
+        self.refresh().await.map(|_| ())
+    }
+
+    /// Waits for the statement to terminate and returns its result set.
+    pub async fn wait(&mut self) -> Result<ResultSet, Error> {
         let mut delay = Duration::from_millis(5);
         let max_delay = Duration::from_secs(1);
 
         loop {
-            self.fetch_once().await?;
+            self.refresh().await?;
 
             if let Some(status) = self.status.as_ref() {
                 match status {
                     StatementStatus::Finished(finished) => return Ok(finished.result_set()),
                     StatementStatus::Failed(failed) => {
-                        return Err(Error::new(ErrorKind::Unexpected, failed.message.clone()));
+                        return Err(Error::new(
+                            ErrorKind::StatementFailed,
+                            failed.message.clone(),
+                        ));
                     }
                     StatementStatus::Cancelled(cancelled) => {
-                        return Err(Error::new(ErrorKind::Unexpected, cancelled.message.clone()));
+                        return Err(Error::new(
+                            ErrorKind::StatementFailed,
+                            cancelled.message.clone(),
+                        ));
                     }
                     StatementStatus::Pending(..) | StatementStatus::Running(..) => {
                         sleep(delay).await;
@@ -186,6 +194,12 @@ impl StatementHandle {
                 }
             }
         }
+    }
+
+    /// Backward-compatible alias for [`StatementHandle::wait`].
+    #[deprecated(note = "use wait")]
+    pub async fn fetch(&mut self) -> Result<ResultSet, Error> {
+        self.wait().await
     }
 
     pub async fn cancel(&mut self) -> Result<StatementCancelResult, Error> {
@@ -240,10 +254,7 @@ impl StatementHandle {
                 };
                 Ok(response)
             }
-            Response::Failed(err) => Err(Error::new(
-                ErrorKind::Unexpected,
-                format!("failed to cancel statement: {err}"),
-            )),
+            Response::Failed(err) => Err(err.into_error(ErrorKind::Unexpected)),
         }
     }
 
