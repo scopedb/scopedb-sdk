@@ -4,6 +4,8 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+## v0.2.2 (2026-08-05)
+
 ### Bug Fixes
 
 * Removed `Client::health_check`, which targeted an internal liveness endpoint
