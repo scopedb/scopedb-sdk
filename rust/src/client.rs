@@ -550,22 +550,22 @@ fn decode_append_response(
     }
 
     let http_error = crate::protocol::ErrorStatus::from_http_parts(status, headers, payload);
-    if let Ok(payload) = serde_json::from_slice::<AppendRowsErrorPayload>(payload) {
-        if matches!(
+    if let Ok(payload) = serde_json::from_slice::<AppendRowsErrorPayload>(payload)
+        && matches!(
             payload.details.append_state,
             AppendState::Rejected | AppendState::Unknown
-        ) {
-            let append_state = payload.details.append_state;
-            let error = http_error
-                .into_error(ErrorKind::AppendRowsFailed)
-                .set_append_details(payload.details);
+        )
+    {
+        let append_state = payload.details.append_state;
+        let error = http_error
+            .into_error(ErrorKind::AppendRowsFailed)
+            .set_append_details(payload.details);
 
-            return Err(if append_state == AppendState::Unknown {
-                error.set_persistent()
-            } else {
-                error
-            });
-        }
+        return Err(if append_state == AppendState::Unknown {
+            error.set_persistent()
+        } else {
+            error
+        });
     }
 
     let metadata_error = http_error.into_error(ErrorKind::AppendRowsFailed);

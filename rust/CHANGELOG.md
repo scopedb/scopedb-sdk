@@ -4,6 +4,12 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+### Breaking Changes
+
+* Raised the minimum supported Rust version from 1.85.0 to 1.91.0 so fresh
+  consumers can resolve the current dependency graph without an inherited
+  lockfile.
+
 ### New Features
 
 * Added an API-key client builder, `Client::query`, full table descriptions,

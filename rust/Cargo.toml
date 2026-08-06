@@ -24,7 +24,7 @@ documentation = "https://docs.rs/scopedb-client"
 edition = "2024"
 homepage = "https://www.scopedb.io"
 license = "Apache-2.0"
-rust-version = "1.85.0"
+rust-version = "1.91.0"
 repository = "https://github.com/scopedb/scopedb-sdk"
 
 [dependencies]

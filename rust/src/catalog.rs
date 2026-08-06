@@ -100,16 +100,16 @@ where
             })
             .await?;
 
-            if let Some(token) = page.next_page_token.as_ref() {
-                if !self.seen_tokens.insert(token.clone()) {
-                    self.exhausted = true;
-                    self.items = page.items.into();
-                    self.terminal_error = Some(Error::new(
-                        ErrorKind::Unexpected,
-                        "catalog pagination returned a repeated page token",
-                    ));
-                    continue;
-                }
+            if let Some(token) = page.next_page_token.as_ref()
+                && !self.seen_tokens.insert(token.clone())
+            {
+                self.exhausted = true;
+                self.items = page.items.into();
+                self.terminal_error = Some(Error::new(
+                    ErrorKind::Unexpected,
+                    "catalog pagination returned a repeated page token",
+                ));
+                continue;
             }
             self.next_page_token = page.next_page_token;
             self.exhausted = self.next_page_token.is_none();

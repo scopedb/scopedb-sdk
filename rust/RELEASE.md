@@ -46,21 +46,21 @@ and verify the exact package that Cargo will upload:
 
 ```sh
 cd rust
-cargo +1.85.0 generate-lockfile
+cargo +1.91.0 generate-lockfile
 manifest_version="$(cargo pkgid | sed -E 's/.*@([^@]+)$/\1/')"
 test "$manifest_version" = "$scopedb_rust_version"
 cargo +nightly fmt --all --check
 cargo +nightly clippy --locked --tests --all-targets --all-features -- -D warnings
-cargo +1.85.0 test --locked --all-targets --all-features
-RUSTDOCFLAGS="-D warnings" cargo +1.85.0 doc --locked --no-deps --all-features
-cargo +1.85.0 publish --dry-run --locked
-cargo +1.85.0 package --list --locked
+cargo +1.91.0 test --locked --all-targets --all-features
+RUSTDOCFLAGS="-D warnings" cargo +1.91.0 doc --locked --no-deps --all-features
+cargo +1.91.0 publish --dry-run --locked
+cargo +1.91.0 package --list --locked
 ```
 
 Publish once from that same clean commit:
 
 ```sh
-cargo +1.85.0 publish --locked
+cargo +1.91.0 publish --locked
 ```
 
 Wait until the published version is visible before tagging:

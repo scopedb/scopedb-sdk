@@ -6,6 +6,8 @@ streaming writes, and transform-oriented JSON ingest.
 
 ## Installation
 
+`scopedb-client` requires Rust 1.91.0 or later.
+
 ```sh
 cargo add scopedb-client serde_json
 cargo add tokio --features macros,rt-multi-thread

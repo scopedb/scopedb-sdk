@@ -416,11 +416,18 @@ async fn run_batch_worker<F>(
                         }
                         current_bytes = current_bytes.saturating_add(record.payload.len());
                         rows.push(record);
-                        if !rows.is_empty() && current_bytes >= batch_bytes {
-                            if let Err(err) = flush_pending(&mut rows, &mut current_bytes, retry, &mut flush_fn).await {
-                                *fatal.lock().await = Some(FatalState::from_error(&err));
-                                break;
-                            }
+                        if !rows.is_empty()
+                            && current_bytes >= batch_bytes
+                            && let Err(err) = flush_pending(
+                                &mut rows,
+                                &mut current_bytes,
+                                retry,
+                                &mut flush_fn,
+                            )
+                            .await
+                        {
+                            *fatal.lock().await = Some(FatalState::from_error(&err));
+                            break;
                         }
                     }
                     BatchCommand::Flush(ack) => {
