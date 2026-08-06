@@ -9,12 +9,17 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 * Raised the minimum supported Rust version from 1.85.0 to 1.91.0 so fresh
   consumers can resolve the current dependency graph without an inherited
   lockfile.
+* Renamed the synchronous `StatementHandle::status()` snapshot accessor to
+  `last_status()` and use the asynchronous `status().await` operation for one
+  remote status check. The previous synchronous name cannot remain as an alias
+  because Rust does not support overloading it with the asynchronous operation.
 
 ### New Features
 
 * Added an API-key client builder, `Client::query`, full table descriptions,
-  lazy catalog iterators, and `StatementHandle::refresh` / `wait` application
-  paths while retaining the existing lower-level APIs.
+  lazy catalog iterators, and `StatementHandle::status` / `wait` application
+  paths. The released `fetch_once` and `fetch` methods remain as deprecated
+  aliases for `status` and `wait`.
 * Added raw, typed-value, keyed-object, and first-row result conversions.
   Object conversion rejects duplicate output column names instead of silently
   dropping a value.

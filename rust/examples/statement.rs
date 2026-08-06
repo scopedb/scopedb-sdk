@@ -26,7 +26,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // durable statement ID before waiting for the result.
     let mut handle = client.statement("SELECT 2 AS value").submit().await?;
     let statement_id = handle.statement_id();
-    let status = handle.refresh().await?;
+    println!(
+        "statement {statement_id} submitted: {:?}",
+        handle.last_status()
+    );
+    let status = handle.status().await?;
     println!("statement {statement_id}: {status:?}");
     let result = handle.wait().await?;
     println!("handle rows: {:?}", result.into_objects()?);

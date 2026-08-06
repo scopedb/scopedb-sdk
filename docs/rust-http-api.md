@@ -248,10 +248,12 @@ in-band states, so HTTP success does not imply statement success.
 ### `GET /v1/statements/{statement_id}?format=json`
 
 Fetches the latest state for a submitted statement and returns the same state
-payload family as statement submission. `StatementHandle::refresh` performs one
-fetch; `StatementHandle::wait` polls with bounded exponential delay until a
+payload family as statement submission. `StatementHandle::status().await`
+performs at most one fetch and updates the snapshot returned by
+`StatementHandle::last_status`; terminal snapshots are returned without another
+request. `StatementHandle::wait` polls with bounded exponential delay until a
 terminal state. The older `fetch_once` and `fetch` names remain deprecated
-aliases.
+aliases for `status` and `wait`, respectively.
 
 ### `POST /v1/statements/{statement_id}/cancel`
 

@@ -69,9 +69,10 @@ form for intentionally duplicated columns. `first()` converts only the first
 row for point lookups and aggregates.
 
 For lifecycle control, call `client.statement(scopeql).submit()` and retain the
-returned handle. `refresh()` fetches one status snapshot, `wait()` polls to a
-terminal result, and `cancel()` requests cancellation. The statement ID is
-available immediately after submission.
+returned handle. `last_status()` reads the latest cached snapshot without a
+network request, `status().await` fetches one current status, `wait()` polls to
+a terminal result, and `cancel()` requests cancellation. The statement ID and
+initial status snapshot are available immediately after submission.
 
 ## Browse the catalog
 

@@ -33,6 +33,12 @@ fn ergonomic_client_builder_is_public() {
 #[allow(dead_code)]
 fn application_api_surface_compiles(client: &scopedb_client::Client) {
     let _query = client.query("SELECT 1");
+    let mut handle = client.statement_handle(uuid::Uuid::nil());
+    let _last_status: Option<&scopedb_client::StatementStatus> = handle.last_status();
+    let status = handle.status();
+    drop(status);
+    let wait = handle.wait();
+    drop(wait);
     let _databases = client.iterate_databases(scopedb_client::CatalogListOptions::default());
     let _schemas = client.iterate_schemas("scopedb", scopedb_client::CatalogListOptions::default());
     let _tables = client.iterate_tables(
