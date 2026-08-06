@@ -4,6 +4,8 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+## v0.3.0 (2026-08-06)
+
 ### Breaking Changes
 
 * Raised the minimum supported Rust version from 1.85.0 to 1.91.0 so fresh
@@ -38,6 +40,7 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ### Documentation
 
+* Included the Apache-2.0 license text in the published crate archive.
 * Added the user guide to the crate root so docs.rs starts with installation,
   query, catalog, streaming-write, and error-handling paths.
 * Reworked runnable examples around read-only discovery, direct append,
