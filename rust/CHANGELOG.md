@@ -38,6 +38,8 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ### Documentation
 
+* Added the user guide to the crate root so docs.rs starts with installation,
+  query, catalog, streaming-write, and error-handling paths.
 * Reworked runnable examples around read-only discovery, direct append,
   asynchronous batching, bulk imports, and best-effort telemetry journeys.
 

@@ -19,7 +19,7 @@ Use the builder for the common API-key path. An API key is a server credential:
 keep it in a trusted process and never compile or return it to an untrusted
 client.
 
-```rust
+```rust,no_run
 use scopedb_client::Client;
 
 let client = Client::builder("http://127.0.0.1:6543")
