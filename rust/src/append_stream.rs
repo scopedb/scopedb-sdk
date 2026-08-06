@@ -43,6 +43,7 @@ use crate::ErrorKind;
 const MAX_APPEND_BODY_BYTES: usize = 16 * 1024 * 1024;
 const MAX_APPEND_ROWS: usize = 200_000;
 const DEFAULT_BATCH_BYTES: usize = MAX_APPEND_BODY_BYTES;
+const DEFAULT_MAX_BATCH_ROWS: usize = MAX_APPEND_ROWS;
 const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_secs(1);
 const DEFAULT_CHANNEL_CAPACITY: usize = 1024;
 const DEFAULT_MAX_IN_FLIGHT_REQUESTS: usize = 4;
@@ -266,6 +267,7 @@ pub struct AppendStreamBuilder {
     schema: String,
     table: String,
     batch_bytes: usize,
+    max_batch_rows: usize,
     flush_interval: Duration,
     channel_capacity: usize,
     max_pending_bytes: usize,
@@ -285,6 +287,7 @@ impl AppendStreamBuilder {
             schema,
             table,
             batch_bytes: DEFAULT_BATCH_BYTES,
+            max_batch_rows: DEFAULT_MAX_BATCH_ROWS,
             flush_interval: DEFAULT_FLUSH_INTERVAL,
             channel_capacity: DEFAULT_CHANNEL_CAPACITY,
             max_pending_bytes: DEFAULT_MAX_PENDING_BYTES,
@@ -307,8 +310,21 @@ impl AppendStreamBuilder {
     }
 
     /// Sets the target NDJSON payload size. One row may exceed this target up to 16 MiB.
+    #[deprecated(note = "use target_batch_bytes")]
     pub fn batch_bytes(mut self, batch_bytes: usize) -> Self {
         self.batch_bytes = batch_bytes;
+        self
+    }
+
+    /// Sets the target NDJSON payload size. One row may exceed this target up to 16 MiB.
+    pub fn target_batch_bytes(mut self, target_batch_bytes: usize) -> Self {
+        self.batch_bytes = target_batch_bytes;
+        self
+    }
+
+    /// Sets the maximum rows in one HTTP batch, up to the 200,000-row protocol limit.
+    pub fn max_batch_rows(mut self, max_batch_rows: usize) -> Self {
+        self.max_batch_rows = max_batch_rows;
         self
     }
 
@@ -323,14 +339,29 @@ impl AppendStreamBuilder {
         self
     }
 
+    /// Backward-compatible alias for [`AppendStreamBuilder::max_buffered_bytes`].
+    #[deprecated(note = "use max_buffered_bytes")]
     pub fn max_pending_bytes(mut self, max_pending_bytes: usize) -> Self {
         self.max_pending_bytes = max_pending_bytes;
         self
     }
 
+    /// Sets the maximum bytes admitted locally but not yet settled remotely.
+    pub fn max_buffered_bytes(mut self, max_buffered_bytes: usize) -> Self {
+        self.max_pending_bytes = max_buffered_bytes;
+        self
+    }
+
     /// Sets the maximum number of append HTTP requests running concurrently.
+    #[deprecated(note = "use max_concurrent_batches")]
     pub fn max_in_flight_requests(mut self, max_in_flight_requests: usize) -> Self {
         self.max_in_flight_requests = max_in_flight_requests;
+        self
+    }
+
+    /// Sets the maximum number of append batches sent concurrently.
+    pub fn max_concurrent_batches(mut self, max_concurrent_batches: usize) -> Self {
+        self.max_in_flight_requests = max_concurrent_batches;
         self
     }
 
@@ -390,6 +421,7 @@ impl AppendStreamBuilder {
             schema: self.schema,
             table: self.table,
             batch_bytes: self.batch_bytes,
+            max_batch_rows: self.max_batch_rows,
             flush_interval: self.flush_interval,
             channel_capacity: self.channel_capacity,
             max_pending_bytes: self.max_pending_bytes,
@@ -404,10 +436,16 @@ impl AppendStreamBuilder {
 }
 
 fn validate_builder(builder: &AppendStreamBuilder) -> Result<(), Error> {
-    validate_positive("batch_bytes", builder.batch_bytes)?;
+    validate_positive("target_batch_bytes", builder.batch_bytes)?;
     if builder.batch_bytes > MAX_APPEND_BODY_BYTES {
         return Err(config_error(format!(
-            "batch_bytes must not exceed {MAX_APPEND_BODY_BYTES}"
+            "target_batch_bytes must not exceed {MAX_APPEND_BODY_BYTES}"
+        )));
+    }
+    validate_positive("max_batch_rows", builder.max_batch_rows)?;
+    if builder.max_batch_rows > MAX_APPEND_ROWS {
+        return Err(config_error(format!(
+            "max_batch_rows must not exceed {MAX_APPEND_ROWS}"
         )));
     }
     if builder.flush_interval.is_zero() {
@@ -415,14 +453,14 @@ fn validate_builder(builder: &AppendStreamBuilder) -> Result<(), Error> {
     }
     validate_deadline("flush_interval", builder.flush_interval)?;
     validate_positive("channel_capacity", builder.channel_capacity)?;
-    validate_positive("max_pending_bytes", builder.max_pending_bytes)?;
+    validate_positive("max_buffered_bytes", builder.max_pending_bytes)?;
     if builder.max_pending_bytes > u32::MAX as usize {
         return Err(config_error(format!(
-            "max_pending_bytes must not exceed {}",
+            "max_buffered_bytes must not exceed {}",
             u32::MAX
         )));
     }
-    validate_positive("max_in_flight_requests", builder.max_in_flight_requests)?;
+    validate_positive("max_concurrent_batches", builder.max_in_flight_requests)?;
     if builder
         .attempt_timeout
         .is_some_and(|attempt_timeout| attempt_timeout.is_zero())
@@ -473,6 +511,7 @@ struct AppendStreamConfig {
     schema: String,
     table: String,
     batch_bytes: usize,
+    max_batch_rows: usize,
     flush_interval: Duration,
     channel_capacity: usize,
     max_pending_bytes: usize,
@@ -1095,6 +1134,9 @@ struct StreamErrorSnapshot {
     message: String,
     status: SnapshotStatus,
     append_details: Option<AppendErrorDetails>,
+    http_status: Option<reqwest::StatusCode>,
+    request_id: Option<String>,
+    retry_after: Option<Duration>,
 }
 
 impl StreamErrorSnapshot {
@@ -1111,6 +1153,9 @@ impl StreamErrorSnapshot {
             message: error.message().to_string(),
             status,
             append_details: error.append_details().cloned(),
+            http_status: error.http_status(),
+            request_id: error.request_id().map(str::to_string),
+            retry_after: error.retry_after(),
         }
     }
 
@@ -1118,6 +1163,15 @@ impl StreamErrorSnapshot {
         let mut error = Error::new(self.kind, self.message.clone());
         if let Some(details) = self.append_details.clone() {
             error = error.set_append_details(details);
+        }
+        if let Some(status) = self.http_status {
+            error = error.set_http_status(status);
+        }
+        if let Some(request_id) = self.request_id.clone() {
+            error = error.set_request_id(request_id);
+        }
+        if let Some(retry_after) = self.retry_after {
+            error = error.set_retry_after(retry_after);
         }
         match self.status {
             SnapshotStatus::Permanent => error.set_permanent(),
@@ -1300,7 +1354,9 @@ impl AppendWorker {
         }
         self.current_bytes = self.current_bytes.saturating_add(record.payload.len());
         self.rows.push(record);
-        if self.current_bytes >= self.config.batch_bytes || self.rows.len() >= MAX_APPEND_ROWS {
+        if self.current_bytes >= self.config.batch_bytes
+            || self.rows.len() >= self.config.max_batch_rows
+        {
             self.dispatch_buffered().await;
         }
     }
@@ -1708,8 +1764,9 @@ async fn append_batch(
         match result {
             Ok(result) => return (Ok(result), retries),
             Err(error) if append_retryable(&error) && retries < request.retry.max_retries => {
-                if !backoff.is_zero() {
-                    tokio::time::sleep(backoff).await;
+                let retry_delay = retry_delay(backoff, &error, request.retry.max_backoff);
+                if !retry_delay.is_zero() {
+                    tokio::time::sleep(retry_delay).await;
                 }
                 retries += 1;
                 backoff = next_backoff(backoff, request.retry.max_backoff);
@@ -1755,6 +1812,12 @@ fn next_backoff(current: Duration, max_backoff: Duration) -> Duration {
     current
         .checked_mul(2)
         .unwrap_or(max_backoff)
+        .min(max_backoff)
+}
+
+fn retry_delay(backoff: Duration, error: &Error, max_backoff: Duration) -> Duration {
+    backoff
+        .max(error.retry_after().unwrap_or(Duration::ZERO))
         .min(max_backoff)
 }
 
@@ -2148,6 +2211,7 @@ mod tests {
             schema: "public".to_string(),
             table: "events".to_string(),
             batch_bytes: 1024,
+            max_batch_rows: 100,
             flush_interval: Duration::from_secs(1),
             channel_capacity: 1,
             max_pending_bytes: 1024,
@@ -2195,6 +2259,55 @@ mod tests {
         );
     }
 
+    #[test]
+    fn retry_after_is_honored_and_capped() {
+        let error = Error::new(ErrorKind::AppendRowsFailed, "busy")
+            .set_retry_after(Duration::from_secs(30));
+        assert_eq!(
+            retry_delay(Duration::from_millis(100), &error, Duration::from_secs(5)),
+            Duration::from_secs(5)
+        );
+
+        let error = Error::new(ErrorKind::AppendRowsFailed, "busy")
+            .set_retry_after(Duration::from_millis(200));
+        assert_eq!(
+            retry_delay(Duration::from_secs(1), &error, Duration::from_secs(5)),
+            Duration::from_secs(1)
+        );
+    }
+
+    #[test]
+    fn max_batch_rows_cannot_exceed_protocol_limit() {
+        let result = Client::new("https://example.com", reqwest::Client::new())
+            .unwrap()
+            .table("events")
+            .append_stream()
+            .max_batch_rows(MAX_APPEND_ROWS + 1)
+            .build();
+        let error = match result {
+            Ok(_) => panic!("invalid max_batch_rows was accepted"),
+            Err(error) => error,
+        };
+        assert_eq!(error.kind(), ErrorKind::ConfigInvalid);
+    }
+
+    #[test]
+    fn error_snapshot_preserves_http_metadata() {
+        let error = Error::new(ErrorKind::AppendRowsFailed, "busy")
+            .set_http_status(reqwest::StatusCode::SERVICE_UNAVAILABLE)
+            .set_request_id("request-123".to_string())
+            .set_retry_after(Duration::from_secs(2))
+            .set_temporary();
+        let restored = StreamErrorSnapshot::from_error(&error).to_error();
+        assert_eq!(
+            restored.http_status(),
+            Some(reqwest::StatusCode::SERVICE_UNAVAILABLE)
+        );
+        assert_eq!(restored.request_id(), Some("request-123"));
+        assert_eq!(restored.retry_after(), Some(Duration::from_secs(2)));
+        assert!(restored.is_temporary());
+    }
+
     #[tokio::test]
     async fn batches_ndjson_and_runs_requests_concurrently() {
         let server = MockServer::start(|_, request| {
@@ -2206,8 +2319,8 @@ mod tests {
             .with_database("analytics 2026")
             .with_schema("public")
             .append_stream()
-            .batch_bytes(1)
-            .max_in_flight_requests(3)
+            .target_batch_bytes(1)
+            .max_concurrent_batches(3)
             .build()
             .unwrap();
 
@@ -2240,6 +2353,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn semantic_builder_names_split_batches_by_row_count() {
+        let server = MockServer::start(|_, request| MockResponse::committed(request));
+        let stream = server
+            .client()
+            .table("events")
+            .append_stream()
+            .target_batch_bytes(1024 * 1024)
+            .max_batch_rows(2)
+            .max_buffered_bytes(1024 * 1024)
+            .max_concurrent_batches(1)
+            .build()
+            .unwrap();
+
+        stream
+            .send_all((0..5).map(|id| serde_json::json!({"id": id})))
+            .await
+            .unwrap();
+        let report = stream.shutdown().await.unwrap();
+
+        assert_eq!(report.committed_rows, 5);
+        let row_counts = server
+            .requests()
+            .iter()
+            .map(|request| request.body.lines().count())
+            .collect::<Vec<_>>();
+        assert_eq!(row_counts, vec![2, 2, 1]);
+    }
+
+    #[tokio::test]
+    async fn client_builder_attaches_api_key_to_requests() {
+        let server = MockServer::start(|_, request| MockResponse::committed(request));
+        let http_client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let client = Client::builder(&server.endpoint)
+            .api_key("secret-api-key")
+            .http_client(http_client)
+            .build()
+            .unwrap();
+
+        client.table("events").append(r#"{"id":1}"#).await.unwrap();
+
+        assert_eq!(
+            server.requests()[0]
+                .headers
+                .get("authorization")
+                .map(String::as_str),
+            Some("Bearer secret-api-key")
+        );
+    }
+
+    #[tokio::test]
     async fn continue_mode_retries_only_temporary_rejections() {
         let server = MockServer::start(|index, request| match index {
             0 => MockResponse::json(503, r#"{"message":"busy","append_state":"rejected"}"#),
@@ -2254,8 +2417,8 @@ mod tests {
             .append_stream()
             .failure_policy(AppendFailurePolicy::Continue)
             .circuit_breaker(None)
-            .batch_bytes(1)
-            .max_in_flight_requests(1)
+            .target_batch_bytes(1)
+            .max_concurrent_batches(1)
             .max_retries(4)
             .initial_backoff(Duration::ZERO)
             .max_backoff(Duration::ZERO)
@@ -2295,7 +2458,7 @@ mod tests {
             .append_stream()
             .failure_policy(AppendFailurePolicy::Continue)
             .circuit_breaker(None)
-            .batch_bytes(1)
+            .target_batch_bytes(1)
             .max_retries(8)
             .attempt_timeout(Duration::from_millis(10))
             .build()
@@ -2320,8 +2483,8 @@ mod tests {
             .client()
             .table("events")
             .append_stream()
-            .batch_bytes(1)
-            .max_in_flight_requests(1)
+            .target_batch_bytes(1)
+            .max_concurrent_batches(1)
             .build()
             .unwrap();
         stream
@@ -2359,8 +2522,8 @@ mod tests {
             .client()
             .table("events")
             .append_stream()
-            .batch_bytes(1)
-            .max_in_flight_requests(2)
+            .target_batch_bytes(1)
+            .max_concurrent_batches(2)
             .build()
             .unwrap();
         stream
@@ -2436,7 +2599,7 @@ mod tests {
             .table("events")
             .append_stream()
             .failure_policy(AppendFailurePolicy::Continue)
-            .max_pending_bytes(1)
+            .max_buffered_bytes(1)
             .build()
             .unwrap();
 

@@ -2,9 +2,9 @@
 
 Start with a quickstart, then choose a write pattern whose delivery tradeoffs
 match the workload. Every example uses only the public `scopedb-client` API.
-The shared client helper uses the SDK's compatible HTTP client re-export at
-`scopedb_client::reqwest`, so copied examples do not need a direct reqwest
-dependency.
+The shared client helper uses `Client::builder(...).api_key(...)`, so copied
+examples do not need a direct reqwest dependency. API keys belong only in a
+trusted process; never return one to an untrusted client.
 
 These examples focus on SDK integration and assume valid ScopeQL. For language
 syntax, use the canonical [Quickstart](https://docs.scopedb.io/guides/quickstart),
@@ -20,9 +20,9 @@ data.
 
 | Example | Shows | Run |
 | --- | --- | --- |
-| [`statement.rs`](statement.rs) | Statement execution and typed result values | `cargo run --example statement` |
-| [`catalog.rs`](catalog.rs) | REST catalog pagination and full table metadata | `cargo run --example catalog` |
-| [`table.rs`](table.rs) | Quoted table identifiers and the table schema helper | `cargo run --example table` |
+| [`statement.rs`](statement.rs) | Query shorthand and object result rows | `cargo run --example statement` |
+| [`catalog.rs`](catalog.rs) | Automatic REST catalog pagination and full resources | `cargo run --example catalog` |
+| [`table.rs`](table.rs) | Quoted table identifiers and full table descriptions | `cargo run --example table` |
 
 ## Before running a write example
 
@@ -109,7 +109,7 @@ wait for a later probe.
   keep the future alive to receive the interval report and use `stats()` for
   post-cancellation diagnostics.
 - Concurrent batches do not have a defined commit order. Use
-  `max_in_flight_requests(1)` when requests must be submitted serially.
+  `max_concurrent_batches(1)` when requests must be submitted serially.
 - An in-memory stream is not a durable queue. Audit or billing writes need an
   application-owned outbox and a reconciliation path for unknown outcomes.
 

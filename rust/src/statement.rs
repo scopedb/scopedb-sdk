@@ -80,17 +80,14 @@ impl Statement {
                 client,
                 statement_id: response.statement_id(),
                 format,
-                status: Some(response),
+                last_status: Some(response),
             }),
-            Response::Failed(err) => Err(Error::new(
-                ErrorKind::Unexpected,
-                format!("failed to submit statement: {err}"),
-            )),
+            Response::Failed(err) => Err(err.into_error(ErrorKind::Unexpected)),
         }
     }
 
     pub async fn execute(self) -> Result<ResultSet, Error> {
-        self.submit().await?.fetch().await
+        self.submit().await?.wait().await
     }
 
     pub(crate) fn new(client: Client, statement: String) -> Self {
@@ -110,7 +107,7 @@ pub struct StatementHandle {
     client: Client,
     statement_id: Uuid,
     format: ResultFormat,
-    status: Option<StatementStatus>,
+    last_status: Option<StatementStatus>,
 }
 
 impl StatementHandle {
@@ -118,28 +115,33 @@ impl StatementHandle {
         self.statement_id
     }
 
-    pub fn status(&self) -> Option<&StatementStatus> {
-        self.status.as_ref()
+    /// Returns the status snapshot received by the most recent request without
+    /// making a network request.
+    pub fn last_status(&self) -> Option<&StatementStatus> {
+        self.last_status.as_ref()
     }
 
+    /// Returns progress from the most recent status snapshot.
     pub fn progress(&self) -> Option<&crate::StatementEstimatedProgress> {
-        self.status.as_ref().map(StatementStatus::progress)
+        self.last_status.as_ref().map(StatementStatus::progress)
     }
 
+    /// Returns a result set when the most recent status snapshot is finished.
     pub fn result_set(&self) -> Option<ResultSet> {
-        self.status.as_ref().and_then(|status| match status {
+        self.last_status.as_ref().and_then(|status| match status {
             StatementStatus::Finished(s) => Some(s.result_set()),
             _ => None,
         })
     }
 
-    pub async fn fetch_once(&mut self) -> Result<(), Error> {
+    /// Fetches and returns the latest statement status.
+    pub async fn status(&mut self) -> Result<&StatementStatus, Error> {
         // already terminated - no need to fetch again
-        match self.status.as_ref() {
+        match self.last_status.as_ref() {
             Some(StatementStatus::Finished(..))
             | Some(StatementStatus::Failed(..))
             | Some(StatementStatus::Cancelled(..)) => {
-                return Ok(());
+                return Ok(self.last_status.as_ref().expect("status was matched above"));
             }
             _ => {}
         }
@@ -151,31 +153,41 @@ impl StatementHandle {
             .await?
         {
             Response::Success(status) => {
-                self.status = Some(status);
-                Ok(())
+                self.last_status = Some(status);
+                Ok(self.last_status.as_ref().expect("status was just assigned"))
             }
-            Response::Failed(err) => Err(Error::new(
-                ErrorKind::Unexpected,
-                format!("failed to fetch statement: {err}"),
-            )),
+            Response::Failed(err) => Err(err.into_error(ErrorKind::Unexpected)),
         }
     }
 
-    pub async fn fetch(&mut self) -> Result<ResultSet, Error> {
+    /// Backward-compatible alias for [`StatementHandle::status`].
+    #[deprecated(note = "use status")]
+    pub async fn fetch_once(&mut self) -> Result<(), Error> {
+        self.status().await.map(|_| ())
+    }
+
+    /// Waits for the statement to terminate and returns its result set.
+    pub async fn wait(&mut self) -> Result<ResultSet, Error> {
         let mut delay = Duration::from_millis(5);
         let max_delay = Duration::from_secs(1);
 
         loop {
-            self.fetch_once().await?;
+            self.status().await?;
 
-            if let Some(status) = self.status.as_ref() {
+            if let Some(status) = self.last_status.as_ref() {
                 match status {
                     StatementStatus::Finished(finished) => return Ok(finished.result_set()),
                     StatementStatus::Failed(failed) => {
-                        return Err(Error::new(ErrorKind::Unexpected, failed.message.clone()));
+                        return Err(Error::new(
+                            ErrorKind::StatementFailed,
+                            failed.message.clone(),
+                        ));
                     }
                     StatementStatus::Cancelled(cancelled) => {
-                        return Err(Error::new(ErrorKind::Unexpected, cancelled.message.clone()));
+                        return Err(Error::new(
+                            ErrorKind::StatementFailed,
+                            cancelled.message.clone(),
+                        ));
                     }
                     StatementStatus::Pending(..) | StatementStatus::Running(..) => {
                         sleep(delay).await;
@@ -188,8 +200,14 @@ impl StatementHandle {
         }
     }
 
+    /// Backward-compatible alias for [`StatementHandle::wait`].
+    #[deprecated(note = "use wait")]
+    pub async fn fetch(&mut self) -> Result<ResultSet, Error> {
+        self.wait().await
+    }
+
     pub async fn cancel(&mut self) -> Result<StatementCancelResult, Error> {
-        if let Some(response) = self.status.as_ref() {
+        if let Some(response) = self.last_status.as_ref() {
             match response {
                 StatementStatus::Pending(..) | StatementStatus::Running(..) => {}
                 StatementStatus::Finished(s) => {
@@ -221,7 +239,7 @@ impl StatementHandle {
 
         match self.client.cancel_statement(self.statement_id).await? {
             Response::Success(response) => {
-                self.status = match response.status.as_str() {
+                self.last_status = match response.status.as_str() {
                     "failed" => Some(StatementStatus::Failed(crate::StatementStatusFailed {
                         statement_id: response.statement_id,
                         created_at: response.created_at,
@@ -236,14 +254,11 @@ impl StatementHandle {
                             message: response.message.clone(),
                         },
                     )),
-                    _ => self.status.take(),
+                    _ => self.last_status.take(),
                 };
                 Ok(response)
             }
-            Response::Failed(err) => Err(Error::new(
-                ErrorKind::Unexpected,
-                format!("failed to cancel statement: {err}"),
-            )),
+            Response::Failed(err) => Err(err.into_error(ErrorKind::Unexpected)),
         }
     }
 
@@ -252,7 +267,7 @@ impl StatementHandle {
             client,
             statement_id,
             format,
-            status: None,
+            last_status: None,
         }
     }
 }

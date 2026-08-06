@@ -18,10 +18,6 @@ use std::io;
 
 use scopedb_client::Client;
 use scopedb_client::Table;
-use scopedb_client::reqwest;
-use scopedb_client::reqwest::header::AUTHORIZATION;
-use scopedb_client::reqwest::header::HeaderMap;
-use scopedb_client::reqwest::header::HeaderValue;
 
 pub fn endpoint() -> String {
     std::env::var("SCOPEDB_ENDPOINT").unwrap_or_else(|_| "http://127.0.0.1:6543".to_string())
@@ -36,8 +32,7 @@ pub fn schema() -> String {
 }
 
 pub fn client() -> Result<Client, Box<dyn std::error::Error>> {
-    let mut headers = HeaderMap::new();
-    let token = std::env::var("SCOPEDB_API_KEY")
+    let api_key = std::env::var("SCOPEDB_API_KEY")
         .ok()
         .filter(|value| !value.is_empty())
         .or_else(|| {
@@ -45,16 +40,11 @@ pub fn client() -> Result<Client, Box<dyn std::error::Error>> {
                 .ok()
                 .filter(|value| !value.is_empty())
         });
-    if let Some(token) = token {
-        let mut authorization = HeaderValue::from_str(&format!("Bearer {token}"))?;
-        authorization.set_sensitive(true);
-        headers.insert(AUTHORIZATION, authorization);
+    let mut builder = Client::builder(endpoint());
+    if let Some(api_key) = api_key {
+        builder = builder.api_key(api_key);
     }
-
-    let http_client = reqwest::Client::builder()
-        .default_headers(headers)
-        .build()?;
-    Ok(Client::new(endpoint(), http_client)?)
+    Ok(builder.build()?)
 }
 
 pub fn write_table(client: &Client) -> Result<Table, io::Error> {

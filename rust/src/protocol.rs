@@ -14,9 +14,12 @@
 
 use std::fmt;
 use std::str::FromStr;
+use std::time::Duration;
+use std::time::SystemTime;
 
 use jiff::SignedDuration;
 use reqwest::StatusCode;
+use reqwest::header::HeaderMap;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -75,7 +78,8 @@ pub struct AppendErrorDetails {
 
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct AppendRowsErrorPayload {
-    pub message: String,
+    #[serde(rename = "message")]
+    pub _message: String,
     #[serde(flatten)]
     pub details: AppendErrorDetails,
 }
@@ -89,6 +93,21 @@ pub struct CatalogListOptions {
     /// Opaque token returned as `next_page_token` by the previous page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page_token: Option<String>,
+}
+
+impl CatalogListOptions {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
+        if self
+            .page_size
+            .is_some_and(|size| !(1..=1000).contains(&size))
+        {
+            return Err(Error::new(
+                ErrorKind::ConfigInvalid,
+                "catalog page_size must be an integer from 1 to 1000",
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// One page of catalog resources.
@@ -179,19 +198,29 @@ pub enum Response<T> {
 
 impl<T: DeserializeOwned> Response<T> {
     pub async fn from_http_response(r: reqwest::Response) -> Result<Self, Error> {
-        let make_error = |err| {
-            Error::new(ErrorKind::Unexpected, "failed to make response".to_string()).set_source(err)
-        };
-
         let code = r.status();
+        let headers = r.headers().clone();
+        let payload = r.bytes().await.map_err(|err| {
+            apply_response_metadata(
+                Error::new(ErrorKind::Unexpected, "failed to read response body").set_source(err),
+                code,
+                &headers,
+            )
+        })?;
         if code.is_success() {
-            let result = r.json().await.map_err(make_error)?;
+            let result = serde_json::from_slice(&payload).map_err(|err| {
+                apply_response_metadata(
+                    Error::new(ErrorKind::Unexpected, "failed to decode response body")
+                        .set_source(err),
+                    code,
+                    &headers,
+                )
+            })?;
             return Ok(Response::Success(result));
         }
 
-        let payload = r.bytes().await.map_err(make_error)?;
-        Ok(Response::Failed(ErrorStatus::from_http_payload(
-            code, &payload,
+        Ok(Response::Failed(ErrorStatus::from_http_parts(
+            code, &headers, &payload,
         )))
     }
 }
@@ -200,38 +229,112 @@ impl<T: DeserializeOwned> Response<T> {
 pub struct ErrorStatus {
     code: StatusCode,
     message: String,
+    request_id: Option<String>,
+    retry_after: Option<Duration>,
+    retryable: Option<bool>,
 }
 
 impl ErrorStatus {
-    pub(crate) fn from_http_payload(code: StatusCode, payload: &[u8]) -> Self {
+    pub(crate) fn from_http_parts(code: StatusCode, headers: &HeaderMap, payload: &[u8]) -> Self {
+        let parsed = parse_error_payload(payload);
         Self {
             code,
-            message: http_error_message(payload),
+            message: parsed
+                .as_ref()
+                .map(|parsed| parsed.message.clone())
+                .unwrap_or_else(|| String::from_utf8_lossy(payload).into_owned()),
+            request_id: parsed
+                .as_ref()
+                .and_then(|parsed| parsed.request_id.clone())
+                .or_else(|| header_string(headers, "x-request-id")),
+            retry_after: parse_retry_after(headers, SystemTime::now()),
+            retryable: parsed.and_then(|parsed| parsed.retryable),
         }
     }
 
-    pub fn code(&self) -> StatusCode {
-        self.code
+    pub(crate) fn into_error(self, kind: ErrorKind) -> Error {
+        let mut error = Error::new(kind, self.message).set_http_status(self.code);
+        if let Some(request_id) = self.request_id {
+            error = error.set_request_id(request_id);
+        }
+        if let Some(retry_after) = self.retry_after {
+            error = error.set_retry_after(retry_after);
+        }
+        let retryable = self.retryable.unwrap_or_else(|| {
+            matches!(
+                self.code,
+                StatusCode::REQUEST_TIMEOUT | StatusCode::TOO_MANY_REQUESTS
+            ) || self.code.is_server_error()
+        });
+        if retryable {
+            error.set_temporary()
+        } else {
+            error.set_permanent()
+        }
     }
 }
 
-pub(crate) fn http_error_message(payload: &[u8]) -> String {
-    if let Ok(payload) = serde_json::from_slice::<serde_json::Value>(payload) {
-        let message = payload
-            .get("message")
-            .and_then(serde_json::Value::as_str)
-            .or_else(|| {
-                payload
-                    .get("error")
-                    .and_then(|error| error.get("message"))
-                    .and_then(serde_json::Value::as_str)
-            });
-        if let Some(message) = message {
-            return message.to_string();
-        }
+#[derive(Debug)]
+struct ParsedErrorPayload {
+    message: String,
+    request_id: Option<String>,
+    retryable: Option<bool>,
+}
+
+fn parse_error_payload(payload: &[u8]) -> Option<ParsedErrorPayload> {
+    let payload = serde_json::from_slice::<serde_json::Value>(payload).ok()?;
+    let object = payload.as_object()?;
+    if let Some(message) = object.get("message").and_then(serde_json::Value::as_str) {
+        return Some(ParsedErrorPayload {
+            message: message.to_string(),
+            request_id: object
+                .get("request_id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string),
+            retryable: object.get("retryable").and_then(serde_json::Value::as_bool),
+        });
     }
 
-    String::from_utf8_lossy(payload).into_owned()
+    let nested = object.get("error")?.as_object()?;
+    Some(ParsedErrorPayload {
+        message: nested.get("message")?.as_str()?.to_string(),
+        request_id: object
+            .get("request_id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string),
+        retryable: nested.get("retryable").and_then(serde_json::Value::as_bool),
+    })
+}
+
+pub(crate) fn apply_response_metadata(
+    mut error: Error,
+    status: StatusCode,
+    headers: &HeaderMap,
+) -> Error {
+    error = error.set_http_status(status);
+    if let Some(request_id) = header_string(headers, "x-request-id") {
+        error = error.set_request_id(request_id);
+    }
+    if let Some(retry_after) = parse_retry_after(headers, SystemTime::now()) {
+        error = error.set_retry_after(retry_after);
+    }
+    error
+}
+
+fn header_string(headers: &HeaderMap, name: &'static str) -> Option<String> {
+    headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string)
+}
+
+fn parse_retry_after(headers: &HeaderMap, now: SystemTime) -> Option<Duration> {
+    let value = headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?;
+    if let Ok(seconds) = value.parse::<u64>() {
+        return Some(Duration::from_secs(seconds));
+    }
+    let at = httpdate::parse_http_date(value).ok()?;
+    Some(at.duration_since(now).unwrap_or(Duration::ZERO))
 }
 
 impl fmt::Display for ErrorStatus {
@@ -559,11 +662,21 @@ impl FromStr for DataType {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+    use std::time::SystemTime;
+
+    use reqwest::header::HeaderMap;
+    use reqwest::header::HeaderValue;
+
     use super::AppendRowsErrorPayload;
     use super::AppendState;
+    use super::CatalogListOptions;
     use super::DataType;
+    use super::ErrorStatus;
     use super::TableResource;
-    use super::http_error_message;
+    use super::parse_error_payload;
+    use super::parse_retry_after;
+    use crate::ErrorKind;
 
     #[test]
     fn append_error_details_use_wire_defaults() {
@@ -579,13 +692,72 @@ mod tests {
     #[test]
     fn http_error_message_supports_direct_and_nested_payloads() {
         assert_eq!(
-            http_error_message(br#"{"message":"direct failure","error":"details"}"#),
+            parse_error_payload(br#"{"message":"direct failure","error":"details"}"#)
+                .unwrap()
+                .message,
             "direct failure"
         );
         assert_eq!(
-            http_error_message(br#"{"error":{"message":"nested failure"}}"#),
+            parse_error_payload(br#"{"error":{"message":"nested failure"}}"#)
+                .unwrap()
+                .message,
             "nested failure"
         );
+    }
+
+    #[test]
+    fn http_error_metadata_prefers_payload_and_honors_retryable() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-request-id", HeaderValue::from_static("header-request"));
+        headers.insert(reqwest::header::RETRY_AFTER, HeaderValue::from_static("7"));
+
+        let error = ErrorStatus::from_http_parts(
+            reqwest::StatusCode::SERVICE_UNAVAILABLE,
+            &headers,
+            br#"{"message":"busy","request_id":"body-request","retryable":false}"#,
+        )
+        .into_error(ErrorKind::Unexpected);
+
+        assert_eq!(error.message(), "busy");
+        assert_eq!(
+            error.http_status(),
+            Some(reqwest::StatusCode::SERVICE_UNAVAILABLE)
+        );
+        assert_eq!(error.request_id(), Some("body-request"));
+        assert_eq!(error.retry_after(), Some(Duration::from_secs(7)));
+        assert!(!error.is_retryable());
+
+        let nested = ErrorStatus::from_http_parts(
+            reqwest::StatusCode::BAD_REQUEST,
+            &HeaderMap::new(),
+            br#"{"error":{"message":"try later","retryable":true}}"#,
+        )
+        .into_error(ErrorKind::Unexpected);
+        assert_eq!(nested.message(), "try later");
+        assert!(nested.is_retryable());
+    }
+
+    #[test]
+    fn retry_after_accepts_http_dates() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            reqwest::header::RETRY_AFTER,
+            HeaderValue::from_static("Thu, 01 Jan 1970 00:00:10 GMT"),
+        );
+        assert_eq!(
+            parse_retry_after(&headers, SystemTime::UNIX_EPOCH),
+            Some(Duration::from_secs(10))
+        );
+    }
+
+    #[test]
+    fn catalog_page_size_is_validated_locally() {
+        let options = CatalogListOptions {
+            page_size: Some(1001),
+            page_token: None,
+        };
+        let error = options.validate().unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::ConfigInvalid);
     }
 
     #[test]

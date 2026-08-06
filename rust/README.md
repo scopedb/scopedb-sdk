@@ -6,6 +6,8 @@ streaming writes, and transform-oriented JSON ingest.
 
 ## Installation
 
+`scopedb-client` requires Rust 1.91.0 or later.
+
 ```sh
 cargo add scopedb-client serde_json
 cargo add tokio --features macros,rt-multi-thread
@@ -13,24 +15,28 @@ cargo add tokio --features macros,rt-multi-thread
 
 ## Create a client
 
-The SDK accepts a configured HTTP client, so applications can own TLS, timeouts,
-authentication headers, and connection pooling. Use the compatible reqwest
-version re-exported as `scopedb_client::reqwest`; a separate direct reqwest
-dependency is not needed.
+Use the builder for the common API-key path. An API key is a server credential:
+keep it in a trusted process and never compile or return it to an untrusted
+client.
 
 ```rust
 use scopedb_client::Client;
 
-let client = Client::new(
-    "http://127.0.0.1:6543",
-    scopedb_client::reqwest::Client::new(),
-)?;
+let client = Client::builder("http://127.0.0.1:6543")
+    .api_key(std::env::var("SCOPEDB_API_KEY").expect("SCOPEDB_API_KEY is required"))
+    .build()?;
 # Ok::<(), scopedb_client::Error>(())
 ```
 
+Applications that own TLS, proxy, timeout, or pooling settings can pass a
+compatible HTTP client through `.http_client(...)`. `Client::new(endpoint,
+http_client)` remains available when authentication is already configured on
+that client. Use the reqwest version re-exported as `scopedb_client::reqwest` to
+avoid dependency-version mismatches.
+
 The runnable examples read authentication from `SCOPEDB_API_KEY`. For backward
 compatibility, they fall back to `SCOPEDB_TOKEN` when the API key variable is
-unset or empty. The shared helper marks the resulting authorization header as
+unset or empty. The builder marks the resulting authorization header as
 sensitive so standard header and request `Debug` formatting redacts the
 credential.
 
@@ -48,44 +54,53 @@ separately. Use these canonical entry points:
 ```rust
 # async fn demo() -> Result<(), scopedb_client::Error> {
 # let client = scopedb_client::Client::new("http://127.0.0.1:6543", scopedb_client::reqwest::Client::new())?;
-let result = client.statement("SELECT 1".to_string()).execute().await?;
-let rows = result.into_values()?;
+let result = client.query("SELECT 1 AS ready").await?;
+let rows = result.into_objects()?;
 println!("{rows:?}");
 # Ok(())
 # }
 ```
 
+`raw_rows()` exposes the string-or-null wire cells without parsing.
+`to_values()` borrows the result while `into_values()` consumes it and moves
+owned string cells. `to_objects()` and `into_objects()` key values by output
+column name; they return an error when names are duplicated, so use the value
+form for intentionally duplicated columns. `first()` converts only the first
+row for point lookups and aggregates.
+
+For lifecycle control, call `client.statement(scopeql).submit()` and retain the
+returned handle. `last_status()` reads the latest cached snapshot without a
+network request, `status().await` fetches one current status, `wait()` polls to
+a terminal result, and `cancel()` requests cancellation. The statement ID and
+initial status snapshot are available immediately after submission.
+
 ## Browse the catalog
 
-Catalog list methods return one page and preserve the opaque continuation token.
-Fetch methods return the full database, schema, or table resource.
+Catalog iterators follow opaque continuation tokens automatically and fetch the
+next page only when needed. List methods remain available when the application
+needs explicit page boundaries; fetch methods return one full resource.
 
 ```rust
 use scopedb_client::CatalogListOptions;
 
 # async fn demo() -> Result<(), scopedb_client::Error> {
 # let client = scopedb_client::Client::new("http://127.0.0.1:6543", scopedb_client::reqwest::Client::new())?;
-let databases = client
-    .list_databases(CatalogListOptions {
+let mut databases = client
+    .iterate_databases(CatalogListOptions {
         page_size: Some(100),
         page_token: None,
-    })
-    .await?;
+    });
+while let Some(database) = databases.next().await? {
+    println!("database = {}", database.name);
+}
 
 let database = client.fetch_database("scopedb").await?;
-let schemas = client
-    .list_schemas("scopedb", CatalogListOptions::default())
-    .await?;
 let schema = client.fetch_schema("scopedb", "public").await?;
-let tables = client
-    .list_tables("scopedb", "public", CatalogListOptions::default())
-    .await?;
 let table = client
     .fetch_table("scopedb", "public", "events")
     .await?;
 
 println!("{} {} {}", database.name, schema.name, table.name);
-println!("first page: {} databases, {} schemas, {} tables", databases.items.len(), schemas.items.len(), tables.items.len());
 # Ok(())
 # }
 ```
@@ -156,6 +171,23 @@ if error.kind() == ErrorKind::AppendRowsFailed {
 `Unknown` is deliberately different from a rejection: replaying the same rows
 may insert duplicates.
 
+All HTTP errors preserve the server message in `Error::message()` and expose
+operational metadata without message parsing:
+
+```rust
+# fn inspect(error: &scopedb_client::Error) {
+eprintln!("{}", error.message());
+eprintln!("status = {:?}", error.http_status());
+eprintln!("request_id = {:?}", error.request_id());
+eprintln!("retryable = {}", error.is_retryable());
+eprintln!("retry_after = {:?}", error.retry_after());
+# }
+```
+
+The asynchronous append stream honors `Retry-After` only for an exact temporary
+batch explicitly reported as `Rejected`; the delay is capped by `max_backoff`.
+Unknown outcomes remain non-retryable because replay can duplicate rows.
+
 ### Asynchronous append stream
 
 Use `append_stream()` for continuous or large producers. The stream serializes
@@ -170,10 +202,11 @@ use std::time::Duration;
 let table = client.table("events").with_schema("public");
 let stream = table
     .append_stream()
-    .batch_bytes(4 * 1024 * 1024)
+    .target_batch_bytes(4 * 1024 * 1024)
+    .max_batch_rows(10_000)
     .flush_interval(Duration::from_secs(1))
-    .max_in_flight_requests(4)
-    .max_pending_bytes(64 * 1024 * 1024)
+    .max_concurrent_batches(4)
+    .max_buffered_bytes(64 * 1024 * 1024)
     .build()?;
 
 let admitted = stream
@@ -206,7 +239,7 @@ deciding how to reconcile the covered rows.
 
 The default `AppendFailurePolicy::Stop` is strict: the first failed batch stops
 admission, and a successful barrier confirms that its accepted prefix committed.
-Use `max_in_flight_requests(1)` if request submission order matters; concurrent
+Use `max_concurrent_batches(1)` if request submission order matters; concurrent
 batches have no defined commit order.
 
 ### Best-effort telemetry and logs
@@ -293,8 +326,8 @@ available for reconciliation.
 let table = client.table("events").with_schema("public");
 println!("identifier = {}", table.identifier());
 
-let schema = table.table_schema().await?;
-println!("fields = {}", schema.fields().len());
+let description = table.describe().await?;
+println!("columns = {}", description.columns.len());
 # Ok(())
 # }
 ```

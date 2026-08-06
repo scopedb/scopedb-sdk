@@ -13,6 +13,9 @@
 // limitations under the License.
 
 use std::fmt;
+use std::time::Duration;
+
+use reqwest::StatusCode;
 
 use crate::protocol::AppendErrorDetails;
 
@@ -29,6 +32,9 @@ pub enum ErrorKind {
 
     /// A table append was rejected or its commit outcome is unknown.
     AppendRowsFailed,
+
+    /// A statement reached a failed or cancelled terminal state.
+    StatementFailed,
 }
 
 impl ErrorKind {
@@ -50,6 +56,7 @@ impl From<ErrorKind> for &'static str {
             ErrorKind::Unexpected => "Unexpected",
             ErrorKind::ConfigInvalid => "ConfigInvalid",
             ErrorKind::AppendRowsFailed => "AppendRowsFailed",
+            ErrorKind::StatementFailed => "StatementFailed",
         }
     }
 }
@@ -76,6 +83,13 @@ enum ErrorStatus {
     Persistent,
 }
 
+#[derive(Debug, Default)]
+struct HttpErrorMetadata {
+    status: Option<StatusCode>,
+    request_id: Option<String>,
+    retry_after: Option<Duration>,
+}
+
 impl fmt::Display for ErrorStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -93,6 +107,7 @@ pub struct Error {
     status: ErrorStatus,
     context: Vec<(&'static str, String)>,
     append_details: Option<AppendErrorDetails>,
+    http_metadata: Option<Box<HttpErrorMetadata>>,
 
     source: Option<anyhow::Error>,
 }
@@ -119,6 +134,16 @@ impl fmt::Display for Error {
             write!(f, " => {}", self.message)?;
         }
 
+        if let Some(status) = self.http_status() {
+            write!(f, ", http_status: {}", status.as_u16())?;
+        }
+        if let Some(request_id) = self.request_id() {
+            write!(f, ", request_id: {request_id}")?;
+        }
+        if let Some(retry_after) = self.retry_after() {
+            write!(f, ", retry_after: {retry_after:?}")?;
+        }
+
         if let Some(source) = &self.source {
             write!(f, ", source: {source}")?;
         }
@@ -137,6 +162,7 @@ impl fmt::Debug for Error {
             de.field("status", &self.status);
             de.field("context", &self.context);
             de.field("append_details", &self.append_details);
+            de.field("http_metadata", &self.http_metadata);
             de.field("source", &self.source);
             return de.finish();
         }
@@ -144,6 +170,15 @@ impl fmt::Debug for Error {
         write!(f, "{} ({})", self.kind, self.status)?;
         if !self.message.is_empty() {
             write!(f, " => {}", self.message)?;
+        }
+        if let Some(status) = self.http_status() {
+            write!(f, ", http_status: {}", status.as_u16())?;
+        }
+        if let Some(request_id) = self.request_id() {
+            write!(f, ", request_id: {request_id}")?;
+        }
+        if let Some(retry_after) = self.retry_after() {
+            write!(f, ", retry_after: {retry_after:?}")?;
         }
         writeln!(f)?;
 
@@ -180,6 +215,7 @@ impl Error {
             status: ErrorStatus::Permanent,
             context: Vec::default(),
             append_details: None,
+            http_metadata: None,
             source: None,
         }
     }
@@ -212,6 +248,26 @@ impl Error {
         self
     }
 
+    pub(crate) fn set_http_status(mut self, status: StatusCode) -> Self {
+        self.http_metadata_mut().status = Some(status);
+        self
+    }
+
+    pub(crate) fn set_request_id(mut self, request_id: String) -> Self {
+        self.http_metadata_mut().request_id = Some(request_id);
+        self
+    }
+
+    pub(crate) fn set_retry_after(mut self, retry_after: Duration) -> Self {
+        self.http_metadata_mut().retry_after = Some(retry_after);
+        self
+    }
+
+    fn http_metadata_mut(&mut self) -> &mut HttpErrorMetadata {
+        self.http_metadata
+            .get_or_insert_with(|| Box::new(HttpErrorMetadata::default()))
+    }
+
     /// Set permanent status for error.
     pub fn set_permanent(mut self) -> Self {
         self.status = ErrorStatus::Permanent;
@@ -242,6 +298,32 @@ impl Error {
     /// Return the error message.
     pub fn message(&self) -> &str {
         &self.message
+    }
+
+    /// Return the HTTP response status when the error came from a server.
+    pub fn http_status(&self) -> Option<StatusCode> {
+        self.http_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.status)
+    }
+
+    /// Return the request identifier supplied by ScopeDB or an intermediary.
+    pub fn request_id(&self) -> Option<&str> {
+        self.http_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.request_id.as_deref())
+    }
+
+    /// Return the delay suggested by the HTTP `Retry-After` header.
+    pub fn retry_after(&self) -> Option<Duration> {
+        self.http_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.retry_after)
+    }
+
+    /// Return whether retrying this operation is currently appropriate.
+    pub fn is_retryable(&self) -> bool {
+        self.is_temporary()
     }
 
     /// Check if this error is temporary.

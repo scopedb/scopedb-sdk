@@ -18,6 +18,7 @@ use crate::FieldSchema;
 use crate::Schema;
 use crate::append_stream::AppendStreamBuilder;
 use crate::protocol::AppendRowsResult;
+use crate::protocol::TableResource;
 
 #[derive(Debug, Clone)]
 pub struct Table {
@@ -91,13 +92,21 @@ impl Table {
         )
     }
 
+    /// Fetches the full REST catalog resource for this table.
+    pub async fn describe(&self) -> Result<TableResource, Error> {
+        self.client
+            .fetch_table(
+                self.database.as_deref().unwrap_or("scopedb"),
+                self.schema.as_deref().unwrap_or("public"),
+                &self.table,
+            )
+            .await
+    }
+
+    /// Backward-compatible schema-only view of [`Table::describe`].
+    #[deprecated(note = "use describe")]
     pub async fn table_schema(&self) -> Result<Schema, Error> {
-        let database_name = self.database.as_deref().unwrap_or("scopedb");
-        let schema_name = self.schema.as_deref().unwrap_or("public");
-        let table = self
-            .client
-            .fetch_table(database_name, schema_name, &self.table)
-            .await?;
+        let table = self.describe().await?;
         let fields = table
             .columns
             .into_iter()

@@ -4,6 +4,43 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+### Breaking Changes
+
+* Raised the minimum supported Rust version from 1.85.0 to 1.91.0 so fresh
+  consumers can resolve the current dependency graph without an inherited
+  lockfile.
+* Renamed the synchronous `StatementHandle::status()` snapshot accessor to
+  `last_status()` and use the asynchronous `status().await` operation for one
+  remote status check. The previous synchronous name cannot remain as an alias
+  because Rust does not support overloading it with the asynchronous operation.
+
+### New Features
+
+* Added an API-key client builder, `Client::query`, full table descriptions,
+  lazy catalog iterators, and `StatementHandle::status` / `wait` application
+  paths. The released `fetch_once` and `fetch` methods remain as deprecated
+  aliases for `status` and `wait`.
+* Added raw, typed-value, keyed-object, and first-row result conversions.
+  Object conversion rejects duplicate output column names instead of silently
+  dropping a value.
+* Added streaming-write builder names centered on batches and buffering, plus a
+  configurable `max_batch_rows` below the protocol ceiling. Existing builder
+  names remain compatible deprecated aliases.
+
+### Reliability
+
+* Preserve HTTP status, request ID, `Retry-After`, and explicit server retry
+  classification on errors while keeping server messages unchanged.
+* Honor delta-seconds and HTTP-date `Retry-After` values for safe rejected-batch
+  retries, capped by the configured maximum backoff.
+* Return typed errors instead of panicking when result metadata and row shapes
+  disagree, and reject repeated catalog page tokens.
+
+### Documentation
+
+* Reworked runnable examples around read-only discovery, direct append,
+  asynchronous batching, bulk imports, and best-effort telemetry journeys.
+
 ## v0.2.2 (2026-08-05)
 
 ### Bug Fixes

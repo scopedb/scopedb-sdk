@@ -18,9 +18,21 @@ mod common;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = common::client()?;
 
-    let result = client.statement("SELECT 1".to_string()).execute().await?;
-
-    let rows = result.into_values()?;
+    let result = client.query("SELECT 1 AS ready").await?;
+    let rows = result.into_objects()?;
     println!("rows: {rows:?}");
+
+    // Keep the handle when an application needs progress, cancellation, or a
+    // durable statement ID before waiting for the result.
+    let mut handle = client.statement("SELECT 2 AS value").submit().await?;
+    let statement_id = handle.statement_id();
+    println!(
+        "statement {statement_id} submitted: {:?}",
+        handle.last_status()
+    );
+    let status = handle.status().await?;
+    println!("statement {statement_id}: {status:?}");
+    let result = handle.wait().await?;
+    println!("handle rows: {:?}", result.into_objects()?);
     Ok(())
 }

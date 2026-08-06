@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod append_stream;
+mod catalog;
 mod client;
 mod error;
 mod ingest_stream;
@@ -36,7 +37,9 @@ pub use append_stream::AppendStreamBuilder;
 pub use append_stream::AppendStreamState;
 pub use append_stream::AppendStreamStats;
 pub use append_stream::AppendTrySendError;
+pub use catalog::CatalogIterator;
 pub use client::Client;
+pub use client::ClientBuilder;
 pub use error::Error;
 pub use error::ErrorKind;
 pub use ingest_stream::IngestStream;
@@ -68,6 +71,7 @@ pub use protocol::TableSpec;
 /// The HTTP client version used by this SDK.
 pub use reqwest;
 pub use result::FieldSchema;
+pub use result::ResultObject;
 pub use result::ResultSet;
 pub use result::Schema;
 pub use result::Value;

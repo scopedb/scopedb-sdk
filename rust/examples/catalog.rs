@@ -22,44 +22,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database = common::database();
     let schema = common::schema();
 
-    let mut page_token = None;
-    loop {
-        let page = client
-            .list_databases(CatalogListOptions {
-                page_size: Some(100),
-                page_token,
-            })
-            .await?;
-        for item in page.items {
-            println!(
-                "database {}: {}",
-                item.name,
-                item.comment.unwrap_or_default()
-            );
-        }
-        page_token = page.next_page_token;
-        if page_token.is_none() {
-            break;
-        }
+    let mut databases = client.iterate_databases(CatalogListOptions {
+        page_size: Some(100),
+        page_token: None,
+    });
+    while let Some(item) = databases.next().await? {
+        println!(
+            "database {}: {}",
+            item.name,
+            item.comment.unwrap_or_default()
+        );
     }
 
     let database_resource = client.fetch_database(&database).await?;
     println!("selected database: {database_resource:?}");
 
-    let schemas = client
-        .list_schemas(&database, CatalogListOptions::default())
-        .await?;
-    for item in schemas.items {
+    let mut schemas = client.iterate_schemas(&database, CatalogListOptions::default());
+    while let Some(item) = schemas.next().await? {
         println!("schema {}.{}", item.database, item.name);
     }
 
     let schema_resource = client.fetch_schema(&database, &schema).await?;
     println!("selected schema: {schema_resource:?}");
 
-    let tables = client
-        .list_tables(&database, &schema, CatalogListOptions::default())
-        .await?;
-    if let Some(first) = tables.items.first() {
+    let mut tables = client.iterate_tables(&database, &schema, CatalogListOptions::default());
+    if let Some(first) = tables.next().await? {
         println!("first table summary: {first:?}");
         let resource = client.fetch_table(&database, &schema, &first.name).await?;
         println!("first table resource: {resource:?}");

@@ -53,7 +53,7 @@ jobs:
       - name: Install MSRV toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: 1.91.0
       - uses: taiki-e/install-action@just
       - name: Run full tests
         timeout-minutes: 10

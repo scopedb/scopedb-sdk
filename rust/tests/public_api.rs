@@ -20,3 +20,38 @@ fn reexported_http_client_matches_constructor() {
     )
     .unwrap();
 }
+
+#[test]
+fn ergonomic_client_builder_is_public() {
+    scopedb_client::Client::builder("http://127.0.0.1:6543")
+        .api_key("test-key")
+        .http_client(scopedb_client::reqwest::Client::new())
+        .build()
+        .unwrap();
+}
+
+#[allow(dead_code)]
+fn application_api_surface_compiles(client: &scopedb_client::Client) {
+    let _query = client.query("SELECT 1");
+    let mut handle = client.statement_handle(uuid::Uuid::nil());
+    let _last_status: Option<&scopedb_client::StatementStatus> = handle.last_status();
+    let status = handle.status();
+    drop(status);
+    let wait = handle.wait();
+    drop(wait);
+    let _databases = client.iterate_databases(scopedb_client::CatalogListOptions::default());
+    let _schemas = client.iterate_schemas("scopedb", scopedb_client::CatalogListOptions::default());
+    let _tables = client.iterate_tables(
+        "scopedb",
+        "public",
+        scopedb_client::CatalogListOptions::default(),
+    );
+    let table = client.table("events").with_schema("public");
+    let _description = table.describe();
+    let _stream = table
+        .append_stream()
+        .target_batch_bytes(1024)
+        .max_batch_rows(100)
+        .max_buffered_bytes(4096)
+        .max_concurrent_batches(2);
+}
