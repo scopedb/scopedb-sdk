@@ -798,6 +798,7 @@ func TestAppendStreamOptionValidation(t *testing.T) {
 		{FlushInterval: -1},
 		{MaxBufferedBytes: -1},
 		{MaxConcurrentBatches: -1},
+		{MaxConcurrentBatches: maxAppendConcurrentBatches + 1},
 		{AttemptTimeout: -1},
 	}
 	for _, options := range invalid {

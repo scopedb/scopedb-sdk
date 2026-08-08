@@ -33,6 +33,7 @@ const (
 	defaultAppendCommandCapacity      = 1024
 	defaultAppendMaxBufferedBytes     = maxAppendBodyBytes * 4
 	defaultAppendMaxConcurrentBatches = 4
+	maxAppendConcurrentBatches        = 1024
 	defaultAppendMaxRetries           = 8
 	defaultAppendInitialBackoff       = 100 * time.Millisecond
 	defaultAppendMaxBackoff           = 5 * time.Second
@@ -142,7 +143,8 @@ type AppendStreamOptions struct {
 	FlushInterval time.Duration
 	// MaxBufferedBytes bounds admitted rows not yet settled. It defaults to 64 MiB.
 	MaxBufferedBytes int
-	// MaxConcurrentBatches defaults to four. Set one for serial request submission.
+	// MaxConcurrentBatches defaults to four, cannot exceed 1024, and may be set
+	// to one for serial request submission.
 	MaxConcurrentBatches int
 	// AttemptTimeout bounds each HTTP attempt. It defaults to 30 seconds.
 	// A timeout leaves that batch's commit outcome unknown.
@@ -304,8 +306,10 @@ func normalizeAppendStreamOptions(options AppendStreamOptions) (normalizedAppend
 	if config.maxConcurrentBatches == 0 {
 		config.maxConcurrentBatches = defaultAppendMaxConcurrentBatches
 	}
-	if config.maxConcurrentBatches < 0 {
-		return config, appendStreamConfigError("max concurrent batches must be greater than zero")
+	if config.maxConcurrentBatches < 0 || config.maxConcurrentBatches > maxAppendConcurrentBatches {
+		return config, appendStreamConfigError(
+			fmt.Sprintf("max concurrent batches must be from 1 to %d", maxAppendConcurrentBatches),
+		)
 	}
 	if config.attemptTimeout < 0 {
 		return config, appendStreamConfigError("attempt timeout must not be negative")
