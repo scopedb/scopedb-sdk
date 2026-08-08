@@ -16,7 +16,10 @@
 
 package scopedb
 
-// Compression defines the wire compression algorithm used for POST requests.
+import "net/http"
+
+// Compression defines the compression used for statement and transform-ingest
+// request bodies. Direct table appends always send identity-encoded NDJSON.
 type Compression string
 
 const (
@@ -35,9 +38,15 @@ type Config struct {
 	// When provided, the client sends it as the Authorization header using the
 	// Bearer scheme.
 	APIKey string `json:"api_key"`
-	// Compression controls how POST request bodies are compressed.
+	// Compression controls how statement and transform-ingest request bodies are
+	// compressed. It does not affect direct or streaming table appends.
 	//
 	// The default is CompressionZstd. Set this to CompressionGzip to talk to
 	// older deployments that do not support zstd yet.
 	Compression Compression `json:"compression"`
+	// HTTPClient is the HTTP client used to send requests.
+	//
+	// When nil, the SDK creates and owns an independent HTTP client. A supplied
+	// client remains owned by the caller and is never closed by the SDK.
+	HTTPClient *http.Client `json:"-"`
 }

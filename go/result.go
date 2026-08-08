@@ -38,10 +38,28 @@ type ResultSet struct {
 	TotalRows uint64
 	// Schema is the schema of the result set.
 	Schema Schema
-	// Format is the result format of the result set.
-	Format ResultFormat
 
 	rows json.RawMessage
+}
+
+// RawRows returns the string-or-null cells from the JSON wire response without
+// converting them to ScopeDB value types.
+func (rs *ResultSet) RawRows() ([][]*string, error) {
+	var rows [][]*string
+	if err := json.Unmarshal(rs.rows, &rows); err != nil {
+		return nil, err
+	}
+	if rows == nil {
+		return nil, errors.New("result rows must be a JSON array")
+	}
+	if uint64(len(rows)) != rs.TotalRows {
+		return nil, fmt.Errorf(
+			"result row count mismatch: expected %d, got %d",
+			rs.TotalRows,
+			len(rows),
+		)
+	}
+	return rows, nil
 }
 
 // ToValues reads the result set and returns the rows as a 2D array of values,
@@ -53,69 +71,146 @@ type ResultSet struct {
 //
 // This method is only valid if the result set is of the JSON format.
 func (rs *ResultSet) ToValues() ([][]Value, error) {
-	if rs.Format != ResultFormatJSON {
-		return nil, fmt.Errorf("unexpected result set format: %s", rs.Format)
-	}
-
-	var rows [][]*string
-	if err := json.Unmarshal(rs.rows, &rows); err != nil {
+	rows, err := rs.RawRows()
+	if err != nil {
 		return nil, err
 	}
 
-	convertValue := func(v string, typ DataType) (Value, error) {
-		switch typ {
-		case StringDataType:
-			return v, nil
-		case BinaryDataType:
-			value, err := hex.DecodeString(v)
-			if err != nil {
-				return nil, fmt.Errorf("invalid binary value %q: %w", v, err)
-			}
-			return value, nil
-		case IntDataType:
-			return strconv.ParseInt(v, 10, 64)
-		case UIntDataType:
-			return strconv.ParseUint(v, 10, 64)
-		case FloatDataType:
-			return strconv.ParseFloat(v, 64)
-		case BooleanDataType:
-			return strconv.ParseBool(v)
-		case TimestampDataType:
-			return time.Parse(time.RFC3339Nano, v)
-		case IntervalDataType:
-			return parseInterval(v)
-		case ArrayDataType, ObjectDataType, AnyDataType:
-			// represent as JSON string
-			return v, nil
-		case NullDataType:
-			return nil, fmt.Errorf("unexpected non-null value for null data type: %q", v)
-		default:
-			return nil, fmt.Errorf("unrecognized type: %s", typ)
-		}
-	}
-
-	var valueLists [][]Value
+	valueLists := make([][]Value, 0, len(rows))
 	for _, r := range rows {
-		if len(r) != len(rs.Schema) {
-			return nil, errors.New("schema length does not match record length")
-		}
-
-		var values []Value
-		for i, v := range r {
-			fs := rs.Schema[i]
-			if v == nil {
-				values = append(values, nil)
-			} else {
-				val, err := convertValue(*v, fs.Type)
-				if err != nil {
-					return nil, err
-				}
-				values = append(values, val)
-			}
+		values, err := rs.convertRow(r)
+		if err != nil {
+			return nil, err
 		}
 		valueLists = append(valueLists, values)
 	}
 	return valueLists, nil
+}
+
+// ToObjects returns rows keyed by result column name.
+//
+// Duplicate output column names are rejected because representing them as a
+// map would silently discard values.
+func (rs *ResultSet) ToObjects() ([]map[string]Value, error) {
+	names, err := rs.objectColumnNames()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := rs.RawRows()
+	if err != nil {
+		return nil, err
+	}
+
+	objects := make([]map[string]Value, 0, len(rows))
+	for _, row := range rows {
+		values, err := rs.convertRow(row)
+		if err != nil {
+			return nil, err
+		}
+		object := make(map[string]Value, len(names))
+		for i, name := range names {
+			object[name] = values[i]
+		}
+		objects = append(objects, object)
+	}
+	return objects, nil
+}
+
+// First returns the first row keyed by column name. The boolean is false when
+// the result set is empty.
+func (rs *ResultSet) First() (map[string]Value, bool, error) {
+	rows, err := rs.RawRows()
+	if err != nil {
+		return nil, false, err
+	}
+	if len(rows) == 0 {
+		return nil, false, nil
+	}
+
+	names, err := rs.objectColumnNames()
+	if err != nil {
+		return nil, false, err
+	}
+	values, err := rs.convertRow(rows[0])
+	if err != nil {
+		return nil, false, err
+	}
+	object := make(map[string]Value, len(names))
+	for i, name := range names {
+		object[name] = values[i]
+	}
+	return object, true, nil
+}
+
+func (rs *ResultSet) objectColumnNames() ([]string, error) {
+	names := make([]string, len(rs.Schema))
+	seen := make(map[string]struct{}, len(rs.Schema))
+	for i, field := range rs.Schema {
+		if field == nil {
+			return nil, fmt.Errorf("result schema field %d is nil", i)
+		}
+		if _, exists := seen[field.Name]; exists {
+			return nil, fmt.Errorf("duplicate result column name %q", field.Name)
+		}
+		seen[field.Name] = struct{}{}
+		names[i] = field.Name
+	}
+	return names, nil
+}
+
+func (rs *ResultSet) convertRow(row []*string) ([]Value, error) {
+	if len(row) != len(rs.Schema) {
+		return nil, errors.New("schema length does not match record length")
+	}
+
+	values := make([]Value, 0, len(row))
+	for i, cell := range row {
+		field := rs.Schema[i]
+		if field == nil {
+			return nil, fmt.Errorf("result schema field %d is nil", i)
+		}
+		if cell == nil {
+			values = append(values, nil)
+			continue
+		}
+		value, err := convertValue(*cell, field.Type)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
+	}
+	return values, nil
+}
+
+func convertValue(value string, dataType DataType) (Value, error) {
+	switch dataType {
+	case StringDataType:
+		return value, nil
+	case BinaryDataType:
+		decoded, err := hex.DecodeString(value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid binary value %q: %w", value, err)
+		}
+		return decoded, nil
+	case IntDataType:
+		return strconv.ParseInt(value, 10, 64)
+	case UIntDataType:
+		return strconv.ParseUint(value, 10, 64)
+	case FloatDataType:
+		return strconv.ParseFloat(value, 64)
+	case BooleanDataType:
+		return strconv.ParseBool(value)
+	case TimestampDataType:
+		return time.Parse(time.RFC3339Nano, value)
+	case IntervalDataType:
+		return parseInterval(value)
+	case ArrayDataType, ObjectDataType, AnyDataType:
+		return value, nil
+	case NullDataType:
+		return nil, fmt.Errorf("unexpected non-null value for null data type: %q", value)
+	default:
+		return nil, fmt.Errorf("unrecognized type: %s", dataType)
+	}
 }
 
 func parseInterval(value string) (time.Duration, error) {
@@ -178,3 +273,52 @@ const (
 	// NullDataType indicates the data is of null data type.
 	NullDataType DataType = "null"
 )
+
+// UnmarshalJSON accepts the canonical wire names and normalizes the historical
+// unsigned-integer alias to UIntDataType.
+func (d *DataType) UnmarshalJSON(data []byte) error {
+	var value string
+	if err := json.Unmarshal(data, &value); err != nil {
+		return fmt.Errorf("invalid data type: %w", err)
+	}
+
+	switch DataType(value) {
+	case StringDataType,
+		BinaryDataType,
+		IntDataType,
+		FloatDataType,
+		BooleanDataType,
+		TimestampDataType,
+		IntervalDataType,
+		ArrayDataType,
+		ObjectDataType,
+		AnyDataType,
+		NullDataType:
+		*d = DataType(value)
+	case UIntDataType, DataType("u_int"):
+		*d = UIntDataType
+	default:
+		return fmt.Errorf("unrecognized data type %q", value)
+	}
+	return nil
+}
+
+func (d DataType) valid() bool {
+	switch d {
+	case StringDataType,
+		BinaryDataType,
+		IntDataType,
+		UIntDataType,
+		FloatDataType,
+		BooleanDataType,
+		TimestampDataType,
+		IntervalDataType,
+		ArrayDataType,
+		ObjectDataType,
+		AnyDataType,
+		NullDataType:
+		return true
+	default:
+		return false
+	}
+}

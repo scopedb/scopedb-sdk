@@ -15,49 +15,51 @@
  */
 
 /*
-Package scopedb provides a lightweight and easy-to-use client for interacting with a ScopeDB service.
+Package scopedb provides a Go client for ScopeQL statements, REST catalog
+discovery, and streaming writes.
 
-# Client
+Create and close one Client for the application's connection pool:
 
-Use NewClient to create a client struct. This is the major entrance to construct structs for interacting with ScopeDB:
-
-	client := scopedb.NewClient(&scopedb.Config{
-		Endpoint:    "http://<scopedb-host>:<scopedb-port:-6543>",
-		APIKey:      "<scopedb-api-key>",
-		Compression: scopedb.CompressionZstd,
+	client, err := scopedb.NewClient(scopedb.Config{
+		Endpoint: os.Getenv("SCOPEDB_ENDPOINT"),
+		APIKey:   os.Getenv("SCOPEDB_API_KEY"),
 	})
-
-POST requests use zstd compression by default. Set CompressionGzip in Config
-when talking to older deployments that do not support zstd yet.
-
-# Write Data via Cables
-
-Use DataCable to write data to ScopeDB:
-
-	cable := c.DataCable(fmt.Sprintf(`
-		SELECT $0["ts"], $0["v"]
-		INSERT INTO %s (ts, v)
-	`, tbl.Identifier()))
-	cable.Start(ctx)
-	defer cable.Close()
-
-	resCh := cable.Send(struct {
-		TS int64 `json:"ts"`
-		V  any   `json:"v"`
-	}{
-		TS: -1024,
-		V:  "scopedb",
-	})
-
-# Query Data
-
-Create a Statement and submit or execute it to get a result set:
-
-	s := c.Statement(fmt.Sprintf(`FROM %s ORDER BY ts`, tbl.Identifier()))
-	result, err := s.Execute(ctx)
 	if err != nil {
 		return err
 	}
-	values := result.ToValues()
+	defer client.Close()
+
+Query waits for a statement result, which can be converted to keyed objects:
+
+	result, err := client.Query(ctx, "SELECT 1 AS ready")
+	if err != nil {
+		return err
+	}
+	rows, err := result.ToObjects()
+	if err != nil {
+		return err
+	}
+	fmt.Println(rows)
+
+Use Statement.Submit when an application needs the statement ID, a local status
+snapshot, an explicit remote status request, or a separate wait. Catalog
+iterators lazily traverse REST pages. Table.Describe returns table metadata,
+Table.Append sends one caller-owned NDJSON request, and Table.AppendStream adds
+bounded asynchronous batching that is safe for concurrent producers.
+Client.IngestStream is the secondary path when input JSON needs a ScopeQL
+transformation before insertion.
+
+Stream Send methods confirm local admission only. Flush and Shutdown wait for
+the accepted prefix. AppendStream reports rejected and unknown outcomes;
+an IngestStream error can also follow a remote commit, so callers must
+reconcile before replaying the same records. A nonzero ingest result returned
+with an error covers only earlier confirmed batches, not a safe replay offset.
+
+ScopeQL is documented separately in the [quickstart], [query guide], and
+[language reference].
+
+[quickstart]: https://docs.scopedb.io/guides/quickstart
+[query guide]: https://docs.scopedb.io/guides/query-events
+[language reference]: https://docs.scopedb.io/reference/
 */
 package scopedb

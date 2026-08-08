@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	scopedb "github.com/scopedb/scopedb-sdk/go"
 	"github.com/stretchr/testify/require"
 )
 
-func TestDataCable(t *testing.T) {
+func TestIngestStream(t *testing.T) {
 	c := NewClient(t)
 	defer c.Close()
 
@@ -43,21 +45,18 @@ func TestDataCable(t *testing.T) {
 		require.NoError(t, tbl.Drop(ctx))
 	}()
 
-	cable := c.DataCable(fmt.Sprintf(`
+	stream, err := c.IngestStream(fmt.Sprintf(`
 		SELECT
 			$0["ts"]::timestamp as ts,
 			$0["name"]::string as name,
 			$0,
 		WHERE LENGTH(name) > 0
 		INSERT INTO %s (ts, name, var)
-	`, tbl.Identifier()))
-
-	// immediately flush
-	cable.BatchSize = 0
-	cable.AutoCommit = true
-
-	cable.Start(ctx)
-	defer cable.Close()
+	`, tbl.Identifier()), scopedb.IngestStreamOptions{
+		MaxBatchRows:  1,
+		FlushInterval: time.Hour,
+	})
+	require.NoError(t, err)
 
 	type TestData struct {
 		TS        int64  `json:"ts"`
@@ -65,25 +64,27 @@ func TestDataCable(t *testing.T) {
 		Arbitrary any    `json:"arbitrary"`
 	}
 
-	require.NoError(t, <-cable.Send(TestData{
+	require.NoError(t, stream.Send(ctx, TestData{
 		TS:        335503360000000,
 		Name:      "tison",
 		Arbitrary: 27,
 	}))
-
-	require.NoError(t, <-cable.Send(TestData{
+	require.NoError(t, stream.Send(ctx, TestData{
 		TS:        315360000000000,
 		Name:      "scopedb",
 		Arbitrary: "Schema On The Fly",
 	}))
+	result, err := stream.Shutdown(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), result.NumRowsInserted)
 
 	s := c.Statement(fmt.Sprintf(`FROM %s ORDER BY ts`, tbl.Identifier()))
-	result, err := s.Execute(ctx)
+	queryResult, err := s.Execute(ctx)
 	require.NoError(t, err)
 
-	records, err := result.ToValues()
+	records, err := queryResult.ToValues()
 	require.NoError(t, err)
 
-	snaps.MatchSnapshot(t, result.Schema)
+	snaps.MatchSnapshot(t, queryResult.Schema)
 	snaps.MatchSnapshot(t, records)
 }

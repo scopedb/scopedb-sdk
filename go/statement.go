@@ -18,20 +18,13 @@ package scopedb
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-// ResultFormat defines the format of the ResultSet.
-type ResultFormat string
-
-const (
-	// ResultFormatJSON parses the result set as JSON lines.
-	ResultFormatJSON ResultFormat = "json"
-)
-
-// Statement is a struct that represents a statement to be executed on ScopeDB.
+// Statement configures a ScopeQL statement before submission.
 type Statement struct {
 	c *Client
 
@@ -42,43 +35,52 @@ type Statement struct {
 	// If provided, the ID must be a UUID, and ScopeDB will use the provided ID;
 	// otherwise, ScopeDB will generate a random UUID for the statement submitted.
 	ID *uuid.UUID
-	// ExecTimeout is the maximum time to for statement execution.
+	// ExecTimeout is the maximum time allowed for statement execution.
 	//
 	// If the total execution time exceeds this value, the statement is failed
 	// as timed out.
 	//
-	// Possible values like "1h".
+	// Values use duration strings such as "1h".
 	ExecTimeout string
-	// ResultFormat is the format of the result set.
-	ResultFormat ResultFormat
+	// MaxParallelism limits the statement's execution parallelism. Zero uses
+	// the server default.
+	MaxParallelism int
 }
 
 // Statement creates a new statement with the given ScopeQL statement.
 func (c *Client) Statement(stmt string) *Statement {
-	return &Statement{
-		c:            c,
-		stmt:         stmt,
-		ResultFormat: ResultFormatJSON,
-	}
+	return &Statement{c: c, stmt: stmt}
+}
+
+// Query executes a ScopeQL statement and waits for all result rows.
+func (c *Client) Query(ctx context.Context, scopeql string) (*ResultSet, error) {
+	return c.Statement(scopeql).Execute(ctx)
 }
 
 // Submit submits the statement to ScopeDB for execution.
 func (s *Statement) Submit(ctx context.Context) (*StatementHandle, error) {
+	if s.MaxParallelism < 0 {
+		return nil, newError(
+			ErrorKindConfigInvalid,
+			"statement MaxParallelism must not be negative",
+			nil,
+		)
+	}
 	resp, err := s.c.submitStatement(ctx, &statementRequest{
-		StatementID: s.ID,
-		Statement:   s.stmt,
-		ExecTimeout: s.ExecTimeout,
-		Format:      s.ResultFormat,
+		StatementID:    s.ID,
+		Statement:      s.stmt,
+		ExecTimeout:    s.ExecTimeout,
+		MaxParallelism: s.MaxParallelism,
+		Format:         resultFormatJSON,
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return &StatementHandle{
-		c:      s.c,
-		resp:   resp,
-		id:     resp.ID,
-		Format: s.ResultFormat,
+		c:    s.c,
+		resp: resp,
+		id:   resp.ID,
 	}, nil
 }
 
@@ -88,36 +90,37 @@ func (s *Statement) Execute(ctx context.Context) (*ResultSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	return handle.Fetch(ctx)
+	return handle.Wait(ctx)
 }
 
 // StatementHandle is a handle to a statement that has been submitted to ScopeDB.
 type StatementHandle struct {
-	c    *Client
-	resp *statementResponse
-
-	id uuid.UUID
-
-	// Format is the expected format of the ResultSet.
-	Format ResultFormat
+	c            *Client
+	resp         *statementResponse
+	cancelResult *StatementCancelResult
+	id           uuid.UUID
 }
 
 // StatementHandle creates a new StatementHandle with the given ID.
 func (c *Client) StatementHandle(id uuid.UUID) *StatementHandle {
 	return &StatementHandle{
-		c:      c,
-		resp:   nil,
-		id:     id,
-		Format: ResultFormatJSON,
+		c:  c,
+		id: id,
 	}
 }
 
-// Status returns the last seen status of the statement.
-func (h *StatementHandle) Status() *StatementStatus {
+// ID returns the statement ID represented by this handle.
+func (h *StatementHandle) ID() uuid.UUID {
+	return h.id
+}
+
+// LastStatus returns the latest locally cached status without making a request.
+func (h *StatementHandle) LastStatus() *StatementStatus {
 	if h.resp == nil {
 		return nil
 	}
-	return &h.resp.Status
+	status := h.resp.Status
+	return &status
 }
 
 // Progress returns the last seen progress of the statement.
@@ -125,7 +128,8 @@ func (h *StatementHandle) Progress() *StatementProgress {
 	if h.resp == nil {
 		return nil
 	}
-	return &h.resp.Progress
+	progress := h.resp.Progress
+	return &progress
 }
 
 // ResultSet returns the result set of the statement if available.
@@ -139,76 +143,123 @@ func (h *StatementHandle) ResultSet() *ResultSet {
 	return h.resp.ResultSet.toResultSet()
 }
 
-// FetchOnce fetches the result set of the statement once.
-//
-// If the last seen status is terminated, no fetch is performed.
-func (h *StatementHandle) FetchOnce(ctx context.Context) error {
+// Status fetches the latest status at most once. A cached terminal status is
+// returned without making another request.
+func (h *StatementHandle) Status(ctx context.Context) (StatementStatus, error) {
 	if h.resp != nil && h.resp.Status.Terminated() {
-		return nil
+		return h.resp.Status, nil
 	}
 
-	resp, err := h.c.fetchStatementResult(ctx, h.id, h.Format)
+	resp, err := h.c.fetchStatementResult(ctx, h.id)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	h.resp = resp
-	if resp.Message != nil {
-		return &Error{Message: *resp.Message}
-	}
-	return nil
+	return h.resp.Status, nil
 }
 
-// Fetch fetches the result set of the statement until it is finished, failed or cancelled.
+// Wait polls until the statement is finished, failed, or cancelled.
 //
 // When the statement is finished, the result set is returned. Otherwise, an error is returned.
-func (h *StatementHandle) Fetch(ctx context.Context) (*ResultSet, error) {
-	tick := 5 * time.Millisecond
-	maxTick := 1 * time.Second
-
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
+func (h *StatementHandle) Wait(ctx context.Context) (*ResultSet, error) {
+	delay := 5 * time.Millisecond
+	maxDelay := time.Second
 	for {
-		if h.resp != nil {
-			if h.resp.ResultSet != nil {
-				return h.resp.ResultSet.toResultSet(), nil
+		status, err := h.Status(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		switch status {
+		case StatementStatusFinished:
+			result := h.ResultSet()
+			if result == nil {
+				return nil, &Error{
+					Kind:    ErrorKindUnexpected,
+					Message: "finished statement response has no result set",
+				}
 			}
-			if h.resp.Message != nil {
-				return nil, &Error{Message: *h.resp.Message}
+			return result, nil
+		case StatementStatusFailed, StatementStatusCancelled:
+			message := fmt.Sprintf("statement is %s", status)
+			if h.resp != nil && h.resp.Message != nil {
+				message = *h.resp.Message
+			}
+			return nil, &Error{Kind: ErrorKindStatementFailed, Message: message}
+		case StatementStatusPending, StatementStatusRunning:
+			// Keep polling below.
+		default:
+			return nil, &Error{
+				Kind:    ErrorKindUnexpected,
+				Message: fmt.Sprintf("unknown statement status %q", status),
 			}
 		}
 
-		if tick < maxTick {
-			tick = min(tick*2, maxTick)
-			ticker.Reset(tick)
-		}
-
+		timer := time.NewTimer(delay)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return nil, ctx.Err()
-		case <-ticker.C:
-			if err := h.FetchOnce(ctx); err != nil {
-				return nil, err
-			}
+		case <-timer.C:
+		}
+		if delay < maxDelay {
+			delay = min(delay*2, maxDelay)
 		}
 	}
+}
+
+// StatementCancelResult reports the server's complete cancellation outcome.
+type StatementCancelResult struct {
+	StatementID uuid.UUID       `json:"statement_id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	Status      StatementStatus `json:"status"`
+	Message     string          `json:"message"`
 }
 
 // Cancel cancels the statement if it is running or pending.
-func (h *StatementHandle) Cancel(ctx context.Context) (*StatementStatus, error) {
+func (h *StatementHandle) Cancel(ctx context.Context) (StatementCancelResult, error) {
+	if h.cancelResult != nil {
+		return *h.cancelResult, nil
+	}
 	if h.resp != nil && h.resp.Status.Terminated() {
-		return &h.resp.Status, nil
+		result := h.cancelResultFromResponse()
+		h.cancelResult = &result
+		return result, nil
 	}
 
 	resp, err := h.c.cancelStatement(ctx, h.id)
 	if err != nil {
-		return nil, err
+		return StatementCancelResult{}, err
 	}
 
-	h.resp.Status = resp.Status
-	h.resp.Message = &resp.Message
-	return &resp.Status, nil
+	result := *resp
+	if result.Status.Terminated() {
+		h.cancelResult = &result
+	}
+	if result.Status != StatementStatusFinished {
+		message := result.Message
+		h.resp = &statementResponse{
+			ID:      result.StatementID,
+			Created: result.CreatedAt,
+			Status:  result.Status,
+			Message: &message,
+		}
+	}
+	return result, nil
+}
+
+func (h *StatementHandle) cancelResultFromResponse() StatementCancelResult {
+	message := fmt.Sprintf("statement is %s", h.resp.Status)
+	if h.resp.Message != nil && *h.resp.Message != "" {
+		message = *h.resp.Message
+	}
+	return StatementCancelResult{
+		StatementID: h.id,
+		CreatedAt:   h.resp.Created,
+		Status:      h.resp.Status,
+		Message:     message,
+	}
 }
 
 // StatementStatus is a string that represents the status of a statement.

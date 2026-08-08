@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFetchStatementFail(t *testing.T) {
+func TestStatusStatementFail(t *testing.T) {
 	c := NewClient(t)
 	defer c.Close()
 
@@ -33,7 +33,7 @@ func TestFetchStatementFail(t *testing.T) {
 
 	id, err := uuid.Parse("c8fe71d6-3695-11f0-85b3-063c3400fda9")
 	require.NoError(t, err)
-	err = c.StatementHandle(id).FetchOnce(ctx)
+	_, err = c.StatementHandle(id).Status(ctx)
 	require.Error(t, err)
 	snaps.MatchSnapshot(t, err.Error())
 }
