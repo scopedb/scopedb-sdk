@@ -60,7 +60,7 @@ func TestTableDescribeUsesDefaultLocation(t *testing.T) {
 	require.Equal(t, "application events", *description.Comment)
 }
 
-func TestTableAppendDelegatesNDJSONRequest(t *testing.T) {
+func TestTableAppendNDJSONDelegatesRequest(t *testing.T) {
 	t.Parallel()
 
 	ndjson := []byte("{\"id\":1}\n{\"id\":2}")
@@ -79,7 +79,7 @@ func TestTableAppendDelegatesNDJSONRequest(t *testing.T) {
 	table := client.Table("logs")
 	table.Database = "analytics"
 	table.Schema = "events"
-	result, err := table.Append(context.Background(), ndjson)
+	result, err := table.AppendNDJSON(context.Background(), ndjson)
 	require.NoError(t, err)
 	require.Equal(t, AppendStateCommitted, result.AppendState)
 	require.Equal(t, int64(2), result.NumRowsInserted)

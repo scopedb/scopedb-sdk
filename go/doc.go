@@ -47,10 +47,10 @@ ExecTimeout are the only optional statement settings; omit ID to let ScopeDB
 generate it, and read the confirmed ID from StatementHandle.ID. Failed
 statements expose structured server error details on Error.StatementDetails.
 Catalog iterators lazily traverse REST pages. Table.Describe returns table
-metadata, Table.Append sends one caller-owned NDJSON request, and
-Table.AppendStream adds bounded asynchronous batching that is safe for
-concurrent producers. Client.IngestStream is the secondary path when input JSON
-needs a ScopeQL transformation before insertion.
+metadata. Table.AppendNDJSON sends one caller-owned raw NDJSON request, while
+Table.AppendStream accepts typed rows and adds bounded asynchronous batching
+that is safe for concurrent producers. Client.IngestStream is the secondary
+path when input JSON needs a ScopeQL transformation before insertion.
 
 AppendStream.Send uses encoding/json and accepts typed structs and other values
 that encode as a top-level JSON object. Send does not validate the destination

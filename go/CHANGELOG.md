@@ -20,7 +20,7 @@ All significant changes to this project will be documented in this file.
 * Added `Client.Query` and expanded result conversion with `RawRows`, `ToObjects`, and `First` alongside `ToValues`.
 * Added structured statement failure details, complete pruning progress, and complete cancellation results.
 * Added paged and lazy-iterator REST catalog APIs for databases, schemas, and tables.
-* Added direct NDJSON table append with committed, rejected, and unknown outcomes.
+* Added direct raw NDJSON table append through `Table.AppendNDJSON`, with committed, rejected, and unknown outcomes.
 * Added bounded concurrent `AppendStream` batching with strict and continue failure policies, local admission backpressure, delivery reports, and lifetime statistics.
 * Added bounded sequential `IngestStream` batching for transform-oriented JSON ingest.
 * Added finite, configurable per-attempt timeouts to both background write streams.

@@ -4,7 +4,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/scopedb/scopedb-sdk/go.svg)](https://pkg.go.dev/github.com/scopedb/scopedb-sdk/go)
 
 The ScopeDB Go SDK supports ScopeQL statements, REST catalog discovery, direct
-NDJSON table appends, bounded asynchronous streaming writes, and
+raw NDJSON table appends, bounded asynchronous streaming writes, and
 transform-oriented JSON ingest.
 
 ## Runtime and installation
@@ -181,20 +181,24 @@ if err != nil {
 fmt.Println(description.Columns)
 ```
 
-## Streaming writes with NDJSON
+## Streaming writes
 
-Table writes accept newline-delimited JSON only: one JSON object per non-empty
-line, not a JSON array. The destination table must already exist. Evaluate the
-examples against an explicitly selected disposable table before using a
-production destination.
+Table appends write rows to an existing destination table. `AppendStream` is
+the typed-row path: the SDK encodes each row and owns bounded asynchronous
+batching. Its current wire encoding is NDJSON, but callers do not construct the
+wire payload. Use `AppendNDJSON` only when the caller already owns a complete
+raw NDJSON request body. Evaluate the examples against an explicitly selected
+disposable table before using a production destination.
 
-### Direct append
+### Direct NDJSON append
 
-Use `Append` when the caller owns one exact NDJSON request boundary:
+Use `AppendNDJSON` when the caller has already encoded one exact raw NDJSON
+request body and owns that request boundary. The body contains one JSON object
+per non-empty line, not a JSON array:
 
 ```go
 ndjson := []byte("{\"id\":1,\"name\":\"first\"}\n{\"id\":2,\"name\":\"second\"}")
-result, err := table.Append(ctx, ndjson)
+result, err := table.AppendNDJSON(ctx, ndjson)
 if err != nil {
 	return err
 }
@@ -205,11 +209,12 @@ One request is limited to 16 MiB and 200,000 rows.
 
 ### Asynchronous append stream
 
-Use `AppendStream` for continuous or large producers. `Send` uses
-`encoding/json` and accepts a typed struct, map, or other Go value that encodes
-as one top-level JSON object. Standard JSON tags and custom `MarshalJSON`
-methods apply. The stream batches those objects by size or time, bounds pending
-bytes, and sends a bounded number of append requests concurrently.
+Use `AppendStream` for continuous or large producers. Unlike the raw
+`AppendNDJSON` method, `Send` accepts typed rows and uses `encoding/json` to
+encode each value as one top-level JSON object. Standard JSON tags and custom
+`MarshalJSON` methods apply. The stream batches those objects by size or time,
+bounds pending bytes, and sends a bounded number of append requests
+concurrently.
 
 ```go
 type Event struct {
@@ -335,7 +340,7 @@ outcomes.
 
 | Workload | Admission and delivery | Example |
 | --- | --- | --- |
-| One exact NDJSON payload | Caller owns the request boundary | [`append`](examples/append) |
+| One exact raw NDJSON payload | Caller encodes the body and owns the request boundary | [`append_ndjson`](examples/append_ndjson) |
 | Basic asynchronous batching | SDK owns batches; strict barriers | [`append_stream`](examples/append_stream) |
 | Backfill or file import | Sequential producer admission and bounded concurrent batches | [`bulk_append`](examples/patterns/bulk_append) |
 | Long-running logs and events | Non-blocking continue mode with observable loss | [`telemetry`](examples/patterns/telemetry) |
@@ -344,8 +349,9 @@ outcomes.
 ## Transform-oriented ingest
 
 `IngestStream` is the secondary write path for JSON records that need a ScopeQL
-transformation before insertion. Prefer `Table.Append` or `Table.AppendStream`
-when records already match the destination table.
+transformation before insertion. Prefer `Table.AppendNDJSON` for a raw NDJSON
+request or `Table.AppendStream` for typed rows when records already match the
+destination table.
 
 ```go
 stream, err := client.IngestStream(`

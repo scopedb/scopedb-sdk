@@ -46,7 +46,7 @@ func TestTableAppendLifecycle(t *testing.T) {
 		require.NoError(t, table.Drop(context.Background()))
 	}()
 
-	direct, err := table.Append(ctx, []byte(
+	direct, err := table.AppendNDJSON(ctx, []byte(
 		"{\"id\":1,\"source\":\"direct\"}\n"+
 			"{\"id\":2,\"source\":\"direct\"}\n",
 	))

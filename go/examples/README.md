@@ -50,7 +50,7 @@ same table:
 
 | Example | Choose it when | Run |
 | --- | --- | --- |
-| [`append`](append) | The caller owns one exact NDJSON request boundary | `go run ./examples/append` |
+| [`append_ndjson`](append_ndjson) | The caller has encoded one exact raw NDJSON request body | `go run ./examples/append_ndjson` |
 | [`append_stream`](append_stream) | A fixed producer pool should feed asynchronous batches with strict delivery | `go run ./examples/append_stream` |
 | [`bulk_append`](patterns/bulk_append) | A backfill needs bounded memory and concurrent strict batches | `go run ./examples/patterns/bulk_append` |
 | [`telemetry`](patterns/telemetry) | Logs or events need non-blocking, observable best-effort delivery | `go run ./examples/patterns/telemetry` |
@@ -58,8 +58,10 @@ same table:
 
 ## Delivery contract
 
-- `Table.Append` accepts NDJSON only: one JSON object per non-empty line, not a
-  JSON array.
+- `Table.AppendNDJSON` sends one caller-encoded raw NDJSON body: one JSON object
+  per non-empty line, not a JSON array.
+- `Table.AppendStream` accepts typed rows and owns their JSON encoding, batching,
+  and concurrent request scheduling.
 - `AppendStream.Send`, `AppendStream.TrySend`, and `IngestStream.Send` confirm
   local admission only. They do not confirm a remote commit.
 - Append stream admission is safe for concurrent producers; use a fixed worker

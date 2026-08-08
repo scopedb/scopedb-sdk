@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package main demonstrates one direct NDJSON table append.
+// Package main demonstrates one caller-encoded raw NDJSON table append.
 package main
 
 import (
@@ -74,7 +74,7 @@ func run(ctx context.Context) error {
 		}
 	}
 
-	result, err := table.Append(ctx, ndjson.Bytes())
+	result, err := table.AppendNDJSON(ctx, ndjson.Bytes())
 	if err != nil {
 		var scopeErr *scopedb.Error
 		if errors.As(err, &scopeErr) && scopeErr.AppendDetails != nil &&

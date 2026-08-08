@@ -68,7 +68,7 @@ type AppendErrorDetails struct {
 	RowErrorsTruncated bool             `json:"row_errors_truncated"`
 }
 
-func (c *Client) appendRows(
+func (c *Client) appendNDJSON(
 	ctx context.Context,
 	database string,
 	schema string,

@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAppendRowsSendsRawNDJSON(t *testing.T) {
+func TestAppendNDJSONSendsRawPayload(t *testing.T) {
 	t.Parallel()
 
 	ndjson := []byte("{\"id\":1}\n\n  \n{\"id\":2}\n")
@@ -61,7 +61,7 @@ func TestAppendRowsSendsRawNDJSON(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(client.Close)
 
-	result, err := client.appendRows(
+	result, err := client.appendNDJSON(
 		context.Background(),
 		"analytics/2026",
 		"events archive",
@@ -73,7 +73,7 @@ func TestAppendRowsSendsRawNDJSON(t *testing.T) {
 	require.Equal(t, int64(2), result.NumRowsInserted)
 }
 
-func TestAppendRowsRejectsLocalLimitsBeforeRequest(t *testing.T) {
+func TestAppendNDJSONRejectsLocalLimitsBeforeRequest(t *testing.T) {
 	t.Parallel()
 
 	requests := 0
@@ -90,7 +90,7 @@ func TestAppendRowsRejectsLocalLimitsBeforeRequest(t *testing.T) {
 		bytes.Repeat([]byte{'x'}, maxAppendBodyBytes+1),
 		bytes.Repeat([]byte("{}\n"), maxAppendRows+1),
 	} {
-		_, err := client.appendRows(context.Background(), "db", "schema", "table", ndjson)
+		_, err := client.appendNDJSON(context.Background(), "db", "schema", "table", ndjson)
 		var scopeErr *Error
 		require.ErrorAs(t, err, &scopeErr)
 		require.Equal(t, ErrorKindAppendRowsFailed, scopeErr.Kind)
@@ -100,7 +100,7 @@ func TestAppendRowsRejectsLocalLimitsBeforeRequest(t *testing.T) {
 	require.Zero(t, requests)
 }
 
-func TestAppendRowsPreservesRejectedDetails(t *testing.T) {
+func TestAppendNDJSONPreservesRejectedDetails(t *testing.T) {
 	t.Parallel()
 
 	requests := 0
@@ -125,7 +125,7 @@ func TestAppendRowsPreservesRejectedDetails(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(client.Close)
 
-	_, err = client.appendRows(context.Background(), "db", "schema", "table", []byte("{\"id\":\"x\"}"))
+	_, err = client.appendNDJSON(context.Background(), "db", "schema", "table", []byte("{\"id\":\"x\"}"))
 	var scopeErr *Error
 	require.ErrorAs(t, err, &scopeErr)
 	require.Equal(t, "column id is invalid", scopeErr.Error())
@@ -142,7 +142,7 @@ func TestAppendRowsPreservesRejectedDetails(t *testing.T) {
 	require.Equal(t, 1, requests)
 }
 
-func TestAppendRowsNeverRetriesUnknownOutcome(t *testing.T) {
+func TestAppendNDJSONNeverRetriesUnknownOutcome(t *testing.T) {
 	t.Parallel()
 
 	requests := 0
@@ -164,7 +164,7 @@ func TestAppendRowsNeverRetriesUnknownOutcome(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(client.Close)
 
-	_, err = client.appendRows(context.Background(), "db", "schema", "table", []byte("{}"))
+	_, err = client.appendNDJSON(context.Background(), "db", "schema", "table", []byte("{}"))
 	var scopeErr *Error
 	require.ErrorAs(t, err, &scopeErr)
 	require.Equal(t, "commit outcome is unavailable", scopeErr.Error())
@@ -173,7 +173,7 @@ func TestAppendRowsNeverRetriesUnknownOutcome(t *testing.T) {
 	require.Equal(t, 1, requests)
 }
 
-func TestAppendRowsTreatsInvalidSuccessAsUnknown(t *testing.T) {
+func TestAppendNDJSONTreatsInvalidSuccessAsUnknown(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -202,7 +202,7 @@ func TestAppendRowsTreatsInvalidSuccessAsUnknown(t *testing.T) {
 			client, err := NewClient(Config{Endpoint: server.URL})
 			require.NoError(t, err)
 			t.Cleanup(client.Close)
-			_, err = client.appendRows(context.Background(), "db", "schema", "table", []byte("{}"))
+			_, err = client.appendNDJSON(context.Background(), "db", "schema", "table", []byte("{}"))
 
 			var scopeErr *Error
 			require.ErrorAs(t, err, &scopeErr)
@@ -219,7 +219,7 @@ func TestAppendRowsTreatsInvalidSuccessAsUnknown(t *testing.T) {
 	}
 }
 
-func TestAppendRowsValidatesZeroRowSuccess(t *testing.T) {
+func TestAppendNDJSONValidatesZeroRowSuccess(t *testing.T) {
 	t.Parallel()
 
 	t.Run("explicit zero", func(t *testing.T) {
@@ -235,7 +235,7 @@ func TestAppendRowsValidatesZeroRowSuccess(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(client.Close)
 
-		result, err := client.appendRows(context.Background(), "db", "schema", "table", []byte("\n  \n"))
+		result, err := client.appendNDJSON(context.Background(), "db", "schema", "table", []byte("\n  \n"))
 		require.NoError(t, err)
 		require.Equal(t, AppendStateCommitted, result.AppendState)
 		require.Zero(t, result.NumRowsInserted)
@@ -257,7 +257,7 @@ func TestAppendRowsValidatesZeroRowSuccess(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(client.Close)
 
-		_, err = client.appendRows(context.Background(), "db", "schema", "table", []byte("\n  \n"))
+		_, err = client.appendNDJSON(context.Background(), "db", "schema", "table", []byte("\n  \n"))
 		var scopeErr *Error
 		require.ErrorAs(t, err, &scopeErr)
 		require.Equal(t, ErrorKindAppendRowsFailed, scopeErr.Kind)
@@ -268,7 +268,7 @@ func TestAppendRowsValidatesZeroRowSuccess(t *testing.T) {
 	})
 }
 
-func TestAppendRowsUnstructuredHTTPErrorIsUnknown(t *testing.T) {
+func TestAppendNDJSONUnstructuredHTTPErrorIsUnknown(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -282,7 +282,7 @@ func TestAppendRowsUnstructuredHTTPErrorIsUnknown(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(client.Close)
 
-	_, err = client.appendRows(context.Background(), "db", "schema", "table", []byte("{}"))
+	_, err = client.appendNDJSON(context.Background(), "db", "schema", "table", []byte("{}"))
 	var scopeErr *Error
 	require.ErrorAs(t, err, &scopeErr)
 	require.Equal(t, "upstream disconnected", scopeErr.Error())
@@ -290,7 +290,7 @@ func TestAppendRowsUnstructuredHTTPErrorIsUnknown(t *testing.T) {
 	require.False(t, scopeErr.Retryable)
 }
 
-func TestAppendRowsTransportAndReadErrorsPreserveCause(t *testing.T) {
+func TestAppendNDJSONTransportAndReadErrorsPreserveCause(t *testing.T) {
 	t.Parallel()
 
 	t.Run("transport", func(t *testing.T) {
@@ -305,7 +305,7 @@ func TestAppendRowsTransportAndReadErrorsPreserveCause(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = client.appendRows(context.Background(), "db", "schema", "table", []byte("{}"))
+		_, err = client.appendNDJSON(context.Background(), "db", "schema", "table", []byte("{}"))
 		var scopeErr *Error
 		require.ErrorAs(t, err, &scopeErr)
 		require.ErrorIs(t, scopeErr, transportErr)
@@ -329,7 +329,7 @@ func TestAppendRowsTransportAndReadErrorsPreserveCause(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = client.appendRows(context.Background(), "db", "schema", "table", []byte("{}"))
+		_, err = client.appendNDJSON(context.Background(), "db", "schema", "table", []byte("{}"))
 		var scopeErr *Error
 		require.ErrorAs(t, err, &scopeErr)
 		require.Equal(t, readErr.Error(), scopeErr.Error())
@@ -338,7 +338,7 @@ func TestAppendRowsTransportAndReadErrorsPreserveCause(t *testing.T) {
 	})
 }
 
-func TestAppendRowsReturnsPreCancelledContextUnchanged(t *testing.T) {
+func TestAppendNDJSONReturnsPreCancelledContextUnchanged(t *testing.T) {
 	t.Parallel()
 
 	requests := 0
@@ -353,7 +353,7 @@ func TestAppendRowsReturnsPreCancelledContextUnchanged(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = client.appendRows(ctx, "db", "schema", "table", []byte("{}"))
+	_, err = client.appendNDJSON(ctx, "db", "schema", "table", []byte("{}"))
 	require.Equal(t, context.Canceled, err)
 	require.Zero(t, requests)
 }
