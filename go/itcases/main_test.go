@@ -40,9 +40,12 @@ func NewClient(t testing.TB) *scopedb.Client {
 		return nil // unreachable
 	}
 
-	return scopedb.NewClient(&scopedb.Config{
+	client, err := scopedb.NewClient(scopedb.Config{
 		Endpoint: endpoint,
+		APIKey:   os.Getenv("SCOPEDB_API_KEY"),
 	})
+	require.NoError(t, err)
+	return client
 }
 
 func RandomName(t testing.TB) string {

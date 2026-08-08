@@ -4,10 +4,39 @@ All significant changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.6.0 (2026-08-08)
+
+### Breaking Changes
+
+* Redesigned `NewClient` to accept `Config` by value and return `(*Client, error)`; invalid endpoints now fail during construction.
+* Replaced the old data cable API with bounded `AppendStream` and `IngestStream` write paths.
+* Redesigned asynchronous statements around `StatementHandle.ID`, optional `LastStatus`, value-returning `Status`, and `Wait`, while retaining optional caller-provided IDs through `Statement.ID`.
+* Removed public result-format configuration; query results use the supported JSON wire format internally.
+* Replaced table schema discovery with `Table.Describe`, which returns the complete REST catalog resource.
+* Renamed the table helper's destination field from `Table` to `Name`.
+
+### New Features
+
+* Added `Client.Query` and expanded result conversion with `RawRows`, `ToObjects`, and `First` alongside `ToValues`.
+* Added structured statement failure details, complete pruning progress, and complete cancellation results.
+* Added paged and lazy-iterator REST catalog APIs for databases, schemas, and tables.
+* Added direct raw NDJSON table append through `Table.AppendNDJSON`, with committed, rejected, and unknown outcomes.
+* Added bounded concurrent `AppendStream` batching with strict and continue failure policies, local admission backpressure, delivery reports, and lifetime statistics.
+* Added bounded sequential `IngestStream` batching for transform-oriented JSON ingest.
+* Added finite, configurable per-attempt timeouts to both background write streams.
+* Added caller-provided HTTP client support while preserving caller ownership.
+* Added structured API errors with HTTP status, request ID, retry metadata, append details, and wrapped causes.
+
 ### Bug Fixes
 
 * Added the missing binary and null data type constants.
 * Fixed `ResultSet.ToValues` conversion for binary and interval columns.
+* Fixed result field decoding for the `data_type` wire field.
+* Fixed statement polling and terminal failure propagation.
+* Fixed cancellation races so cached finished status does not hide the result from `Wait`.
+* Prevented blocked `IngestStream` producers from being admitted after a terminal batch failure.
+* Preserved configured endpoint base paths and percent-encoded individual REST resource identifiers.
+* Kept REST and ScopeQL table destinations aligned when only a database is configured.
 
 ## v0.5.0 (2026-04-23)
 

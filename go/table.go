@@ -22,28 +22,23 @@ import (
 	"fmt"
 )
 
-// Table represents a table like object (table, view, etc.) in ScopeDB.
+// Table references a ScopeDB table.
 type Table struct {
 	c *Client
 
-	// Database is the name of the database.
-	//
-	// This is optional and may be empty.
+	// Database is the database name. Empty uses "scopedb" for REST APIs.
 	Database string
-	// Schema is the name of the schema.
-	//
-	// This is optional and may be empty. When Database is not empty,
-	// Schema must not be empty.
+	// Schema is the schema name. Empty uses "public" for REST APIs.
 	Schema string
-	// Table is the name of the table.
-	Table string
+	// Name is the name of the table.
+	Name string
 }
 
 // Table creates a new Table object with the given name.
 func (c *Client) Table(tableName string) *Table {
 	return &Table{
-		c:     c,
-		Table: tableName,
+		c:    c,
+		Name: tableName,
 	}
 }
 
@@ -56,57 +51,15 @@ func (t *Table) Drop(ctx context.Context) error {
 	return err
 }
 
-// TableSchema returns the schema of the table.
-//
-// This method issues a meta query to ScopeDB and blocks until the result is fetched.
-func (t *Table) TableSchema(ctx context.Context) (Schema, error) {
-	var dbName, schemaName, tableName string
-	if t.Database != "" {
-		dbName = quoteIdent(t.Database, '\'')
-	} else {
-		dbName = quoteIdent("scopedb", '\'')
-	}
-	if t.Schema != "" {
-		schemaName = quoteIdent(t.Schema, '\'')
-	} else {
-		schemaName = quoteIdent("public", '\'')
-	}
-	tableName = quoteIdent(t.Table, '\'')
+// Describe returns the complete REST catalog resource for this table.
+func (t *Table) Describe(ctx context.Context) (TableResource, error) {
+	return t.c.FetchTable(ctx, t.databaseName(), t.schemaName(), t.Name)
+}
 
-	r, err := t.c.Statement(fmt.Sprintf(`
-		FROM scopedb.system.columns
-		WHERE table_name = %s
-		  AND schema_name = %s
-		  AND database_name = %s
-		SELECT column_name, data_type
-	`, tableName, schemaName, dbName)).Execute(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var records [][]Value
-	if records, err = r.ToValues(); err != nil {
-		return nil, err
-	}
-	var schema Schema
-	for _, record := range records {
-		if len(record) != 2 {
-			return nil, fmt.Errorf("expected 2 columns, got %d", len(record))
-		}
-		name, ok := record[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("expected string, got %T", record[0])
-		}
-		dataType, ok := record[1].(string)
-		if !ok {
-			return nil, fmt.Errorf("expected string, got %T", record[1])
-		}
-		schema = append(schema, &FieldSchema{
-			Name: name,
-			Type: DataType(dataType),
-		})
-	}
-	return schema, nil
+// AppendNDJSON sends one caller-encoded NDJSON request to this table. The body
+// contains one JSON object per non-empty line, not a JSON array.
+func (t *Table) AppendNDJSON(ctx context.Context, ndjson []byte) (AppendRowsResult, error) {
+	return t.c.appendNDJSON(ctx, t.databaseName(), t.schemaName(), t.Name, ndjson)
 }
 
 // Identifier returns the quoted table identifier.
@@ -115,13 +68,28 @@ func (t *Table) Identifier() string {
 	if t.Database != "" {
 		b.WriteString(quoteIdent(t.Database, '`'))
 		b.WriteByte('.')
-	}
-	if t.Schema != "" {
+		b.WriteString(quoteIdent(t.schemaName(), '`'))
+		b.WriteByte('.')
+	} else if t.Schema != "" {
 		b.WriteString(quoteIdent(t.Schema, '`'))
 		b.WriteByte('.')
 	}
-	b.WriteString(quoteIdent(t.Table, '`'))
+	b.WriteString(quoteIdent(t.Name, '`'))
 	return b.String()
+}
+
+func (t *Table) databaseName() string {
+	if t.Database == "" {
+		return "scopedb"
+	}
+	return t.Database
+}
+
+func (t *Table) schemaName() string {
+	if t.Schema == "" {
+		return "public"
+	}
+	return t.Schema
 }
 
 func quoteIdent(s string, r rune) string {

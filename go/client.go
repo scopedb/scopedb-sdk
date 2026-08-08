@@ -23,38 +23,83 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/klauspost/compress/zstd"
 )
 
-// Client is the major entrance to construct structs for interacting with ScopeDB.
+// Client provides access to ScopeDB APIs.
 type Client struct {
-	config *Config
-	http   *httpClient
+	endpoint *url.URL
+	http     *httpClient
 }
 
 // NewClient creates a new ScopeDB client with the given configuration.
-func NewClient(config *Config) *Client {
+func NewClient(config Config) (*Client, error) {
+	endpoint, err := normalizeEndpoint(config.Endpoint)
+	if err != nil {
+		return nil, newError(
+			ErrorKindConfigInvalid,
+			fmt.Sprintf("invalid ScopeDB endpoint: %v", err),
+			err,
+		)
+	}
+
+	compression := requestCompression(config)
+	if compression != CompressionZstd && compression != CompressionGzip {
+		return nil, newError(
+			ErrorKindConfigInvalid,
+			fmt.Sprintf("unsupported compression: %q", compression),
+			nil,
+		)
+	}
+
+	standardClient := config.HTTPClient
+	owned := false
+	if standardClient == nil {
+		transport := independentDefaultTransport()
+		standardClient = &http.Client{Transport: transport}
+		owned = true
+	}
+
 	return &Client{
-		config: config,
+		endpoint: endpoint,
 		http: &httpClient{
-			client:        http.DefaultClient,
+			client:        standardClient,
 			authorization: bearerAuthorization(config),
-			compression:   requestCompression(config),
+			compression:   compression,
+			owned:         owned,
 		},
+	}, nil
+}
+
+func independentDefaultTransport() *http.Transport {
+	if transport, ok := http.DefaultTransport.(*http.Transport); ok && transport != nil {
+		return transport.Clone()
+	}
+
+	return &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: time.Second,
 	}
 }
 
-// Close closes the ScopeDB client and release all associated resources.
-//
-// You don't typically need to call this as the garbage collector will release
-// the resources when the connection is no longer referenced. However, it can be
-// useful to call this if you want to release the resources immediately.
+// Close releases idle connections owned by the client. It does not close a
+// caller-provided HTTP client.
 func (c *Client) Close() {
 	c.http.Close()
 }
@@ -64,6 +109,7 @@ type httpClient struct {
 	client        *http.Client
 	authorization string
 	compression   Compression
+	owned         bool
 }
 
 // doGet sends a GET request to the ScopeDB server.
@@ -72,9 +118,7 @@ func (c *httpClient) doGet(ctx context.Context, u *url.URL) (*http.Response, err
 	if err != nil {
 		return nil, err
 	}
-	c.applyAuthorization(req)
-	resp, err := c.client.Do(req)
-	return resp, err
+	return c.do(req)
 }
 
 // doPost sends a POST request to the ScopeDB server.
@@ -93,9 +137,12 @@ func (c *httpClient) doPost(ctx context.Context, u *url.URL, body []byte) (*http
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", string(compression))
 	req.Header.Set("X-ScopeDB-Uncompressed-Content-Length", strconv.Itoa(uncompressedContentLength))
+	return c.do(req)
+}
+
+func (c *httpClient) do(req *http.Request) (*http.Response, error) {
 	c.applyAuthorization(req)
-	resp, err := c.client.Do(req)
-	return resp, err
+	return c.client.Do(req)
 }
 
 func (c *httpClient) applyAuthorization(req *http.Request) {
@@ -105,27 +152,58 @@ func (c *httpClient) applyAuthorization(req *http.Request) {
 	req.Header.Set("Authorization", c.authorization)
 }
 
-// Close closes the HTTP client.
-//
-// You don't typically need to call this as the garbage collector will release
-// the resources when the client is no longer referenced. However, it can be
-// useful to call this if you want to release the resources immediately.
+// Close releases idle connections when this wrapper owns its HTTP client.
 func (c *httpClient) Close() {
-	c.client.CloseIdleConnections()
+	if c.owned {
+		c.client.CloseIdleConnections()
+	}
 }
 
-func bearerAuthorization(config *Config) string {
-	if config == nil || config.APIKey == "" {
+func bearerAuthorization(config Config) string {
+	if config.APIKey == "" {
 		return ""
 	}
 	return "Bearer " + config.APIKey
 }
 
-func requestCompression(config *Config) Compression {
-	if config == nil || config.Compression == "" {
+func requestCompression(config Config) Compression {
+	if config.Compression == "" {
 		return CompressionZstd
 	}
 	return config.Compression
+}
+
+func normalizeEndpoint(raw string) (*url.URL, error) {
+	endpoint, err := url.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	if endpoint.Scheme != "http" && endpoint.Scheme != "https" {
+		return nil, fmt.Errorf("endpoint scheme must be http or https")
+	}
+	if endpoint.Host == "" {
+		return nil, fmt.Errorf("endpoint host is required")
+	}
+	if endpoint.RawQuery != "" || endpoint.Fragment != "" {
+		return nil, fmt.Errorf("endpoint must not contain a query or fragment")
+	}
+	return endpoint, nil
+}
+
+func (c *Client) resourceURL(segments ...string) (*url.URL, error) {
+	rawPath := strings.TrimRight(c.endpoint.EscapedPath(), "/") + "/v1"
+	for _, segment := range segments {
+		rawPath += "/" + url.PathEscape(segment)
+	}
+	path, err := url.PathUnescape(rawPath)
+	if err != nil {
+		return nil, newError(ErrorKindConfigInvalid, "invalid ScopeDB endpoint path", err)
+	}
+
+	u := *c.endpoint
+	u.Path = path
+	u.RawPath = rawPath
+	return &u, nil
 }
 
 func compressRequestBody(body []byte, compression Compression) (bytes.Buffer, Compression, error) {
@@ -158,11 +236,15 @@ func compressRequestBody(body []byte, compression Compression) (bytes.Buffer, Co
 	return b, compression, nil
 }
 
+type resultFormat string
+
+const resultFormatJSON resultFormat = "json"
+
 type statementRequest struct {
 	StatementID *uuid.UUID   `json:"statement_id,omitempty"`
 	Statement   string       `json:"statement"`
 	ExecTimeout string       `json:"exec_timeout,omitempty"`
-	Format      ResultFormat `json:"format"`
+	Format      resultFormat `json:"format"`
 }
 
 type statementResponse struct {
@@ -173,6 +255,8 @@ type statementResponse struct {
 
 	// Message is set when the statement was failed or canceled.
 	Message *string `json:"message"`
+	// Error is set when the statement failed with structured details.
+	Error *StatementErrorDetails `json:"error"`
 
 	// ResultSet is set when the statement was successfully finished.
 	ResultSet *resultSet `json:"result_set"`
@@ -180,7 +264,7 @@ type statementResponse struct {
 
 type resultSet struct {
 	Metadata *resultSetMetadata `json:"metadata"`
-	Format   ResultFormat       `json:"format"`
+	Format   resultFormat       `json:"format"`
 	Rows     json.RawMessage    `json:"rows"`
 }
 
@@ -190,29 +274,34 @@ type resultSetMetadata struct {
 }
 
 type resultSetField struct {
-	Name     string `json:"name"`
-	DataType string `json:"data_Type"`
+	Name     string   `json:"name"`
+	DataType DataType `json:"data_type"`
 }
 
 func (rs *resultSet) toResultSet() *ResultSet {
+	if rs == nil || rs.Metadata == nil {
+		return nil
+	}
 	schema := make(Schema, len(rs.Metadata.Fields))
 	for i, field := range rs.Metadata.Fields {
+		if field == nil {
+			return nil
+		}
 		schema[i] = &FieldSchema{
 			Name: field.Name,
-			Type: DataType(field.DataType),
+			Type: field.DataType,
 		}
 	}
 
 	return &ResultSet{
 		TotalRows: rs.Metadata.NumRows,
 		Schema:    schema,
-		Format:    rs.Format,
 		rows:      rs.Rows,
 	}
 }
 
 func (c *Client) submitStatement(ctx context.Context, request *statementRequest) (*statementResponse, error) {
-	req, err := url.Parse(c.config.Endpoint + "/v1/statements")
+	req, err := c.resourceURL("statements")
 	if err != nil {
 		return nil, err
 	}
@@ -230,14 +319,14 @@ func (c *Client) submitStatement(ctx context.Context, request *statementRequest)
 	return checkStatementResponse(resp)
 }
 
-func (c *Client) fetchStatementResult(ctx context.Context, id uuid.UUID, format ResultFormat) (*statementResponse, error) {
-	req, err := url.Parse(c.config.Endpoint + "/v1/statements/" + id.String())
+func (c *Client) fetchStatementResult(ctx context.Context, id uuid.UUID) (*statementResponse, error) {
+	req, err := c.resourceURL("statements", id.String())
 	if err != nil {
 		return nil, err
 	}
 
 	q := req.Query()
-	q.Add("format", string(format))
+	q.Add("format", string(resultFormatJSON))
 	req.RawQuery = q.Encode()
 
 	resp, err := c.http.doGet(ctx, req)
@@ -248,13 +337,10 @@ func (c *Client) fetchStatementResult(ctx context.Context, id uuid.UUID, format 
 	return checkStatementResponse(resp)
 }
 
-type statementCancelResponse struct {
-	Status  StatementStatus `json:"status"`
-	Message string          `json:"message"`
-}
+type statementCancelResponse = StatementCancelResult
 
 func (c *Client) cancelStatement(ctx context.Context, statementID uuid.UUID) (*statementCancelResponse, error) {
-	req, err := url.Parse(c.config.Endpoint + "/v1/statements/" + statementID.String() + "/cancel")
+	req, err := c.resourceURL("statements", statementID.String(), "cancel")
 	if err != nil {
 		return nil, err
 	}
@@ -272,16 +358,8 @@ type writeFormat string
 // writeFormatJSON is to ingest rows as JSON lines.
 const writeFormatJSON writeFormat = "json"
 
-type writeType string
-
-const (
-	writeTypeCommitted writeType = "committed"
-	writeTypeBuffered  writeType = "buffered"
-)
-
 type ingestRequest struct {
 	Data      ingestData `json:"data"`
-	Type      writeType  `json:"type"`
 	Statement string     `json:"statement"`
 }
 
@@ -297,7 +375,7 @@ type ingestResponse struct {
 }
 
 func (c *Client) ingest(ctx context.Context, request *ingestRequest) (*ingestResponse, error) {
-	req, err := url.Parse(c.config.Endpoint + "/v1/ingest")
+	req, err := c.resourceURL("ingest")
 	if err != nil {
 		return nil, err
 	}
@@ -306,10 +384,13 @@ func (c *Client) ingest(ctx context.Context, request *ingestRequest) (*ingestRes
 	if err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	resp, err := c.http.doPost(ctx, req, body)
 	if err != nil {
-		return nil, err
+		return nil, unknownIngestCommitOutcomeError(nil, err)
 	}
 	defer sneakyBodyClose(resp.Body)
 	return checkIngestResponse(resp)

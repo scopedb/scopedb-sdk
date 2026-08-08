@@ -1,4 +1,4 @@
-[TestDataCable - 1]
+[TestIngestStream - 1]
 scopedb.Schema{
     &scopedb.FieldSchema{Name:"ts", Type:"timestamp"},
     &scopedb.FieldSchema{Name:"name", Type:"string"},
@@ -6,7 +6,7 @@ scopedb.Schema{
 }
 ---
 
-[TestDataCable - 2]
+[TestIngestStream - 2]
 [][]scopedb.Value{
     {
         time.Date(1970, time.January, 4, 15, 36, 0, 0, time.UTC),
