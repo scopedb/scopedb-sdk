@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-// Package main demonstrates transform-oriented JSON ingest.
+// Package main demonstrates the advanced IngestStream path for source JSON
+// that needs a server-side ScopeQL transformation before it matches a table.
+// Most applications should use Table.AppendStream.
 package main
 
 import (

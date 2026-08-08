@@ -48,13 +48,15 @@ same table:
 
 ## Choose a write journey
 
+For most application writes, start with `append_stream`. It accepts typed rows
+and owns their encoding, batching, backpressure, and request concurrency.
+
 | Example | Choose it when | Run |
 | --- | --- | --- |
-| [`append_ndjson`](append_ndjson) | The caller has encoded one exact raw NDJSON request body | `go run ./examples/append_ndjson` |
-| [`append_stream`](append_stream) | A fixed producer pool should feed asynchronous batches with strict delivery | `go run ./examples/append_stream` |
+| [`append_stream`](append_stream) | Typed application rows need asynchronous batching with strict delivery | `go run ./examples/append_stream` |
 | [`bulk_append`](patterns/bulk_append) | A backfill needs bounded memory and concurrent strict batches | `go run ./examples/patterns/bulk_append` |
 | [`telemetry`](patterns/telemetry) | Logs or events need non-blocking, observable best-effort delivery | `go run ./examples/patterns/telemetry` |
-| [`ingest_transform`](ingest_transform) | JSON records need a ScopeQL transformation before insertion | `go run ./examples/ingest_transform` |
+| [`append_ndjson`](append_ndjson) | The caller already owns one exact raw NDJSON request body | `go run ./examples/append_ndjson` |
 
 ## Delivery contract
 
@@ -62,8 +64,8 @@ same table:
   per non-empty line, not a JSON array.
 - `Table.AppendStream` accepts typed rows and owns their JSON encoding, batching,
   and concurrent request scheduling.
-- `AppendStream.Send`, `AppendStream.TrySend`, and `IngestStream.Send` confirm
-  local admission only. They do not confirm a remote commit.
+- `AppendStream.Send` and `AppendStream.TrySend` confirm local admission only.
+  They do not confirm a remote commit.
 - Append stream admission is safe for concurrent producers; use a fixed worker
   pool instead of starting one goroutine per row.
 - `TrySend` does not wait for stream capacity. Use it for latency-sensitive
@@ -80,10 +82,23 @@ same table:
   reconcile it or use an application-owned durable outbox.
 - Each background write request has a finite 30-second timeout by default. A
   timeout makes that request's commit outcome unknown.
-- An ingest result returned with an error counts only earlier confirmed
-  batches. It is not a safe offset for replaying the failing batch.
 - Concurrent append batches have no defined commit order. Set
   `MaxConcurrentBatches: 1` when request submission must be serial.
+
+## Advanced: server-side transformation
+
+Use [`ingest_transform`](ingest_transform) only when source JSON specifically
+needs a ScopeQL transformation before it can match the destination table. For
+normal typed events, use `Table.AppendStream`.
+
+```sh
+go run ./examples/ingest_transform
+```
+
+`IngestStream.Send` confirms local admission only. An ingest result returned
+with an error counts only earlier confirmed batches; it is not a safe offset
+for replaying the failing batch. Reconcile an unknown outcome before replaying
+records.
 
 ## Compile every example
 

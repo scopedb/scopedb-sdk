@@ -47,10 +47,10 @@ ExecTimeout are the only optional statement settings; omit ID to let ScopeDB
 generate it, and read the confirmed ID from StatementHandle.ID. Failed
 statements expose structured server error details on Error.StatementDetails.
 Catalog iterators lazily traverse REST pages. Table.Describe returns table
-metadata. Table.AppendNDJSON sends one caller-owned raw NDJSON request, while
-Table.AppendStream accepts typed rows and adds bounded asynchronous batching
-that is safe for concurrent producers. Client.IngestStream is the secondary
-path when input JSON needs a ScopeQL transformation before insertion.
+metadata. For application writes, Table.AppendStream is the recommended path:
+it accepts typed rows and adds bounded asynchronous batching that is safe for
+concurrent producers. Table.AppendNDJSON is the low-level path for one
+caller-owned raw NDJSON request.
 
 AppendStream.Send uses encoding/json and accepts typed structs and other values
 that encode as a top-level JSON object. Send does not validate the destination
@@ -59,10 +59,13 @@ settles: the stop policy returns the error, while continue mode reports failed
 rows in the delivery report and failure details in Stats().LastFailure.
 
 Stream Send methods confirm local admission only. Flush and Shutdown wait for
-the accepted prefix. AppendStream reports rejected and unknown outcomes;
-an IngestStream error can also follow a remote commit, so callers must
-reconcile before replaying the same records. A nonzero ingest result returned
-with an error covers only earlier confirmed batches, not a safe replay offset.
+the accepted prefix. AppendStream reports rejected and unknown outcomes.
+
+Client.IngestStream is an advanced path for source JSON that specifically needs
+a server-side ScopeQL transformation before it matches the destination table.
+An IngestStream error can follow a remote commit, so callers must reconcile
+before replaying the same records. A nonzero ingest result returned with an
+error covers only earlier confirmed batches, not a safe replay offset.
 
 ScopeQL is documented separately in the [quickstart], [query guide], and
 [language reference].

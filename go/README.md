@@ -3,9 +3,9 @@
 [![Apache License, Version 2.0](https://img.shields.io/:license-Apache%202-brightgreen.svg)](https://www.apache.org/licenses/LICENSE-2.0.txt)
 [![Go Reference](https://pkg.go.dev/badge/github.com/scopedb/scopedb-sdk/go.svg)](https://pkg.go.dev/github.com/scopedb/scopedb-sdk/go)
 
-The ScopeDB Go SDK supports ScopeQL statements, REST catalog discovery, direct
-raw NDJSON table appends, bounded asynchronous streaming writes, and
-transform-oriented JSON ingest.
+The ScopeDB Go SDK supports ScopeQL statements, REST catalog discovery, and
+bounded asynchronous streaming writes. For application writes, start with
+`Table.AppendStream`.
 
 ## Runtime and installation
 
@@ -183,38 +183,22 @@ fmt.Println(description.Columns)
 
 ## Streaming writes
 
-Table appends write rows to an existing destination table. `AppendStream` is
-the typed-row path: the SDK encodes each row and owns bounded asynchronous
-batching. Its current wire encoding is NDJSON, but callers do not construct the
-wire payload. Use `AppendNDJSON` only when the caller already owns a complete
-raw NDJSON request body. Evaluate the examples against an explicitly selected
+Table appends write rows to an existing destination table. For most
+applications, `AppendStream` is the recommended path: the SDK accepts typed
+rows and owns their encoding, bounded batching, backpressure, and request
+concurrency. Its current wire encoding is NDJSON, but callers do not construct
+the wire payload. Evaluate the examples against an explicitly selected
 disposable table before using a production destination.
 
-### Direct NDJSON append
+### Recommended: asynchronous append stream
 
-Use `AppendNDJSON` when the caller has already encoded one exact raw NDJSON
-request body and owns that request boundary. The body contains one JSON object
-per non-empty line, not a JSON array:
-
-```go
-ndjson := []byte("{\"id\":1,\"name\":\"first\"}\n{\"id\":2,\"name\":\"second\"}")
-result, err := table.AppendNDJSON(ctx, ndjson)
-if err != nil {
-	return err
-}
-fmt.Println("committed rows:", result.NumRowsInserted)
-```
-
-One request is limited to 16 MiB and 200,000 rows.
-
-### Asynchronous append stream
-
-Use `AppendStream` for continuous or large producers. Unlike the raw
-`AppendNDJSON` method, `Send` accepts typed rows and uses `encoding/json` to
-encode each value as one top-level JSON object. Standard JSON tags and custom
+Use `AppendStream` for normal application writes, including continuous and
+large producers. `Send` accepts typed rows and uses `encoding/json` to encode
+each value as one top-level JSON object. Standard JSON tags and custom
 `MarshalJSON` methods apply. The stream batches those objects by size or time,
 bounds pending bytes, and sends a bounded number of append requests
-concurrently.
+concurrently. The zero-value options use bounded defaults; override them only
+when the workload needs a different delivery policy or resource bound.
 
 ```go
 type Event struct {
@@ -222,14 +206,7 @@ type Event struct {
 	Name string `json:"name"`
 }
 
-stream, err := table.AppendStream(scopedb.AppendStreamOptions{
-	TargetBatchBytes:     4 * 1024 * 1024,
-	MaxBatchRows:         10_000,
-	FlushInterval:        time.Second,
-	MaxBufferedBytes:     64 * 1024 * 1024,
-	MaxConcurrentBatches: 4,
-	AttemptTimeout:       30 * time.Second,
-})
+stream, err := table.AppendStream(scopedb.AppendStreamOptions{})
 if err != nil {
 	return err
 }
@@ -336,52 +313,43 @@ An in-memory stream is not a durable queue. Use an application-owned outbox and
 a reconciliation path when payloads must survive process failure or unknown
 outcomes.
 
+### Low-level: direct NDJSON append
+
+Use `AppendNDJSON` only when the caller already owns one exact raw NDJSON body
+and its request boundary. The body contains one JSON object per non-empty line,
+not a JSON array:
+
+```go
+ndjson := []byte("{\"id\":1,\"name\":\"first\"}\n{\"id\":2,\"name\":\"second\"}")
+result, err := table.AppendNDJSON(ctx, ndjson)
+if err != nil {
+	return err
+}
+fmt.Println("committed rows:", result.NumRowsInserted)
+```
+
+One request is limited to 16 MiB and 200,000 rows.
+
 ### Choose a delivery path
 
 | Workload | Admission and delivery | Example |
 | --- | --- | --- |
-| One exact raw NDJSON payload | Caller encodes the body and owns the request boundary | [`append_ndjson`](examples/append_ndjson) |
-| Basic asynchronous batching | SDK owns batches; strict barriers | [`append_stream`](examples/append_stream) |
+| Normal typed application writes | SDK owns encoding and batches; strict barriers | [`append_stream`](examples/append_stream) |
 | Backfill or file import | Sequential producer admission and bounded concurrent batches | [`bulk_append`](examples/patterns/bulk_append) |
 | Long-running logs and events | Non-blocking continue mode with observable loss | [`telemetry`](examples/patterns/telemetry) |
-| ScopeQL transformation before insert | Sequential transform-oriented ingest | [`ingest_transform`](examples/ingest_transform) |
+| One exact raw NDJSON payload | Caller encodes the body and owns the request boundary | [`append_ndjson`](examples/append_ndjson) |
 
-## Transform-oriented ingest
+## Advanced: transform before writing
 
-`IngestStream` is the secondary write path for JSON records that need a ScopeQL
-transformation before insertion. Prefer `Table.AppendNDJSON` for a raw NDJSON
-request or `Table.AppendStream` for typed rows when records already match the
-destination table.
+Use `Client.IngestStream` only when source JSON specifically needs a server-side
+ScopeQL transformation before it can match the destination table. For normal
+typed events, shape the row in the producer and use `Table.AppendStream`. See
+the guarded [`ingest_transform`](examples/ingest_transform) example for the
+advanced path.
 
-```go
-stream, err := client.IngestStream(`
-	SELECT $0["ts"]::timestamp, $0["name"]::string
-	INSERT INTO public.events (occurred_at, name)
-`, scopedb.IngestStreamOptions{
-	AttemptTimeout: 30 * time.Second,
-})
-if err != nil {
-	return err
-}
-
-if err := stream.Send(ctx, map[string]any{
-	"ts":   "2026-08-08T12:00:00Z",
-	"name": "example",
-}); err != nil {
-	_, _ = stream.Shutdown(ctx)
-	return err
-}
-
-result, err := stream.Shutdown(ctx)
-if err != nil {
-	return err
-}
-fmt.Println("inserted rows:", result.NumRowsInserted)
-```
-
-`IngestStream.Send` also confirms local admission only. `Flush` and `Shutdown`
-wait for the accepted prefix to settle when they succeed. This path is
-sequential and fail-fast. If a remote ingest request returns an error, its
+This path is sequential and fail-fast. `IngestStream.Send` confirms local
+admission only, while `Flush` and `Shutdown` wait for the accepted prefix to
+settle when they succeed. If a remote ingest request returns an error, its
 commit outcome may be unknown. A nonzero result returned with that error counts
 only earlier confirmed batches; it is not a safe replay offset. Reconcile the
 failing batch before replaying records.
