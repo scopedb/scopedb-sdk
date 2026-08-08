@@ -224,7 +224,6 @@ func testIngestRequest() *ingestRequest {
 			Format: writeFormatJSON,
 			Rows:   `{"id":1}`,
 		},
-		Type:      writeTypeCommitted,
 		Statement: "SELECT $0 INSERT INTO events",
 	}
 }

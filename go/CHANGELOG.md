@@ -18,7 +18,7 @@ All significant changes to this project will be documented in this file.
 ### New Features
 
 * Added `Client.Query` and expanded result conversion with `RawRows`, `ToObjects`, and `First` alongside `ToValues`.
-* Added statement parallelism controls and complete cancellation results.
+* Added optional statement row and scan limits, structured statement failure details, complete pruning progress, and complete cancellation results.
 * Added paged and lazy-iterator REST catalog APIs for databases, schemas, and tables.
 * Added direct NDJSON table append with committed, rejected, and unknown outcomes.
 * Added bounded concurrent `AppendStream` batching with strict and continue failure policies, local admission backpressure, delivery reports, and lifetime statistics.
@@ -33,6 +33,8 @@ All significant changes to this project will be documented in this file.
 * Fixed `ResultSet.ToValues` conversion for binary and interval columns.
 * Fixed result field decoding for the `data_type` wire field.
 * Fixed statement polling and terminal failure propagation.
+* Fixed cancellation races so cached finished status does not hide the result from `Wait`.
+* Prevented blocked `IngestStream` producers from being admitted after a terminal batch failure.
 * Preserved configured endpoint base paths and percent-encoded individual REST resource identifiers.
 * Kept REST and ScopeQL table destinations aligned when only a database is configured.
 

@@ -241,11 +241,12 @@ type resultFormat string
 const resultFormatJSON resultFormat = "json"
 
 type statementRequest struct {
-	StatementID    *uuid.UUID   `json:"statement_id,omitempty"`
-	Statement      string       `json:"statement"`
-	ExecTimeout    string       `json:"exec_timeout,omitempty"`
-	MaxParallelism int          `json:"max_parallelism,omitempty"`
-	Format         resultFormat `json:"format"`
+	StatementID                 *uuid.UUID   `json:"statement_id,omitempty"`
+	Statement                   string       `json:"statement"`
+	ExecTimeout                 string       `json:"exec_timeout,omitempty"`
+	MaxTotalRows                *uint64      `json:"max_total_rows,omitempty"`
+	MaxScannedUncompressedBytes *uint64      `json:"max_scanned_uncompressed_bytes,omitempty"`
+	Format                      resultFormat `json:"format"`
 }
 
 type statementResponse struct {
@@ -256,6 +257,8 @@ type statementResponse struct {
 
 	// Message is set when the statement was failed or canceled.
 	Message *string `json:"message"`
+	// Error is set when the statement failed with structured details.
+	Error *StatementErrorDetails `json:"error"`
 
 	// ResultSet is set when the statement was successfully finished.
 	ResultSet *resultSet `json:"result_set"`
@@ -357,16 +360,8 @@ type writeFormat string
 // writeFormatJSON is to ingest rows as JSON lines.
 const writeFormatJSON writeFormat = "json"
 
-type writeType string
-
-const (
-	writeTypeCommitted writeType = "committed"
-	writeTypeBuffered  writeType = "buffered"
-)
-
 type ingestRequest struct {
 	Data      ingestData `json:"data"`
-	Type      writeType  `json:"type"`
 	Statement string     `json:"statement"`
 }
 

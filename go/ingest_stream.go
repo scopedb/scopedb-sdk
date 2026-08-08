@@ -501,10 +501,22 @@ func (s *ingestStreamInner) run() {
 				Format: writeFormatJSON,
 				Rows:   body.String(),
 			},
-			Type:      writeTypeCommitted,
 			Statement: s.config.statement,
 		})
 		cancelAttempt()
+		if err == nil && response.NumRowsInserted < 0 {
+			err = newError(
+				ErrorKindUnexpected,
+				"ingest response reported a negative inserted row count",
+				nil,
+			)
+		}
+		if err != nil {
+			// Publish the terminal failure before releasing capacity. Otherwise a
+			// sender blocked on the failed batch's reservation can acquire that
+			// capacity and report successful admission after the failure is known.
+			s.beginFailure(err)
+		}
 		for _, record := range batch {
 			record.reservation.release()
 		}
@@ -513,13 +525,6 @@ func (s *ingestStreamInner) run() {
 		stopTimer()
 		if err != nil {
 			return IngestResult{}, err
-		}
-		if response.NumRowsInserted < 0 {
-			return IngestResult{}, newError(
-				ErrorKindUnexpected,
-				"ingest response reported a negative inserted row count",
-				nil,
-			)
 		}
 		return IngestResult{NumRowsInserted: int64(response.NumRowsInserted)}, nil
 	}
@@ -596,11 +601,7 @@ func (s *ingestStreamInner) run() {
 }
 
 func (s *ingestStreamInner) fail(err error, result IngestResult) {
-	s.stateMu.Lock()
-	s.fatal = err
-	s.stateMu.Unlock()
-	s.failureOnce.Do(func() { close(s.failureDone) })
-	s.budget.close()
+	s.beginFailure(err)
 
 	// Stop further admissions after any sender that was already linearizing has
 	// observed failure and released the gate.
@@ -624,6 +625,16 @@ func (s *ingestStreamInner) fail(err error, result IngestResult) {
 			return
 		}
 	}
+}
+
+func (s *ingestStreamInner) beginFailure(err error) {
+	s.failureOnce.Do(func() {
+		s.stateMu.Lock()
+		s.fatal = err
+		s.stateMu.Unlock()
+		close(s.failureDone)
+		s.budget.close()
+	})
 }
 
 func (s *ingestStreamInner) finish(result IngestResult, err error) {

@@ -18,6 +18,7 @@ package scopedb
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -42,9 +43,14 @@ type Statement struct {
 	//
 	// Values use duration strings such as "1h".
 	ExecTimeout string
-	// MaxParallelism limits the statement's execution parallelism. Zero uses
-	// the server default.
-	MaxParallelism int
+	// MaxTotalRows limits the total number of rows the statement may process.
+	// Nil leaves the limit unset. A pointer to zero rejects statements that
+	// would process any rows.
+	MaxTotalRows *uint64
+	// MaxScannedUncompressedBytes limits the number of uncompressed bytes the
+	// statement may scan. Nil leaves the limit unset. A pointer to zero rejects
+	// statements that would scan any data.
+	MaxScannedUncompressedBytes *uint64
 }
 
 // Statement creates a new statement with the given ScopeQL statement.
@@ -59,19 +65,13 @@ func (c *Client) Query(ctx context.Context, scopeql string) (*ResultSet, error) 
 
 // Submit submits the statement to ScopeDB for execution.
 func (s *Statement) Submit(ctx context.Context) (*StatementHandle, error) {
-	if s.MaxParallelism < 0 {
-		return nil, newError(
-			ErrorKindConfigInvalid,
-			"statement MaxParallelism must not be negative",
-			nil,
-		)
-	}
 	resp, err := s.c.submitStatement(ctx, &statementRequest{
-		StatementID:    s.ID,
-		Statement:      s.stmt,
-		ExecTimeout:    s.ExecTimeout,
-		MaxParallelism: s.MaxParallelism,
-		Format:         resultFormatJSON,
+		StatementID:                 s.ID,
+		Statement:                   s.stmt,
+		ExecTimeout:                 s.ExecTimeout,
+		MaxTotalRows:                s.MaxTotalRows,
+		MaxScannedUncompressedBytes: s.MaxScannedUncompressedBytes,
+		Format:                      resultFormatJSON,
 	})
 	if err != nil {
 		return nil, err
@@ -95,10 +95,11 @@ func (s *Statement) Execute(ctx context.Context) (*ResultSet, error) {
 
 // StatementHandle is a handle to a statement that has been submitted to ScopeDB.
 type StatementHandle struct {
-	c            *Client
-	resp         *statementResponse
-	cancelResult *StatementCancelResult
-	id           uuid.UUID
+	c                      *Client
+	resp                   *statementResponse
+	cancelResult           *StatementCancelResult
+	cancelResultNeedsFetch bool
+	id                     uuid.UUID
 }
 
 // StatementHandle creates a new StatementHandle with the given ID.
@@ -116,11 +117,19 @@ func (h *StatementHandle) ID() uuid.UUID {
 
 // LastStatus returns the latest locally cached status without making a request.
 func (h *StatementHandle) LastStatus() *StatementStatus {
-	if h.resp == nil {
-		return nil
+	if h.resp != nil && h.resp.Status.Terminated() {
+		status := h.resp.Status
+		return &status
 	}
-	status := h.resp.Status
-	return &status
+	if h.cancelResult != nil && h.cancelResult.Status.Terminated() {
+		status := h.cancelResult.Status
+		return &status
+	}
+	if h.resp != nil {
+		status := h.resp.Status
+		return &status
+	}
+	return nil
 }
 
 // Progress returns the last seen progress of the statement.
@@ -149,6 +158,9 @@ func (h *StatementHandle) Status(ctx context.Context) (StatementStatus, error) {
 	if h.resp != nil && h.resp.Status.Terminated() {
 		return h.resp.Status, nil
 	}
+	if h.cancelResult != nil && h.cancelResult.Status.Terminated() {
+		return h.cancelResult.Status, nil
+	}
 
 	resp, err := h.c.fetchStatementResult(ctx, h.id)
 	if err != nil {
@@ -170,23 +182,49 @@ func (h *StatementHandle) Wait(ctx context.Context) (*ResultSet, error) {
 		if err != nil {
 			return nil, err
 		}
+		if h.cancelResultNeedsFetch &&
+			(status == StatementStatusFinished || status == StatementStatusFailed) {
+			resp, err := h.c.fetchStatementResult(ctx, h.id)
+			if err != nil {
+				return nil, err
+			}
+			if !resp.Status.Terminated() {
+				return nil, &Error{
+					Kind: ErrorKindUnexpected,
+					Message: fmt.Sprintf(
+						"statement cancel reported %s but fetched status is %s",
+						status,
+						resp.Status,
+					),
+				}
+			}
+			h.resp = resp
+			h.cancelResultNeedsFetch = false
+			continue
+		}
 
 		switch status {
 		case StatementStatusFinished:
 			result := h.ResultSet()
-			if result == nil {
-				return nil, &Error{
-					Kind:    ErrorKindUnexpected,
-					Message: "finished statement response has no result set",
-				}
+			if result != nil {
+				return result, nil
 			}
-			return result, nil
+			return nil, &Error{
+				Kind:    ErrorKindUnexpected,
+				Message: "finished statement response has no result set",
+			}
 		case StatementStatusFailed, StatementStatusCancelled:
 			message := fmt.Sprintf("statement is %s", status)
-			if h.resp != nil && h.resp.Message != nil {
+			if h.resp != nil && h.resp.Status == status && h.resp.Message != nil {
 				message = *h.resp.Message
+			} else if h.cancelResult != nil && h.cancelResult.Status == status {
+				message = h.cancelResult.Message
 			}
-			return nil, &Error{Kind: ErrorKindStatementFailed, Message: message}
+			failure := &Error{Kind: ErrorKindStatementFailed, Message: message}
+			if h.resp != nil && h.resp.Status == status {
+				failure.StatementDetails = h.resp.Error
+			}
+			return nil, failure
 		case StatementStatusPending, StatementStatusRunning:
 			// Keep polling below.
 		default:
@@ -225,6 +263,7 @@ func (h *StatementHandle) Cancel(ctx context.Context) (StatementCancelResult, er
 	if h.resp != nil && h.resp.Status.Terminated() {
 		result := h.cancelResultFromResponse()
 		h.cancelResult = &result
+		h.cancelResultNeedsFetch = false
 		return result, nil
 	}
 
@@ -236,15 +275,8 @@ func (h *StatementHandle) Cancel(ctx context.Context) (StatementCancelResult, er
 	result := *resp
 	if result.Status.Terminated() {
 		h.cancelResult = &result
-	}
-	if result.Status != StatementStatusFinished {
-		message := result.Message
-		h.resp = &statementResponse{
-			ID:      result.StatementID,
-			Created: result.CreatedAt,
-			Status:  result.Status,
-			Message: &message,
-		}
+		h.cancelResultNeedsFetch = result.Status == StatementStatusFinished ||
+			result.Status == StatementStatusFailed
 	}
 	return result, nil
 }
@@ -277,6 +309,36 @@ const (
 	// StatementStatusCancelled indicates the query is cancelled.
 	StatementStatusCancelled StatementStatus = "cancelled"
 )
+
+// StatementErrorCode identifies the reason a statement failed. Unknown values
+// are preserved for forward compatibility.
+type StatementErrorCode string
+
+const (
+	// StatementErrorCodePrepareError indicates that statement preparation failed.
+	StatementErrorCodePrepareError StatementErrorCode = "prepare_error"
+	// StatementErrorCodeExecuteError indicates that statement execution failed.
+	StatementErrorCodeExecuteError StatementErrorCode = "execute_error"
+	// StatementErrorCodePendingTimeout indicates that the statement timed out before execution.
+	StatementErrorCodePendingTimeout StatementErrorCode = "pending_timeout"
+	// StatementErrorCodeExecutionTimeout indicates that the statement exceeded its execution timeout.
+	StatementErrorCodeExecutionTimeout StatementErrorCode = "execution_timeout"
+	// StatementErrorCodeHeartbeatLost indicates that the statement worker stopped reporting progress.
+	StatementErrorCodeHeartbeatLost StatementErrorCode = "heartbeat_lost"
+	// StatementErrorCodeRowLimitExceeded indicates that the statement exceeded MaxTotalRows.
+	StatementErrorCodeRowLimitExceeded StatementErrorCode = "row_limit_exceeded"
+	// StatementErrorCodeScanLimitExceeded indicates that the statement exceeded MaxScannedUncompressedBytes.
+	StatementErrorCodeScanLimitExceeded StatementErrorCode = "scan_limit_exceeded"
+)
+
+// StatementErrorDetails contains the structured failure returned for a failed
+// statement. Details is code-specific JSON and is nil when the server did not
+// provide additional details.
+type StatementErrorDetails struct {
+	Code    StatementErrorCode `json:"code"`
+	Message string             `json:"message"`
+	Details json.RawMessage    `json:"details,omitempty"`
+}
 
 // Finished returns true if the statement is finished.
 func (s StatementStatus) Finished() bool {
@@ -320,7 +382,7 @@ type StatementProgress struct {
 	TotalCompressedBytes int64 `json:"total_compressed_bytes"`
 	// TotalUncompressedBytes denotes the estimated total number of uncompressed bytes to scan.
 	TotalUncompressedBytes int64 `json:"total_uncompressed_bytes"`
-	// TotalStages denotes the total number of stages executed.
+	// ScannedStages denotes the total number of stages executed.
 	ScannedStages int64 `json:"scanned_stages"`
 	// ScannedPartitions denotes the number of partitions scanned.
 	ScannedPartitions int64 `json:"scanned_partitions"`
@@ -330,4 +392,12 @@ type StatementProgress struct {
 	ScannedCompressedBytes int64 `json:"scanned_compressed_bytes"`
 	// ScannedUncompressedBytes denotes the number of uncompressed bytes scanned.
 	ScannedUncompressedBytes int64 `json:"scanned_uncompressed_bytes"`
+	// SkippedPartitions denotes the number of partitions skipped by pruning.
+	SkippedPartitions int64 `json:"skipped_partitions"`
+	// SkippedRows denotes the number of rows skipped by pruning.
+	SkippedRows int64 `json:"skipped_rows"`
+	// SkippedCompressedBytes denotes the number of compressed bytes skipped by pruning.
+	SkippedCompressedBytes int64 `json:"skipped_compressed_bytes"`
+	// SkippedUncompressedBytes denotes the number of uncompressed bytes skipped by pruning.
+	SkippedUncompressedBytes int64 `json:"skipped_uncompressed_bytes"`
 }

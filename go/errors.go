@@ -52,6 +52,9 @@ type Error struct {
 	RetryAfter    time.Duration
 	Retryable     bool
 	AppendDetails *AppendErrorDetails
+	// StatementDetails contains the structured server failure for a failed
+	// statement, when available.
+	StatementDetails *StatementErrorDetails
 
 	cause error
 }
@@ -221,14 +224,73 @@ func validateStatementResponse(resp *statementResponse) error {
 	switch resp.Status {
 	case StatementStatusPending,
 		StatementStatusRunning,
-		StatementStatusFailed,
 		StatementStatusCancelled:
 		return nil
+	case StatementStatusFailed:
+		if resp.Error == nil {
+			// Older servers returned only the top-level message.
+			return nil
+		}
+		return validateStatementError(resp.Error)
 	case StatementStatusFinished:
 		return validateFinishedResult(resp.ResultSet)
 	default:
 		return fmt.Errorf("unknown status %q", resp.Status)
 	}
+}
+
+func validateStatementError(statementError *StatementErrorDetails) error {
+	if statementError.Code == "" {
+		return fmt.Errorf("failed statement error has no code")
+	}
+	if statementError.Message == "" {
+		return fmt.Errorf("failed statement error has no message")
+	}
+
+	switch statementError.Code {
+	case StatementErrorCodeRowLimitExceeded:
+		return validateStatementLimitDetails(
+			statementError.Details,
+			"total_rows",
+			"max_total_rows",
+		)
+	case StatementErrorCodeScanLimitExceeded:
+		return validateStatementLimitDetails(
+			statementError.Details,
+			"scanned_uncompressed_bytes",
+			"max_scanned_uncompressed_bytes",
+		)
+	case StatementErrorCodePrepareError,
+		StatementErrorCodeExecuteError,
+		StatementErrorCodePendingTimeout,
+		StatementErrorCodeExecutionTimeout,
+		StatementErrorCodeHeartbeatLost:
+		return nil
+	default:
+		return nil
+	}
+}
+
+func validateStatementLimitDetails(details json.RawMessage, fields ...string) error {
+	if len(details) == 0 {
+		return fmt.Errorf("failed statement error has no details")
+	}
+
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(details, &object); err != nil || object == nil {
+		return fmt.Errorf("failed statement error details must be an object")
+	}
+	for _, field := range fields {
+		raw, ok := object[field]
+		if !ok {
+			return fmt.Errorf("failed statement error details has no %s", field)
+		}
+		var value *uint64
+		if err := json.Unmarshal(raw, &value); err != nil || value == nil {
+			return fmt.Errorf("failed statement error detail %s must be an unsigned integer", field)
+		}
+	}
+	return nil
 }
 
 func validateFinishedResult(result *resultSet) error {

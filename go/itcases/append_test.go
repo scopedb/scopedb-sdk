@@ -106,7 +106,6 @@ func TestTableAppendLifecycle(t *testing.T) {
 	require.True(t, found)
 
 	statement := client.Statement(fmt.Sprintf("FROM %s", table.Identifier()))
-	statement.MaxParallelism = 2
 	result, err := statement.Execute(ctx)
 	require.NoError(t, err)
 	rows, err := result.ToObjects()

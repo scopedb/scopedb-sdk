@@ -49,6 +49,11 @@ type AppendRowsResult struct {
 	NumRowsInserted int64       `json:"num_rows_inserted"`
 }
 
+type appendRowsResponse struct {
+	AppendState     AppendState `json:"append_state"`
+	NumRowsInserted *int64      `json:"num_rows_inserted"`
+}
+
 // AppendRowError describes a validation error for one row in an append request.
 type AppendRowError struct {
 	RowIndex uint64 `json:"row_index"`
@@ -130,25 +135,42 @@ func (c *Client) appendRows(
 		return AppendRowsResult{}, apiErr
 	}
 
-	var result AppendRowsResult
-	if err := json.Unmarshal(body, &result); err != nil {
+	var response appendRowsResponse
+	if err := json.Unmarshal(body, &response); err != nil {
 		return AppendRowsResult{}, appendUnknownError("failed to decode table append response", err, resp)
 	}
-	if result.AppendState != AppendStateCommitted {
+	if response.AppendState != AppendStateCommitted {
 		return AppendRowsResult{}, appendUnknownError(
 			"table append response did not confirm a committed outcome",
 			nil,
 			resp,
 		)
 	}
-	if result.NumRowsInserted != int64(numRows) {
+	if response.NumRowsInserted == nil {
+		return AppendRowsResult{}, appendUnknownError(
+			"table append response did not report the number of inserted rows",
+			nil,
+			resp,
+		)
+	}
+	if *response.NumRowsInserted < 0 {
+		return AppendRowsResult{}, appendUnknownError(
+			"table append response reported a negative number of inserted rows",
+			nil,
+			resp,
+		)
+	}
+	if *response.NumRowsInserted != int64(numRows) {
 		return AppendRowsResult{}, appendUnknownError(fmt.Sprintf(
 			"table append response reported %d inserted rows for a %d-row request",
-			result.NumRowsInserted,
+			*response.NumRowsInserted,
 			numRows,
 		), nil, resp)
 	}
-	return result, nil
+	return AppendRowsResult{
+		AppendState:     response.AppendState,
+		NumRowsInserted: *response.NumRowsInserted,
+	}, nil
 }
 
 func countAppendRows(ndjson []byte) int {

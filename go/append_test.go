@@ -182,6 +182,9 @@ func TestAppendRowsTreatsInvalidSuccessAsUnknown(t *testing.T) {
 	}{
 		{name: "malformed", body: "not-json"},
 		{name: "contradictory state", body: `{"append_state":"rejected","num_rows_inserted":0}`},
+		{name: "missing row count", body: `{"append_state":"committed"}`},
+		{name: "null row count", body: `{"append_state":"committed","num_rows_inserted":null}`},
+		{name: "negative row count", body: `{"append_state":"committed","num_rows_inserted":-1}`},
 		{name: "row count mismatch", body: `{"append_state":"committed","num_rows_inserted":2}`},
 	}
 	for _, test := range tests {
@@ -214,6 +217,55 @@ func TestAppendRowsTreatsInvalidSuccessAsUnknown(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAppendRowsValidatesZeroRowSuccess(t *testing.T) {
+	t.Parallel()
+
+	t.Run("explicit zero", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, err := io.WriteString(w, `{"append_state":"committed","num_rows_inserted":0}`)
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		client, err := NewClient(Config{Endpoint: server.URL})
+		require.NoError(t, err)
+		t.Cleanup(client.Close)
+
+		result, err := client.appendRows(context.Background(), "db", "schema", "table", []byte("\n  \n"))
+		require.NoError(t, err)
+		require.Equal(t, AppendStateCommitted, result.AppendState)
+		require.Zero(t, result.NumRowsInserted)
+	})
+
+	t.Run("missing row count", func(t *testing.T) {
+		t.Parallel()
+
+		requests := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			requests++
+			w.Header().Set("X-Request-ID", "missing-count-request")
+			_, err := io.WriteString(w, `{"append_state":"committed"}`)
+			require.NoError(t, err)
+		}))
+		defer server.Close()
+
+		client, err := NewClient(Config{Endpoint: server.URL})
+		require.NoError(t, err)
+		t.Cleanup(client.Close)
+
+		_, err = client.appendRows(context.Background(), "db", "schema", "table", []byte("\n  \n"))
+		var scopeErr *Error
+		require.ErrorAs(t, err, &scopeErr)
+		require.Equal(t, ErrorKindAppendRowsFailed, scopeErr.Kind)
+		require.Equal(t, AppendStateUnknown, scopeErr.AppendDetails.AppendState)
+		require.Equal(t, "missing-count-request", scopeErr.RequestID)
+		require.False(t, scopeErr.Retryable)
+		require.Equal(t, 1, requests)
+	})
 }
 
 func TestAppendRowsUnstructuredHTTPErrorIsUnknown(t *testing.T) {

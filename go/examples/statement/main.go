@@ -50,7 +50,10 @@ func run(ctx context.Context) error {
 		fmt.Printf("query result: %#v\n", row)
 	}
 
-	handle, err := client.Statement("SELECT 2 AS value").Submit(ctx)
+	statement := client.Statement("SELECT 2 AS value")
+	maxTotalRows := uint64(1)
+	statement.MaxTotalRows = &maxTotalRows
+	handle, err := statement.Submit(ctx)
 	if err != nil {
 		return err
 	}

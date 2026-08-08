@@ -509,7 +509,6 @@ func TestIngestStreamDefaultsAttemptTimeout(t *testing.T) {
 }
 
 type ingestStreamRequestPayload struct {
-	Type      string `json:"type"`
 	Statement string `json:"statement"`
 	Data      struct {
 		Format string `json:"format"`
@@ -523,9 +522,14 @@ func readIngestStreamRequest(t *testing.T, r *http.Request) ingestStreamRequestP
 	require.Equal(t, "/v1/ingest", r.URL.Path)
 	body, err := decodeCompressedRequestBody(r)
 	require.NoError(t, err)
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &fields))
+	require.Len(t, fields, 2)
+	require.Contains(t, fields, "data")
+	require.Contains(t, fields, "statement")
+	require.NotContains(t, fields, "type")
 	var request ingestStreamRequestPayload
 	require.NoError(t, json.Unmarshal(body, &request))
-	require.Equal(t, "committed", request.Type)
 	require.Equal(t, "json", request.Data.Format)
 	require.Equal(t, "SELECT $0 INSERT INTO events", request.Statement)
 	return request
