@@ -31,11 +31,6 @@ type Statement struct {
 
 	stmt string
 
-	// ID of the statement.
-	//
-	// If provided, the ID must be a UUID, and ScopeDB will use the provided ID;
-	// otherwise, ScopeDB will generate a random UUID for the statement submitted.
-	ID *uuid.UUID
 	// ExecTimeout is the maximum time allowed for statement execution.
 	//
 	// If the total execution time exceeds this value, the statement is failed
@@ -43,14 +38,6 @@ type Statement struct {
 	//
 	// Values use duration strings such as "1h".
 	ExecTimeout string
-	// MaxTotalRows limits the total number of rows the statement may process.
-	// Nil leaves the limit unset. A pointer to zero rejects statements that
-	// would process any rows.
-	MaxTotalRows *uint64
-	// MaxScannedUncompressedBytes limits the number of uncompressed bytes the
-	// statement may scan. Nil leaves the limit unset. A pointer to zero rejects
-	// statements that would scan any data.
-	MaxScannedUncompressedBytes *uint64
 }
 
 // Statement creates a new statement with the given ScopeQL statement.
@@ -66,12 +53,9 @@ func (c *Client) Query(ctx context.Context, scopeql string) (*ResultSet, error) 
 // Submit submits the statement to ScopeDB for execution.
 func (s *Statement) Submit(ctx context.Context) (*StatementHandle, error) {
 	resp, err := s.c.submitStatement(ctx, &statementRequest{
-		StatementID:                 s.ID,
-		Statement:                   s.stmt,
-		ExecTimeout:                 s.ExecTimeout,
-		MaxTotalRows:                s.MaxTotalRows,
-		MaxScannedUncompressedBytes: s.MaxScannedUncompressedBytes,
-		Format:                      resultFormatJSON,
+		Statement:   s.stmt,
+		ExecTimeout: s.ExecTimeout,
+		Format:      resultFormatJSON,
 	})
 	if err != nil {
 		return nil, err
@@ -325,9 +309,9 @@ const (
 	StatementErrorCodeExecutionTimeout StatementErrorCode = "execution_timeout"
 	// StatementErrorCodeHeartbeatLost indicates that the statement worker stopped reporting progress.
 	StatementErrorCodeHeartbeatLost StatementErrorCode = "heartbeat_lost"
-	// StatementErrorCodeRowLimitExceeded indicates that the statement exceeded MaxTotalRows.
+	// StatementErrorCodeRowLimitExceeded indicates that the statement exceeded a server-enforced row limit.
 	StatementErrorCodeRowLimitExceeded StatementErrorCode = "row_limit_exceeded"
-	// StatementErrorCodeScanLimitExceeded indicates that the statement exceeded MaxScannedUncompressedBytes.
+	// StatementErrorCodeScanLimitExceeded indicates that the statement exceeded a server-enforced scan limit.
 	StatementErrorCodeScanLimitExceeded StatementErrorCode = "scan_limit_exceeded"
 )
 

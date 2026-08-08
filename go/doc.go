@@ -42,15 +42,14 @@ Query waits for a statement result, which can be converted to keyed objects:
 	fmt.Println(rows)
 
 Use Statement.Submit when an application needs the statement ID, a local status
-snapshot, an explicit remote status request, or a separate wait. Optional
-statement row and scan limits use pointers to distinguish an unset limit from
-an explicit zero. Failed statements expose structured server error details on
-Error.StatementDetails. Catalog
-iterators lazily traverse REST pages. Table.Describe returns table metadata,
-Table.Append sends one caller-owned NDJSON request, and Table.AppendStream adds
-bounded asynchronous batching that is safe for concurrent producers.
-Client.IngestStream is the secondary path when input JSON needs a ScopeQL
-transformation before insertion.
+snapshot, an explicit remote status request, or a separate wait. ExecTimeout is
+the only optional statement execution setting. Failed statements expose
+structured server error details on Error.StatementDetails. Catalog iterators
+lazily traverse REST pages. Table.Describe returns table metadata, Table.Append
+sends one caller-owned NDJSON request, and Table.AppendStream adds bounded
+asynchronous batching that is safe for concurrent producers. Client.IngestStream
+is the secondary path when input JSON needs a ScopeQL transformation before
+insertion.
 
 Stream Send methods confirm local admission only. Flush and Shutdown wait for
 the accepted prefix. AppendStream reports rejected and unknown outcomes;

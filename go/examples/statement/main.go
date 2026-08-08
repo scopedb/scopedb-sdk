@@ -51,8 +51,7 @@ func run(ctx context.Context) error {
 	}
 
 	statement := client.Statement("SELECT 2 AS value")
-	maxTotalRows := uint64(1)
-	statement.MaxTotalRows = &maxTotalRows
+	statement.ExecTimeout = "30s"
 	handle, err := statement.Submit(ctx)
 	if err != nil {
 		return err

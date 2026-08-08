@@ -101,39 +101,26 @@ statement already finished or failed, `Wait` fetches the complete statement
 response needed for its result or structured failure details. A cancelled
 outcome uses the cancellation message directly.
 
-Set `Statement.ID` or `ExecTimeout` before `Submit` when a query needs those
-controls. Optional row and scan limits use pointers so an unset limit remains
-distinct from an explicit zero:
+Set `ExecTimeout` before `Submit` when a query needs a custom execution
+timeout:
 
 ```go
 statement := client.Statement("FROM events")
-maxRows := uint64(10_000)
-maxScannedBytes := uint64(64 * 1024 * 1024)
-statement.MaxTotalRows = &maxRows
-statement.MaxScannedUncompressedBytes = &maxScannedBytes
+statement.ExecTimeout = "30s"
 result, err := statement.Execute(ctx)
 ```
 
-A pointer to zero is a real limit and rejects a statement that would process
-rows or scan data. When `Wait` or `Execute` returns a `*scopedb.Error` with
-kind `ErrorKindStatementFailed`, `StatementDetails` preserves the server's
+When `Wait` or `Execute` returns a `*scopedb.Error` with kind
+`ErrorKindStatementFailed`, `StatementDetails` preserves the server's
 structured error code, message, and code-specific JSON details. The outer error
 message remains the server's top-level statement message:
 
 ```go
 var scopeErr *scopedb.Error
 if errors.As(err, &scopeErr) && scopeErr.StatementDetails != nil {
-	switch scopeErr.StatementDetails.Code {
-	case scopedb.StatementErrorCodeRowLimitExceeded:
-		var details struct {
-			TotalRows    uint64 `json:"total_rows"`
-			MaxTotalRows uint64 `json:"max_total_rows"`
-		}
-		if decodeErr := json.Unmarshal(scopeErr.StatementDetails.Details, &details); decodeErr != nil {
-			return decodeErr
-		}
-		fmt.Println("row limit:", details.TotalRows, details.MaxTotalRows)
-	}
+	fmt.Println("statement error code:", scopeErr.StatementDetails.Code)
+	fmt.Println("statement error:", scopeErr.StatementDetails.Message)
+	fmt.Println("details:", string(scopeErr.StatementDetails.Details))
 }
 ```
 

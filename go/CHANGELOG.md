@@ -11,6 +11,7 @@ All significant changes to this project will be documented in this file.
 * Redesigned `NewClient` to accept `Config` by value and return `(*Client, error)`; invalid endpoints now fail during construction.
 * Replaced the old data cable API with bounded `AppendStream` and `IngestStream` write paths.
 * Redesigned asynchronous statements around `StatementHandle.ID`, optional `LastStatus`, value-returning `Status`, and `Wait`.
+* Removed caller-provided statement IDs; submitted statements now receive server-generated IDs through `StatementHandle.ID`.
 * Removed public result-format configuration; query results use the supported JSON wire format internally.
 * Replaced table schema discovery with `Table.Describe`, which returns the complete REST catalog resource.
 * Renamed the table helper's destination field from `Table` to `Name`.
@@ -18,7 +19,7 @@ All significant changes to this project will be documented in this file.
 ### New Features
 
 * Added `Client.Query` and expanded result conversion with `RawRows`, `ToObjects`, and `First` alongside `ToValues`.
-* Added optional statement row and scan limits, structured statement failure details, complete pruning progress, and complete cancellation results.
+* Added structured statement failure details, complete pruning progress, and complete cancellation results.
 * Added paged and lazy-iterator REST catalog APIs for databases, schemas, and tables.
 * Added direct NDJSON table append with committed, rejected, and unknown outcomes.
 * Added bounded concurrent `AppendStream` batching with strict and continue failure policies, local admission backpressure, delivery reports, and lifetime statistics.

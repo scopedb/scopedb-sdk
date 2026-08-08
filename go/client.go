@@ -241,12 +241,9 @@ type resultFormat string
 const resultFormatJSON resultFormat = "json"
 
 type statementRequest struct {
-	StatementID                 *uuid.UUID   `json:"statement_id,omitempty"`
-	Statement                   string       `json:"statement"`
-	ExecTimeout                 string       `json:"exec_timeout,omitempty"`
-	MaxTotalRows                *uint64      `json:"max_total_rows,omitempty"`
-	MaxScannedUncompressedBytes *uint64      `json:"max_scanned_uncompressed_bytes,omitempty"`
-	Format                      resultFormat `json:"format"`
+	Statement   string       `json:"statement"`
+	ExecTimeout string       `json:"exec_timeout,omitempty"`
+	Format      resultFormat `json:"format"`
 }
 
 type statementResponse struct {

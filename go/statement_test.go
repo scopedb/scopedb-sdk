@@ -67,33 +67,22 @@ func TestClientQueryExecutesAndReturnsRows(t *testing.T) {
 	require.Equal(t, uint64(1), row["ready"])
 }
 
-func TestStatementSubmitSendsSupportedLimits(t *testing.T) {
+func TestStatementSubmitSendsOnlySupportedConfiguration(t *testing.T) {
 	t.Parallel()
 
-	zero := uint64(0)
-	rows := uint64(1_000)
-	bytes := uint64(2_000)
 	tests := []struct {
-		name      string
-		maxRows   *uint64
-		maxBytes  *uint64
-		wantRows  *uint64
-		wantBytes *uint64
+		name        string
+		execTimeout string
+		wantBody    string
 	}{
-		{name: "unset"},
 		{
-			name:      "explicit zero",
-			maxRows:   &zero,
-			maxBytes:  &zero,
-			wantRows:  &zero,
-			wantBytes: &zero,
+			name:     "default",
+			wantBody: `{"statement":"FROM events","format":"json"}`,
 		},
 		{
-			name:      "positive limits",
-			maxRows:   &rows,
-			maxBytes:  &bytes,
-			wantRows:  &rows,
-			wantBytes: &bytes,
+			name:        "execution timeout",
+			execTimeout: "1h",
+			wantBody:    `{"statement":"FROM events","exec_timeout":"1h","format":"json"}`,
 		},
 	}
 	for _, test := range tests {
@@ -105,17 +94,7 @@ func TestStatementSubmitSendsSupportedLimits(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				body, err := decodeCompressedRequestBody(r)
 				require.NoError(t, err)
-				var request map[string]json.RawMessage
-				require.NoError(t, json.Unmarshal(body, &request))
-				require.JSONEq(t, `"json"`, string(request["format"]))
-				require.NotContains(t, request, "max_parallelism")
-				assertOptionalUint64JSON(t, request, "max_total_rows", test.wantRows)
-				assertOptionalUint64JSON(
-					t,
-					request,
-					"max_scanned_uncompressed_bytes",
-					test.wantBytes,
-				)
+				require.JSONEq(t, test.wantBody, string(body))
 				writeTestJSON(t, w, `{
 					"statement_id":"`+statementID.String()+`",
 					"status":"running",
@@ -127,8 +106,7 @@ func TestStatementSubmitSendsSupportedLimits(t *testing.T) {
 
 			client := newTestClient(t, server.URL)
 			statement := client.Statement("FROM events")
-			statement.MaxTotalRows = test.maxRows
-			statement.MaxScannedUncompressedBytes = test.maxBytes
+			statement.ExecTimeout = test.execTimeout
 			handle, err := statement.Submit(context.Background())
 			require.NoError(t, err)
 			require.Equal(t, statementID, handle.ID())
@@ -685,22 +663,4 @@ func writeTestJSON(t *testing.T, w http.ResponseWriter, body string) {
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write([]byte(body))
 	require.NoError(t, err)
-}
-
-func assertOptionalUint64JSON(
-	t *testing.T,
-	request map[string]json.RawMessage,
-	field string,
-	want *uint64,
-) {
-	t.Helper()
-	value, ok := request[field]
-	if want == nil {
-		require.False(t, ok, "%s must be omitted", field)
-		return
-	}
-	require.True(t, ok, "%s must be present", field)
-	var got uint64
-	require.NoError(t, json.Unmarshal(value, &got))
-	require.Equal(t, *want, got)
 }
