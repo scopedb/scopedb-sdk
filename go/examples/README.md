@@ -7,7 +7,7 @@ the public SDK API.
 
 | Example | Shows | Run |
 | --- | --- | --- |
-| [`statement`](statement) | Query conversion, an execution timeout, and the asynchronous statement handle lifecycle | `go run ./examples/statement` |
+| [`statement`](statement) | Query conversion, an optional caller-provided ID and execution timeout, and the asynchronous statement handle lifecycle | `go run ./examples/statement` |
 | [`catalog`](catalog) | Lazy REST catalog pagination and table metadata | `go run ./examples/catalog` |
 
 The shared helper reads:

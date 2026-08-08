@@ -31,6 +31,10 @@ type Statement struct {
 
 	stmt string
 
+	// ID is an optional caller-provided statement ID.
+	//
+	// When nil, ScopeDB generates the statement ID.
+	ID *uuid.UUID
 	// ExecTimeout is the maximum time allowed for statement execution.
 	//
 	// If the total execution time exceeds this value, the statement is failed
@@ -53,6 +57,7 @@ func (c *Client) Query(ctx context.Context, scopeql string) (*ResultSet, error) 
 // Submit submits the statement to ScopeDB for execution.
 func (s *Statement) Submit(ctx context.Context) (*StatementHandle, error) {
 	resp, err := s.c.submitStatement(ctx, &statementRequest{
+		StatementID: s.ID,
 		Statement:   s.stmt,
 		ExecTimeout: s.ExecTimeout,
 		Format:      resultFormatJSON,

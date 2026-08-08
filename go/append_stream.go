@@ -407,8 +407,10 @@ type AppendStream struct {
 	shared appendSharedState
 }
 
-// Send serializes and admits one row, waiting for bounded local capacity.
-// Success does not confirm a remote commit.
+// Send serializes row with encoding/json and admits it, waiting for bounded
+// local capacity. Row may be a typed struct or any other value that encodes as
+// one top-level JSON object. Success does not validate the destination table
+// schema or confirm a remote commit.
 func (s *AppendStream) Send(ctx context.Context, row any) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -459,8 +461,10 @@ func (s *AppendStream) Send(ctx context.Context, row any) error {
 	return nil
 }
 
-// TrySend attempts local admission without waiting for capacity.
-// Success does not confirm a remote commit.
+// TrySend serializes row with encoding/json and attempts local admission
+// without waiting for capacity. Row must encode as one top-level JSON object.
+// Success does not validate the destination table schema or confirm a remote
+// commit.
 func (s *AppendStream) TrySend(row any) error {
 	if err := s.checkOpen(); err != nil {
 		s.noteDrop(appendDropClosed)

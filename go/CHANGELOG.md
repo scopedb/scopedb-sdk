@@ -10,8 +10,7 @@ All significant changes to this project will be documented in this file.
 
 * Redesigned `NewClient` to accept `Config` by value and return `(*Client, error)`; invalid endpoints now fail during construction.
 * Replaced the old data cable API with bounded `AppendStream` and `IngestStream` write paths.
-* Redesigned asynchronous statements around `StatementHandle.ID`, optional `LastStatus`, value-returning `Status`, and `Wait`.
-* Removed caller-provided statement IDs; submitted statements now receive server-generated IDs through `StatementHandle.ID`.
+* Redesigned asynchronous statements around `StatementHandle.ID`, optional `LastStatus`, value-returning `Status`, and `Wait`, while retaining optional caller-provided IDs through `Statement.ID`.
 * Removed public result-format configuration; query results use the supported JSON wire format internally.
 * Replaced table schema discovery with `Table.Describe`, which returns the complete REST catalog resource.
 * Renamed the table helper's destination field from `Table` to `Name`.

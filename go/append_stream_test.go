@@ -67,6 +67,50 @@ func TestAppendStreamBatchesByRowsAndBarrier(t *testing.T) {
 	}, bodies)
 }
 
+func TestAppendStreamSerializesTypedStructRows(t *testing.T) {
+	type event struct {
+		EventID    string    `json:"event_id"`
+		OccurredAt time.Time `json:"occurred_at"`
+		Name       string    `json:"name"`
+		Ignored    string    `json:"-"`
+	}
+
+	received := make(chan string, 1)
+	table := newAppendStreamTestTable(t, func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		received <- string(body)
+		writeAppendStreamSuccess(t, w, countAppendRows(body))
+	})
+	stream, err := table.AppendStream(AppendStreamOptions{
+		MaxBatchRows:         2,
+		FlushInterval:        time.Hour,
+		MaxConcurrentBatches: 1,
+	})
+	require.NoError(t, err)
+
+	occurredAt := time.Date(2026, time.August, 8, 12, 34, 56, 123456789, time.UTC)
+	first := event{
+		EventID:    "evt-1",
+		OccurredAt: occurredAt,
+		Name:       "checkout.completed",
+		Ignored:    "not-on-the-wire",
+	}
+	second := first
+	second.EventID = "evt-2"
+	require.NoError(t, stream.Send(context.Background(), first))
+	require.NoError(t, stream.Send(context.Background(), &second))
+
+	report, err := stream.Shutdown(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), report.CommittedRows)
+	require.Equal(t,
+		"{\"event_id\":\"evt-1\",\"occurred_at\":\"2026-08-08T12:34:56.123456789Z\",\"name\":\"checkout.completed\"}\n"+
+			"{\"event_id\":\"evt-2\",\"occurred_at\":\"2026-08-08T12:34:56.123456789Z\",\"name\":\"checkout.completed\"}",
+		<-received,
+	)
+}
+
 func TestAppendStreamFlushInterval(t *testing.T) {
 	requestStarted := make(chan struct{}, 1)
 	table := newAppendStreamTestTable(t, func(w http.ResponseWriter, r *http.Request) {

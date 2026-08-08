@@ -42,14 +42,21 @@ Query waits for a statement result, which can be converted to keyed objects:
 	fmt.Println(rows)
 
 Use Statement.Submit when an application needs the statement ID, a local status
-snapshot, an explicit remote status request, or a separate wait. ExecTimeout is
-the only optional statement execution setting. Failed statements expose
-structured server error details on Error.StatementDetails. Catalog iterators
-lazily traverse REST pages. Table.Describe returns table metadata, Table.Append
-sends one caller-owned NDJSON request, and Table.AppendStream adds bounded
-asynchronous batching that is safe for concurrent producers. Client.IngestStream
-is the secondary path when input JSON needs a ScopeQL transformation before
-insertion.
+snapshot, an explicit remote status request, or a separate wait. ID and
+ExecTimeout are the only optional statement settings; omit ID to let ScopeDB
+generate it, and read the confirmed ID from StatementHandle.ID. Failed
+statements expose structured server error details on Error.StatementDetails.
+Catalog iterators lazily traverse REST pages. Table.Describe returns table
+metadata, Table.Append sends one caller-owned NDJSON request, and
+Table.AppendStream adds bounded asynchronous batching that is safe for
+concurrent producers. Client.IngestStream is the secondary path when input JSON
+needs a ScopeQL transformation before insertion.
+
+AppendStream.Send uses encoding/json and accepts typed structs and other values
+that encode as a top-level JSON object. Send does not validate the destination
+table schema. ScopeDB validation failures surface when Flush or Shutdown
+settles: the stop policy returns the error, while continue mode reports failed
+rows in the delivery report and failure details in Stats().LastFailure.
 
 Stream Send methods confirm local admission only. Flush and Shutdown wait for
 the accepted prefix. AppendStream reports rejected and unknown outcomes;

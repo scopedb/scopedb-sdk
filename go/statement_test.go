@@ -70,8 +70,10 @@ func TestClientQueryExecutesAndReturnsRows(t *testing.T) {
 func TestStatementSubmitSendsOnlySupportedConfiguration(t *testing.T) {
 	t.Parallel()
 
+	providedID := uuid.MustParse("01989a4e-4ee2-7e63-87a5-65ac3b5161dc")
 	tests := []struct {
 		name        string
+		statementID *uuid.UUID
 		execTimeout string
 		wantBody    string
 	}{
@@ -84,19 +86,33 @@ func TestStatementSubmitSendsOnlySupportedConfiguration(t *testing.T) {
 			execTimeout: "1h",
 			wantBody:    `{"statement":"FROM events","exec_timeout":"1h","format":"json"}`,
 		},
+		{
+			name:        "provided statement ID",
+			statementID: &providedID,
+			wantBody:    `{"statement_id":"01989a4e-4ee2-7e63-87a5-65ac3b5161dc","statement":"FROM events","format":"json"}`,
+		},
+		{
+			name:        "provided statement ID and execution timeout",
+			statementID: &providedID,
+			execTimeout: "1h",
+			wantBody:    `{"statement_id":"01989a4e-4ee2-7e63-87a5-65ac3b5161dc","statement":"FROM events","exec_timeout":"1h","format":"json"}`,
+		},
 	}
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			statementID := uuid.New()
+			responseID := uuid.New()
+			if test.statementID != nil {
+				responseID = *test.statementID
+			}
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				body, err := decodeCompressedRequestBody(r)
 				require.NoError(t, err)
 				require.JSONEq(t, test.wantBody, string(body))
 				writeTestJSON(t, w, `{
-					"statement_id":"`+statementID.String()+`",
+					"statement_id":"`+responseID.String()+`",
 					"status":"running",
 					"created_at":"2026-08-08T00:00:00Z",
 					"progress":{}
@@ -106,10 +122,11 @@ func TestStatementSubmitSendsOnlySupportedConfiguration(t *testing.T) {
 
 			client := newTestClient(t, server.URL)
 			statement := client.Statement("FROM events")
+			statement.ID = test.statementID
 			statement.ExecTimeout = test.execTimeout
 			handle, err := statement.Submit(context.Background())
 			require.NoError(t, err)
-			require.Equal(t, statementID, handle.ID())
+			require.Equal(t, responseID, handle.ID())
 		})
 	}
 }

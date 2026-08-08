@@ -28,6 +28,15 @@ import (
 	"github.com/scopedb/scopedb-sdk/go/examples/internal/exampleutil"
 )
 
+// Event is one typed row written to the example destination table.
+type Event struct {
+	ID         int               `json:"id"`
+	EventID    string            `json:"event_id"`
+	OccurredAt time.Time         `json:"occurred_at"`
+	Name       string            `json:"name"`
+	Attributes map[string]string `json:"attributes,omitempty"`
+}
+
 func main() {
 	if err := run(context.Background()); err != nil {
 		log.Fatal(err)
@@ -73,12 +82,12 @@ func run(ctx context.Context) error {
 	fmt.Printf("flush committed %d of %d accepted rows\n", report.CommittedRows, report.AcceptedRows)
 
 	// Flush keeps the stream open, so later rows belong to the next barrier.
-	if err := stream.Send(ctx, map[string]any{
-		"id":          101,
-		"event_id":    fmt.Sprintf("go-stream-%d-101", now.UnixNano()),
-		"occurred_at": now.Format(time.RFC3339Nano),
-		"name":        "example.stream",
-		"attributes":  map[string]any{"source": "go"},
+	if err := stream.Send(ctx, Event{
+		ID:         101,
+		EventID:    fmt.Sprintf("go-stream-%d-101", now.UnixNano()),
+		OccurredAt: now,
+		Name:       "example.stream",
+		Attributes: map[string]string{"source": "go"},
 	}); err != nil {
 		_, _ = stream.Shutdown(ctx)
 		return err
@@ -106,12 +115,12 @@ func sendConcurrently(ctx context.Context, stream *scopedb.AppendStream, now tim
 		go func() {
 			defer producers.Done()
 			for id := producer + 1; id <= 100; id += producerCount {
-				row := map[string]any{
-					"id":          id,
-					"event_id":    fmt.Sprintf("go-stream-%d-%d", now.UnixNano(), id),
-					"occurred_at": now.Format(time.RFC3339Nano),
-					"name":        "example.stream",
-					"attributes":  map[string]any{"source": "go"},
+				row := Event{
+					ID:         id,
+					EventID:    fmt.Sprintf("go-stream-%d-%d", now.UnixNano(), id),
+					OccurredAt: now,
+					Name:       "example.stream",
+					Attributes: map[string]string{"source": "go"},
 				}
 				// Send is safe for concurrent producers and waits for bounded
 				// local capacity. It does not wait for a remote commit.

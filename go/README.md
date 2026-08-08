@@ -101,13 +101,21 @@ statement already finished or failed, `Wait` fetches the complete statement
 response needed for its result or structured failure details. A cancelled
 outcome uses the cancellation message directly.
 
-Set `ExecTimeout` before `Submit` when a query needs a custom execution
-timeout:
+`Statement.ID` and `Statement.ExecTimeout` are the only optional statement
+settings. Provide an ID when the application needs to choose the statement ID;
+otherwise ScopeDB generates one. `StatementHandle.ID()` always returns the ID
+confirmed by ScopeDB:
 
 ```go
 statement := client.Statement("FROM events")
+statementID := uuid.New()
+statement.ID = &statementID // Optional.
 statement.ExecTimeout = "30s"
-result, err := statement.Execute(ctx)
+handle, err := statement.Submit(ctx)
+if err != nil {
+	return err
+}
+fmt.Println("statement ID:", handle.ID())
 ```
 
 When `Wait` or `Execute` returns a `*scopedb.Error` with kind
@@ -197,11 +205,18 @@ One request is limited to 16 MiB and 200,000 rows.
 
 ### Asynchronous append stream
 
-Use `AppendStream` for continuous or large producers. It serializes each Go
-value as one JSON object, batches by size or time, bounds pending bytes, and
-sends a bounded number of append requests concurrently.
+Use `AppendStream` for continuous or large producers. `Send` uses
+`encoding/json` and accepts a typed struct, map, or other Go value that encodes
+as one top-level JSON object. Standard JSON tags and custom `MarshalJSON`
+methods apply. The stream batches those objects by size or time, bounds pending
+bytes, and sends a bounded number of append requests concurrently.
 
 ```go
+type Event struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
 stream, err := table.AppendStream(scopedb.AppendStreamOptions{
 	TargetBatchBytes:     4 * 1024 * 1024,
 	MaxBatchRows:         10_000,
@@ -214,11 +229,11 @@ if err != nil {
 	return err
 }
 
-for _, row := range []any{
-	map[string]any{"id": 1, "name": "first"},
-	map[string]any{"id": 2, "name": "second"},
+for _, event := range []Event{
+	{ID: 1, Name: "first"},
+	{ID: 2, Name: "second"},
 } {
-	if err := stream.Send(ctx, row); err != nil {
+	if err := stream.Send(ctx, event); err != nil {
 		_, _ = stream.Shutdown(ctx)
 		return err
 	}
@@ -240,6 +255,13 @@ return err
 the row entered the local stream; it does not confirm a remote commit. Feed
 large sources one row at a time instead of starting one goroutine per row,
 which would move an unbounded backlog outside the stream.
+
+JSON serialization validates only that each value encodes as an object. ScopeDB
+validates that object's fields and types against the destination table when it
+processes the batch. With the default stop policy, `Flush` or `Shutdown` returns
+the server error and structured row details. Continue mode reports failed rows
+through the barrier report and `Stats().LastFailure`. An earlier successful
+`Send` does not imply schema compatibility.
 
 `Send` and `TrySend` are safe for concurrent producers. When source-side work
 benefits from parallelism, use a fixed worker pool; the

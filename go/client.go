@@ -241,6 +241,7 @@ type resultFormat string
 const resultFormatJSON resultFormat = "json"
 
 type statementRequest struct {
+	StatementID *uuid.UUID   `json:"statement_id,omitempty"`
 	Statement   string       `json:"statement"`
 	ExecTimeout string       `json:"exec_timeout,omitempty"`
 	Format      resultFormat `json:"format"`
