@@ -2347,6 +2347,7 @@ mod tests {
                 request.headers.get("content-type").map(String::as_str),
                 Some("application/x-ndjson")
             );
+            assert!(!request.headers.contains_key("content-encoding"));
             assert_eq!(request.body.lines().count(), 1);
             assert!(request.body.starts_with('{'));
         }

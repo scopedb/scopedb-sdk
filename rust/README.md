@@ -34,6 +34,11 @@ http_client)` remains available when authentication is already configured on
 that client. Use the reqwest version re-exported as `scopedb_client::reqwest` to
 avoid dependency-version mismatches.
 
+Statement and transform-ingest JSON request bodies use zstd compression by
+default. The default HTTP client also negotiates compressed responses. Direct
+and streaming table appends remain identity-encoded as required by the table
+append API.
+
 The runnable examples read authentication from `SCOPEDB_API_KEY`. For backward
 compatibility, they fall back to `SCOPEDB_TOKEN` when the API key variable is
 unset or empty. The builder marks the resulting authorization header as
