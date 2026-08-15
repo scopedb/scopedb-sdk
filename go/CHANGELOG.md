@@ -4,6 +4,12 @@ All significant changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+* `AppendStream` request batches now use the client's configured compression,
+  which defaults to zstd. Direct `AppendNDJSON` requests remain
+  identity-encoded.
+
 ## v0.6.0 (2026-08-08)
 
 ### Breaking Changes

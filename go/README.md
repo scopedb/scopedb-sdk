@@ -37,6 +37,11 @@ timeouts, proxies, TLS, or connection pooling. `Client.Close` closes idle
 connections only for the HTTP client created by the SDK; it never closes a
 caller-provided client.
 
+Statement, transform-ingest, and `AppendStream` request bodies use zstd
+compression by default. Set `Config.Compression` to `CompressionGzip` when gzip
+is required. Direct caller-encoded `AppendNDJSON` requests remain
+identity-encoded.
+
 ## ScopeQL documentation
 
 The SDK executes ScopeQL but does not define the language. Start with the

@@ -304,7 +304,29 @@ impl Client {
         table: &str,
         ndjson: impl Into<String>,
     ) -> Result<AppendRowsResult, Error> {
-        let ndjson = ndjson.into();
+        self.append_rows_request(database, schema, table, ndjson.into(), false)
+            .await
+    }
+
+    pub(crate) async fn append_rows_compressed(
+        &self,
+        database: &str,
+        schema: &str,
+        table: &str,
+        ndjson: impl Into<String>,
+    ) -> Result<AppendRowsResult, Error> {
+        self.append_rows_request(database, schema, table, ndjson.into(), true)
+            .await
+    }
+
+    async fn append_rows_request(
+        &self,
+        database: &str,
+        schema: &str,
+        table: &str,
+        ndjson: String,
+        compressed: bool,
+    ) -> Result<AppendRowsResult, Error> {
         let expected_rows = ndjson
             .lines()
             .filter(|line| !line.trim().is_empty())
@@ -318,16 +340,27 @@ impl Client {
             table,
             "rows",
         ])?;
-        let response = self
+        let body = if compressed {
+            zstd::stream::encode_all(ndjson.as_bytes(), ZSTD_COMPRESSION_LEVEL).map_err(|err| {
+                Error::new(
+                    ErrorKind::Unexpected,
+                    "failed to compress table append request body",
+                )
+                .set_source(err)
+            })?
+        } else {
+            ndjson.into_bytes()
+        };
+        let mut request = self
             .request(Method::POST, url)
             .headers(traceparent_headers())
-            .header(reqwest::header::CONTENT_TYPE, "application/x-ndjson")
-            .body(ndjson)
-            .send()
-            .await
-            .map_err(|err| {
-                append_unknown_error("failed to send table append request").set_source(err)
-            })?;
+            .header(reqwest::header::CONTENT_TYPE, "application/x-ndjson");
+        if compressed {
+            request = request.header(reqwest::header::CONTENT_ENCODING, JSON_CONTENT_ENCODING);
+        }
+        let response = request.body(body).send().await.map_err(|err| {
+            append_unknown_error("failed to send table append request").set_source(err)
+        })?;
 
         let status = response.status();
         let headers = response.headers().clone();

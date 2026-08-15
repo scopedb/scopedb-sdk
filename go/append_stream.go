@@ -960,7 +960,7 @@ func (s *AppendStream) sendBatch(batch appendBatch) {
 		if s.config.attemptTimeout > 0 {
 			ctx, cancel = context.WithTimeout(ctx, s.config.attemptTimeout)
 		}
-		result, err = s.client.appendNDJSON(
+		result, err = s.client.appendNDJSONCompressed(
 			ctx,
 			s.database,
 			s.schema,

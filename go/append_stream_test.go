@@ -17,6 +17,7 @@
 package scopedb
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -827,7 +828,13 @@ func TestAppendStreamOptionValidation(t *testing.T) {
 
 func newAppendStreamTestTable(t *testing.T, handler http.HandlerFunc) *Table {
 	t.Helper()
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, string(CompressionZstd), r.Header.Get("Content-Encoding"))
+		body, err := decodeCompressedRequestBody(r)
+		require.NoError(t, err)
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		handler(w, r)
+	}))
 	t.Cleanup(server.Close)
 	client, err := NewClient(Config{Endpoint: server.URL})
 	require.NoError(t, err)
