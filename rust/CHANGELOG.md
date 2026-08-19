@@ -4,6 +4,13 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+### Changed
+
+* JSON request bodies and streaming table append batches now use zstd
+  compression by default, and the default HTTP client transparently negotiates
+  compressed responses. Direct caller-encoded table appends remain
+  identity-encoded.
+
 ## v0.3.0 (2026-08-06)
 
 ### Breaking Changes

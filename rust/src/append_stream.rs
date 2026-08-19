@@ -1743,7 +1743,7 @@ async fn append_batch(
     let mut retries = 0usize;
     let mut backoff = request.retry.initial_backoff;
     loop {
-        let append = request.client.append_rows(
+        let append = request.client.append_rows_compressed(
             &request.database,
             &request.schema,
             &request.table,
@@ -2162,10 +2162,13 @@ mod tests {
             }
             bytes.extend_from_slice(&buffer[..read]);
         }
-        let body = String::from_utf8(
-            bytes[header_end..header_end.saturating_add(content_length)].to_vec(),
-        )
-        .ok()?;
+        let wire_body = &bytes[header_end..header_end.saturating_add(content_length)];
+        let decoded_body = match headers.get("content-encoding").map(String::as_str) {
+            Some("zstd") => zstd::stream::decode_all(wire_body).ok()?,
+            None | Some("identity") => wire_body.to_vec(),
+            Some(_) => return None,
+        };
+        let body = String::from_utf8(decoded_body).ok()?;
         Some(RecordedRequest {
             target,
             headers,
@@ -2347,6 +2350,10 @@ mod tests {
                 request.headers.get("content-type").map(String::as_str),
                 Some("application/x-ndjson")
             );
+            assert_eq!(
+                request.headers.get("content-encoding").map(String::as_str),
+                Some("zstd")
+            );
             assert_eq!(request.body.lines().count(), 1);
             assert!(request.body.starts_with('{'));
         }
@@ -2393,13 +2400,12 @@ mod tests {
 
         client.table("events").append(r#"{"id":1}"#).await.unwrap();
 
+        let requests = server.requests();
         assert_eq!(
-            server.requests()[0]
-                .headers
-                .get("authorization")
-                .map(String::as_str),
+            requests[0].headers.get("authorization").map(String::as_str),
             Some("Bearer secret-api-key")
         );
+        assert!(!requests[0].headers.contains_key("content-encoding"));
     }
 
     #[tokio::test]

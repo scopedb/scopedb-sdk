@@ -75,6 +75,27 @@ func (c *Client) appendNDJSON(
 	table string,
 	ndjson []byte,
 ) (AppendRowsResult, error) {
+	return c.appendNDJSONRequest(ctx, database, schema, table, ndjson, false)
+}
+
+func (c *Client) appendNDJSONCompressed(
+	ctx context.Context,
+	database string,
+	schema string,
+	table string,
+	ndjson []byte,
+) (AppendRowsResult, error) {
+	return c.appendNDJSONRequest(ctx, database, schema, table, ndjson, true)
+}
+
+func (c *Client) appendNDJSONRequest(
+	ctx context.Context,
+	database string,
+	schema string,
+	table string,
+	ndjson []byte,
+	compressed bool,
+) (AppendRowsResult, error) {
 	if err := ctx.Err(); err != nil {
 		return AppendRowsResult{}, err
 	}
@@ -105,11 +126,29 @@ func (c *Client) appendNDJSON(
 	if err != nil {
 		return AppendRowsResult{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(ndjson))
+	body := ndjson
+	contentEncoding := Compression("")
+	if compressed {
+		compressedBody, encoding, err := compressRequestBody(ndjson, c.http.compression)
+		if err != nil {
+			return AppendRowsResult{}, newError(
+				ErrorKindUnexpected,
+				"failed to compress table append request body",
+				err,
+			)
+		}
+		body = compressedBody.Bytes()
+		contentEncoding = encoding
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
 	if err != nil {
 		return AppendRowsResult{}, newError(ErrorKindUnexpected, "failed to build table append request", err)
 	}
 	req.Header.Set("Content-Type", "application/x-ndjson")
+	if contentEncoding != "" {
+		req.Header.Set("Content-Encoding", string(contentEncoding))
+	}
 
 	resp, err := c.http.do(req)
 	if err != nil {
@@ -117,12 +156,12 @@ func (c *Client) appendNDJSON(
 	}
 	defer sneakyBodyClose(resp.Body)
 
-	body, err := io.ReadAll(resp.Body)
+	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return AppendRowsResult{}, appendUnknownError(err.Error(), err, resp)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		apiErr := responseError(resp, body, ErrorKindAppendRowsFailed)
+		apiErr := responseError(resp, responseBody, ErrorKindAppendRowsFailed)
 		if apiErr.AppendDetails == nil {
 			apiErr.AppendDetails = &AppendErrorDetails{
 				AppendState: AppendStateUnknown,
@@ -136,7 +175,7 @@ func (c *Client) appendNDJSON(
 	}
 
 	var response appendRowsResponse
-	if err := json.Unmarshal(body, &response); err != nil {
+	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return AppendRowsResult{}, appendUnknownError("failed to decode table append response", err, resp)
 	}
 	if response.AppendState != AppendStateCommitted {

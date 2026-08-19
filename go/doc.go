@@ -49,8 +49,9 @@ statements expose structured server error details on Error.StatementDetails.
 Catalog iterators lazily traverse REST pages. Table.Describe returns table
 metadata. For application writes, Table.AppendStream is the recommended path:
 it accepts typed rows and adds bounded asynchronous batching that is safe for
-concurrent producers. Table.AppendNDJSON is the low-level path for one
-caller-owned raw NDJSON request.
+concurrent producers. Its request batches use the client's configured
+compression, which defaults to zstd. Table.AppendNDJSON is the low-level path
+for one caller-owned, identity-encoded NDJSON request.
 
 AppendStream.Send uses encoding/json and accepts typed structs and other values
 that encode as a top-level JSON object. Send does not validate the destination

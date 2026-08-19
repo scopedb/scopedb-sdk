@@ -18,7 +18,10 @@ use reqwest::Method;
 use reqwest::StatusCode;
 use reqwest::Url;
 use reqwest::header::AUTHORIZATION;
+use reqwest::header::CONTENT_ENCODING;
+use reqwest::header::CONTENT_TYPE;
 use reqwest::header::HeaderValue;
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 use uuid::Uuid;
 
@@ -51,6 +54,10 @@ use crate::protocol::TableResource;
 use crate::protocol::TableResourceSummary;
 use crate::protocol::apply_response_metadata;
 use crate::statement::StatementHandle;
+
+const JSON_CONTENT_ENCODING: &str = "zstd";
+const UNCOMPRESSED_CONTENT_LENGTH: &str = "X-ScopeDB-Uncompressed-Content-Length";
+const ZSTD_COMPRESSION_LEVEL: i32 = 3;
 
 #[derive(Debug, Clone)]
 pub struct Client {
@@ -297,7 +304,29 @@ impl Client {
         table: &str,
         ndjson: impl Into<String>,
     ) -> Result<AppendRowsResult, Error> {
-        let ndjson = ndjson.into();
+        self.append_rows_request(database, schema, table, ndjson.into(), false)
+            .await
+    }
+
+    pub(crate) async fn append_rows_compressed(
+        &self,
+        database: &str,
+        schema: &str,
+        table: &str,
+        ndjson: impl Into<String>,
+    ) -> Result<AppendRowsResult, Error> {
+        self.append_rows_request(database, schema, table, ndjson.into(), true)
+            .await
+    }
+
+    async fn append_rows_request(
+        &self,
+        database: &str,
+        schema: &str,
+        table: &str,
+        ndjson: String,
+        compressed: bool,
+    ) -> Result<AppendRowsResult, Error> {
         let expected_rows = ndjson
             .lines()
             .filter(|line| !line.trim().is_empty())
@@ -311,16 +340,27 @@ impl Client {
             table,
             "rows",
         ])?;
-        let response = self
+        let body = if compressed {
+            zstd::stream::encode_all(ndjson.as_bytes(), ZSTD_COMPRESSION_LEVEL).map_err(|err| {
+                Error::new(
+                    ErrorKind::Unexpected,
+                    "failed to compress table append request body",
+                )
+                .set_source(err)
+            })?
+        } else {
+            ndjson.into_bytes()
+        };
+        let mut request = self
             .request(Method::POST, url)
             .headers(traceparent_headers())
-            .header(reqwest::header::CONTENT_TYPE, "application/x-ndjson")
-            .body(ndjson)
-            .send()
-            .await
-            .map_err(|err| {
-                append_unknown_error("failed to send table append request").set_source(err)
-            })?;
+            .header(reqwest::header::CONTENT_TYPE, "application/x-ndjson");
+        if compressed {
+            request = request.header(reqwest::header::CONTENT_ENCODING, JSON_CONTENT_ENCODING);
+        }
+        let response = request.body(body).send().await.map_err(|err| {
+            append_unknown_error("failed to send table append request").set_source(err)
+        })?;
 
         let status = response.status();
         let headers = response.headers().clone();
@@ -395,9 +435,8 @@ impl Client {
     ) -> Result<Response<StatementStatus>, Error> {
         let url = self.make_url("v1/statements")?;
         let response = self
-            .request(Method::POST, url)
+            .post_json(url, &request)?
             .headers(traceparent_headers())
-            .json(&request)
             .send()
             .await
             .map_err(|err| {
@@ -462,9 +501,8 @@ impl Client {
         let format = request.data.format();
         let url = self.make_url("v1/ingest")?;
         let response = self
-            .request(Method::POST, url)
+            .post_json(url, &request)?
             .headers(traceparent_headers())
-            .json(&request)
             .send()
             .await
             .map_err(|err| {
@@ -505,6 +543,36 @@ impl Client {
         } else {
             request
         }
+    }
+
+    fn post_json<T: Serialize>(
+        &self,
+        url: Url,
+        value: &T,
+    ) -> Result<reqwest::RequestBuilder, Error> {
+        let uncompressed = serde_json::to_vec(value).map_err(|err| {
+            Error::new(
+                ErrorKind::Unexpected,
+                "failed to serialize JSON request body",
+            )
+            .set_source(err)
+        })?;
+        let uncompressed_bytes = uncompressed.len();
+        let body = zstd::stream::encode_all(uncompressed.as_slice(), ZSTD_COMPRESSION_LEVEL)
+            .map_err(|err| {
+                Error::new(
+                    ErrorKind::Unexpected,
+                    "failed to compress JSON request body",
+                )
+                .set_source(err)
+            })?;
+
+        Ok(self
+            .request(Method::POST, url)
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_ENCODING, JSON_CONTENT_ENCODING)
+            .header(UNCOMPRESSED_CONTENT_LENGTH, uncompressed_bytes.to_string())
+            .body(body))
     }
 }
 
@@ -594,8 +662,11 @@ fn append_unknown_error(message: impl Into<String>) -> Error {
 mod tests {
     use reqwest::StatusCode;
     use reqwest::header::HeaderMap;
+    use serde_json::json;
 
     use super::Client;
+    use super::JSON_CONTENT_ENCODING;
+    use super::UNCOMPRESSED_CONTENT_LENGTH;
     use super::decode_append_response;
     use crate::ErrorKind;
     use crate::protocol::AppendState;
@@ -633,6 +704,37 @@ mod tests {
             .build()
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::ConfigInvalid);
+    }
+
+    #[test]
+    fn json_requests_use_zstd_by_default() {
+        let client = Client::new("https://example.com", reqwest::Client::new()).unwrap();
+        let value = json!({"statement": "SELECT 1", "format": "json"});
+        let expected = serde_json::to_vec(&value).unwrap();
+        let request = client
+            .post_json(client.make_url("v1/statements").unwrap(), &value)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert_eq!(
+            request
+                .headers()
+                .get(reqwest::header::CONTENT_ENCODING)
+                .unwrap(),
+            JSON_CONTENT_ENCODING
+        );
+        assert_eq!(
+            request
+                .headers()
+                .get(UNCOMPRESSED_CONTENT_LENGTH)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            expected.len().to_string()
+        );
+        let compressed = request.body().unwrap().as_bytes().unwrap();
+        assert_eq!(zstd::stream::decode_all(compressed).unwrap(), expected);
     }
 
     #[test]
