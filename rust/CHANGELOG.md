@@ -4,6 +4,8 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+## v0.3.1 (2026-08-20)
+
 ### Changed
 
 * JSON request bodies and streaming table append batches now use zstd

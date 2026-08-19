@@ -4,6 +4,8 @@ All significant changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.6.1 (2026-08-20)
+
 ### Changed
 
 * `AppendStream` request batches now use the client's configured compression,

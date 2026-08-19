@@ -1,7 +1,7 @@
 # Releasing the ScopeDB Go SDK
 
 The Go module lives in the repository's `go/` subdirectory, so release tags use
-the `go/vX.Y.Z` form. The examples below use `go/v0.6.0`.
+the `go/vX.Y.Z` form. The examples below use `go/v0.6.1`.
 
 ## Prepare and verify
 
@@ -39,7 +39,7 @@ Then, from the repository root, create the annotated submodule tag and push
 only that tag:
 
 ```sh
-version=v0.6.0
+version=v0.6.1
 git tag -a "go/$version" -m "Release $version for Go SDK"
 git push origin "go/$version"
 ```
@@ -56,7 +56,7 @@ module:
 release_tmp=$(mktemp -d)
 cd "$release_tmp"
 go mod init example.com/scopedb-release-check
-go get github.com/scopedb/scopedb-sdk/go@v0.6.0
+go get github.com/scopedb/scopedb-sdk/go@v0.6.1
 go list -m github.com/scopedb/scopedb-sdk/go
 go doc github.com/scopedb/scopedb-sdk/go
 ```

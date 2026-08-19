@@ -14,7 +14,7 @@
 
 [package]
 name = "scopedb-client"
-version = "0.3.0"
+version = "0.3.1"
 
 categories = ["database"]
 description = "A Rust client for ScopeDB"
