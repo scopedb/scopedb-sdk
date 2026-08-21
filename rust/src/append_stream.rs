@@ -40,14 +40,14 @@ use crate::Client;
 use crate::Error;
 use crate::ErrorKind;
 
-const MAX_APPEND_BODY_BYTES: usize = 16 * 1024 * 1024;
+const MAX_APPEND_BODY_BYTES: usize = 8 * 1024 * 1024;
 const MAX_APPEND_ROWS: usize = 200_000;
 const DEFAULT_BATCH_BYTES: usize = MAX_APPEND_BODY_BYTES;
 const DEFAULT_MAX_BATCH_ROWS: usize = MAX_APPEND_ROWS;
 const DEFAULT_FLUSH_INTERVAL: Duration = Duration::from_secs(1);
 const DEFAULT_CHANNEL_CAPACITY: usize = 1024;
 const DEFAULT_MAX_IN_FLIGHT_REQUESTS: usize = 4;
-const DEFAULT_MAX_PENDING_BYTES: usize = DEFAULT_BATCH_BYTES * DEFAULT_MAX_IN_FLIGHT_REQUESTS;
+const DEFAULT_MAX_PENDING_BYTES: usize = 64 * 1024 * 1024;
 const DEFAULT_MAX_RETRIES: usize = 8;
 const DEFAULT_INITIAL_BACKOFF: Duration = Duration::from_millis(100);
 const DEFAULT_MAX_BACKOFF: Duration = Duration::from_secs(5);
@@ -309,14 +309,14 @@ impl AppendStreamBuilder {
         self
     }
 
-    /// Sets the target NDJSON payload size. One row may exceed this target up to 16 MiB.
+    /// Sets the target NDJSON payload size. One row may exceed this target up to 8 MiB.
     #[deprecated(note = "use target_batch_bytes")]
     pub fn batch_bytes(mut self, batch_bytes: usize) -> Self {
         self.batch_bytes = batch_bytes;
         self
     }
 
-    /// Sets the target NDJSON payload size. One row may exceed this target up to 16 MiB.
+    /// Sets the target NDJSON payload size. One row may exceed this target up to 8 MiB.
     pub fn target_batch_bytes(mut self, target_batch_bytes: usize) -> Self {
         self.batch_bytes = target_batch_bytes;
         self
@@ -2292,6 +2292,30 @@ mod tests {
             Err(error) => error,
         };
         assert_eq!(error.kind(), ErrorKind::ConfigInvalid);
+    }
+
+    #[test]
+    fn append_stream_enforces_eight_mibibyte_request_limit() {
+        let result = Client::new("https://example.com", reqwest::Client::new())
+            .unwrap()
+            .table("events")
+            .append_stream()
+            .target_batch_bytes(MAX_APPEND_BODY_BYTES + 1)
+            .build();
+        let error = match result {
+            Ok(_) => panic!("oversized target_batch_bytes was accepted"),
+            Err(error) => error,
+        };
+        assert_eq!(error.kind(), ErrorKind::ConfigInvalid);
+
+        let row = serde_json::json!({"payload": "x".repeat(MAX_APPEND_BODY_BYTES)});
+        assert!(matches!(
+            prepare_record_for_try_send(&row),
+            Err(AppendTrySendError::RecordTooLarge {
+                limit: MAX_APPEND_BODY_BYTES,
+                ..
+            })
+        ));
     }
 
     #[test]

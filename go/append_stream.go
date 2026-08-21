@@ -27,11 +27,12 @@ import (
 )
 
 const (
-	defaultAppendTargetBatchBytes     = maxAppendBodyBytes
+	maxAppendStreamBodyBytes          = 8 * 1024 * 1024
+	defaultAppendTargetBatchBytes     = maxAppendStreamBodyBytes
 	defaultAppendMaxBatchRows         = maxAppendRows
 	defaultAppendFlushInterval        = time.Second
 	defaultAppendCommandCapacity      = 1024
-	defaultAppendMaxBufferedBytes     = maxAppendBodyBytes * 4
+	defaultAppendMaxBufferedBytes     = 64 * 1024 * 1024
 	defaultAppendMaxConcurrentBatches = 4
 	maxAppendConcurrentBatches        = 1024
 	defaultAppendMaxRetries           = 8
@@ -47,7 +48,7 @@ var (
 	ErrAppendStreamClosed = errors.New("append stream is closed")
 	// ErrAppendRowInvalid means a row did not encode to one JSON object.
 	ErrAppendRowInvalid = errors.New("append row must encode to a JSON object")
-	// ErrAppendRowTooLarge means one encoded row exceeds the append protocol limit.
+	// ErrAppendRowTooLarge means one encoded row exceeds the append stream request limit.
 	ErrAppendRowTooLarge = errors.New("append row exceeds the protocol limit")
 )
 
@@ -135,7 +136,7 @@ func (o AppendDeliveryOutcome) String() string {
 type AppendStreamOptions struct {
 	// FailurePolicy defaults to AppendFailureStop.
 	FailurePolicy AppendFailurePolicy
-	// TargetBatchBytes defaults to 16 MiB and cannot exceed the request limit.
+	// TargetBatchBytes defaults to 8 MiB and cannot exceed the request limit.
 	TargetBatchBytes int
 	// MaxBatchRows defaults to 200,000 and cannot exceed the request limit.
 	MaxBatchRows int
@@ -278,9 +279,9 @@ func normalizeAppendStreamOptions(options AppendStreamOptions) (normalizedAppend
 	if config.targetBatchBytes == 0 {
 		config.targetBatchBytes = defaultAppendTargetBatchBytes
 	}
-	if config.targetBatchBytes < 0 || config.targetBatchBytes > maxAppendBodyBytes {
+	if config.targetBatchBytes < 0 || config.targetBatchBytes > maxAppendStreamBodyBytes {
 		return config, appendStreamConfigError(
-			fmt.Sprintf("target batch bytes must be from 1 to %d", maxAppendBodyBytes),
+			fmt.Sprintf("target batch bytes must be from 1 to %d", maxAppendStreamBodyBytes),
 		)
 	}
 	if config.maxBatchRows == 0 {
@@ -773,8 +774,8 @@ func marshalAppendRecord(row any) ([]byte, error) {
 	if len(payload) == 0 || payload[0] != '{' {
 		return nil, ErrAppendRowInvalid
 	}
-	if len(payload) > maxAppendBodyBytes {
-		return nil, fmt.Errorf("%w: encoded row is %d bytes, limit is %d", ErrAppendRowTooLarge, len(payload), maxAppendBodyBytes)
+	if len(payload) > maxAppendStreamBodyBytes {
+		return nil, fmt.Errorf("%w: encoded row is %d bytes, limit is %d", ErrAppendRowTooLarge, len(payload), maxAppendStreamBodyBytes)
 	}
 	return payload, nil
 }

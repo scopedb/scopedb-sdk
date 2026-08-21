@@ -205,6 +205,9 @@ bounds pending bytes, and sends a bounded number of append requests
 concurrently. The zero-value options use bounded defaults; override them only
 when the workload needs a different delivery policy or resource bound.
 
+Each `AppendStream` request contains at most 8 MiB of uncompressed NDJSON and
+200,000 rows. The stream splits automatically at either limit.
+
 ```go
 type Event struct {
 	ID   int    `json:"id"`
