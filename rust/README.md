@@ -232,6 +232,10 @@ stream.shutdown().await?;
 # }
 ```
 
+Each `AppendStream` request contains at most 8 MiB of uncompressed NDJSON and
+200,000 rows. The stream splits automatically at either limit. Direct
+caller-encoded appends retain the endpoint's 16 MiB limit.
+
 `send()` and `send_all()` wait for local admission capacity only; they do not
 wait for a remote commit. Feed an iterator sequentially instead of spawning one
 task per row, which would move the unbounded backlog outside the stream.

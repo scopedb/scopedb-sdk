@@ -4,6 +4,10 @@ All significant changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+* `AppendStream` now caps each uncompressed NDJSON request at 8 MiB.
+
 ## v0.6.1 (2026-08-20)
 
 ### Changed

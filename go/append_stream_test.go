@@ -263,7 +263,7 @@ func TestAppendStreamRejectsNonObjectRows(t *testing.T) {
 	require.ErrorAs(t, sendErr, &scopeErr)
 	require.Equal(t, ErrorKindAppendRowsFailed, scopeErr.Kind)
 
-	tooLargeRow := map[string]string{"payload": strings.Repeat("x", maxAppendBodyBytes)}
+	tooLargeRow := map[string]string{"payload": strings.Repeat("x", maxAppendStreamBodyBytes)}
 	require.ErrorIs(t, stream.TrySend(tooLargeRow), ErrAppendRowTooLarge)
 	tooLargeErr := stream.Send(context.Background(), tooLargeRow)
 	require.ErrorIs(t, tooLargeErr, ErrAppendRowTooLarge)
@@ -793,7 +793,7 @@ func TestAppendStreamOptionValidation(t *testing.T) {
 	invalid := []AppendStreamOptions{
 		{FailurePolicy: AppendFailurePolicy(9)},
 		{TargetBatchBytes: -1},
-		{TargetBatchBytes: maxAppendBodyBytes + 1},
+		{TargetBatchBytes: maxAppendStreamBodyBytes + 1},
 		{MaxBatchRows: -1},
 		{MaxBatchRows: maxAppendRows + 1},
 		{FlushInterval: -1},
@@ -811,6 +811,8 @@ func TestAppendStreamOptionValidation(t *testing.T) {
 	}
 	defaults, err := normalizeAppendStreamOptions(AppendStreamOptions{})
 	require.NoError(t, err)
+	require.Equal(t, 8*1024*1024, defaults.targetBatchBytes)
+	require.Equal(t, 64*1024*1024, defaults.maxBufferedBytes)
 	require.Equal(t, defaultAppendAttemptTimeout, defaults.attemptTimeout)
 	require.Equal(t, "stop", AppendFailureStop.String())
 	require.Equal(t, "continue", AppendFailureContinue.String())
