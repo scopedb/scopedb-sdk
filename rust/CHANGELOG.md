@@ -4,6 +4,8 @@ All significant changes to the ScopeDB Rust SDK are documented in this file.
 
 ## Unreleased
 
+## v0.3.2 (2026-08-22)
+
 ### Changed
 
 * `AppendStream` now caps each uncompressed NDJSON request at 8 MiB.
